@@ -106,6 +106,7 @@ assistantMessage := (firstResponseJson at: 'choices') first at: 'message'.
     payload removeKey: 'tool_choice' ifAbsent: [].
 
     secondResponse := ZnClient new
+		  timeout: 3600;
         url: baseUrl;
         entity: (ZnEntity json: (STONJSON toString: payload));
         post.

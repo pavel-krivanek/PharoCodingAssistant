@@ -7,30 +7,35 @@ Class {
 
 { #category : 'definition' }
 PharoCAToolDefineClass class >> execute: args [
-	| result |
-	result := Smalltalk compiler evaluate: (args at: 'definition').
-	^ {
-		'status' -> 'ok'.
-		'result' -> result printString
-	} asDictionary
+	"Uses the modern Fluid Class Syntax"
+    | builder resolvedSuperclass |
+    resolvedSuperclass := self resolveClass: (args at: 'superclassName').
+    builder := resolvedSuperclass << (args at: 'className') asSymbol.
+    (args includesKey: 'slots') ifTrue: [ builder slots: (args at: 'slots') ].
+    (args includesKey: 'package') ifTrue: [ builder package: (args at: 'package') ].
+    builder install.
+    ^ { 'status' -> 'Class defined/modified' } asDictionary
 ]
 
 { #category : 'definition' }
 PharoCAToolDefineClass class >> toolDefinition [
 	^ {
-		'type' -> 'function'.
-		'function' -> {
-			'name' -> 'define_class'.
-			'description' -> 'Defines a class by evaluating a class definition expression (e.g., Object subclass: #Foo ...).'.
-			'parameters' -> {
-				'type' -> 'object'.
-				'properties' -> {
-					'definition' -> { 'type' -> 'string' } asDictionary
-				} asDictionary.
-				'required' -> #('definition')
-			} asDictionary
-		} asDictionary
-	} asDictionary.
+        'type' -> 'function'.
+        'function' -> {
+            'name' -> 'define_class'.
+            'description' -> 'Creates or modifies a class using Fluid syntax.'.
+            'parameters' -> {
+                'type' -> 'object'.
+                'properties' -> { 
+                    'className' -> { 'type' -> 'string' } asDictionary.
+                    'superclassName' -> { 'type' -> 'string' } asDictionary.
+                    'slots' -> { 'type' -> 'string' } asDictionary.
+                    'package' -> { 'type' -> 'string' } asDictionary.
+                } asDictionary.
+                'required' -> #('className' 'superclassName' 'package')
+            } asDictionary
+        } asDictionary
+    } asDictionary.
 ]
 
 { #category : 'definition' }
