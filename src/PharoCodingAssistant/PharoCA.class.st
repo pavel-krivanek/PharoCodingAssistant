@@ -18,7 +18,7 @@ PharoCA >> prompt: prompt [
 
 baseUrl := 'http://localhost:1234/v1/chat/completions'.
 modelName := 'local-model'.
-maxIterations := 10.
+maxIterations := 50.
 iterations := 0.
 
 toolActions := Dictionary new.
