@@ -8,6 +8,7 @@ Class {
 { #category : 'definition' }
 PharoCAToolCompileMethod class >> execute: args [
 	| aClass classSymbol side targetClass source protocol selector |
+
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
 		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary
