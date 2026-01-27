@@ -1,3 +1,6 @@
+"
+Utility class providing tools for interacting with the Pharo Coding Assistant environment, including methods for inspecting and modifying classes, packages, and code.
+"
 Class {
 	#name : 'PharoCAToolSetClassComment',
 	#superclass : 'PharoCATool',
@@ -7,13 +10,13 @@ Class {
 
 { #category : 'as yet unclassified' }
 PharoCAToolSetClassComment class >> execute: args [
-	| aClass classSymbol |
+	| aClass classSymbol newComment |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary
-	].
-	aClass comment: (args at: 'comment').
-	^ { 'status' -> 'ok' } asDictionary
+		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary].
+	newComment := args at: 'comment'.
+	aClass comment: newComment.
+	^ { 'result' -> 'Comment set successfully' } asDictionary.
 ]
 
 { #category : 'as yet unclassified' }
