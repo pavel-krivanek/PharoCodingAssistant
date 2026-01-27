@@ -8,7 +8,8 @@ Class {
 { #category : 'definition' }
 PharoCAToolListImplementors class >> execute: args [
 	| sel refs items |
-	sel := (args at: 'selector') asSymbol.
+	sel := (args at: 'selector').
+ 	sel := (sel withoutPrefix: '#') asSymbol.
 	refs := SystemNavigation default allImplementorsOf: sel.
 
 	items := (refs collect: [ :ref |
