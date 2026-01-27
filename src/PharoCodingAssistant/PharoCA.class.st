@@ -13,90 +13,89 @@ PharoCA >> enabledTolls [
 
 { #category : 'as yet unclassified' }
 PharoCA >> prompt: prompt [
-    "--- Configuration ---"
-    | baseUrl modelName tools toolActions messages payload response assistantMessage finalText iterations maxIterations |
-    
-    baseUrl := 'http://localhost:1234/v1/chat/completions'. 
-    modelName := 'local-model'. 
-    maxIterations := 10. "Safety guard"
-    iterations := 0.
 
-    "--- Tool Implementation Mapping ---"
-    toolActions := Dictionary new.
-    self enabledTolls do: [ :tool |
-        toolActions at: tool toolName put: [ :args | tool execute: args ]
-    ].
+| baseUrl modelName tools toolActions messages payload response parsed choice assistantMessage finishReason finalText iterations maxIterations toolCalls |
 
-    "--- Tool Definitions (JSON Schema) ---"
-    tools := (self enabledTolls collect: [ :each | each toolDefinition ]) asArray.
+baseUrl := 'http://localhost:1234/v1/chat/completions'.
+modelName := 'local-model'.
+maxIterations := 10.
+iterations := 0.
 
-    "--- Initial Messages ---"
-    messages := OrderedCollection new.
-    messages add: { 
-        'role' -> 'system'. 
-        'content' -> 'You are a Pharo Smalltalk coding assistant. You have tools to inspect and modify the system. Use them to answer user requests.' 
+toolActions := Dictionary new.
+self enabledTolls do: [ :tool |
+    toolActions at: tool toolName put: [ :args | tool execute: args ]
+].
+
+tools := (self enabledTolls collect: [ :each | each toolDefinition ]) asArray.
+
+messages := OrderedCollection new.
+messages add: {
+    'role' -> 'system'.
+    'content' -> 'You are a Pharo Smalltalk coding assistant. You have tools to inspect and modify the system. Use them to answer user requests.'
+} asDictionary.
+messages add: { 'role' -> 'user'. 'content' -> prompt } asDictionary.
+
+[
+    iterations := iterations + 1.
+
+    payload := {
+        'model' -> modelName.
+        'messages' -> messages asArray.
+        'tools' -> tools.
+        'tool_choice' -> 'auto'.
+        'temperature' -> 0.0
     } asDictionary.
 
-    messages add: { 
-        'role' -> 'user'. 
-        'content' -> prompt 
-    } asDictionary.
+    Transcript show: '>>> Sending Request (Turn ', iterations printString, ')...'; cr.
 
-    "--- Main Agent Loop ---"
-    [
-        iterations := iterations + 1.
-        
-        payload := { 
-            'model' -> modelName.
-            'messages' -> messages asArray.
-            'tools' -> tools.
-            'tool_choice' -> 'auto'.
-            'temperature' -> 0.0
-        } asDictionary.
+    response := ZnClient new
+        timeout: 3600;
+        url: baseUrl;
+        entity: (ZnEntity json: (STONJSON toString: payload));
+        post.
 
-        Transcript show: '>>> Sending Request (Turn ', iterations printString, ')...'; cr.
+    parsed := STONJSON fromString: response.
+    choice := (parsed at: 'choices') first.
+    assistantMessage := choice at: 'message'.
+    finishReason := choice at: 'finish_reason'.
 
-        response := ZnClient new
-            timeout: 3600;
-            url: baseUrl;
-            entity: (ZnEntity json: (STONJSON toString: payload));
-            post.
+    "Record assistant response"
+    messages add: assistantMessage.
 
-        assistantMessage := ((STONJSON fromString: response) at: 'choices') first at: 'message'.
-        
-        "Always record the assistant's response in history"
-        messages add: assistantMessage.
+    toolCalls := assistantMessage at: 'tool_calls' ifAbsent: [ #() ].
 
-        "Check if we should continue (does the assistant want to call tools?)"
-        (assistantMessage includesKey: 'tool_calls') and: [ iterations < maxIterations ]
-    ] whileTrue: [
-        Transcript show: '>>> Tool Calls Detected'; cr.
+    (finishReason = 'tool_calls')
+        and: (toolCalls notEmpty 
+        and: [ iterations < maxIterations ])
+] whileTrue: [
+    Transcript show: '>>> Tool Calls Detected'; cr.
 
-        (assistantMessage at: 'tool_calls') do: [ :tc |
-            | functionName toolArgs toolResult resultJson |
-            functionName := (tc at: 'function') at: 'name'.
-            toolArgs := STONJSON fromString: ((tc at: 'function') at: 'arguments').
-            
-            Transcript show: 'Executing: ', functionName; cr.
-            
-            [
-                toolResult := (toolActions at: functionName) value: toolArgs.
-            ] on: Error do: [ :err |
-                toolResult := { 'error' -> err description } asDictionary.
-            ].
-            
-            resultJson := STONJSON toString: toolResult.
-            
-            messages add: { 
-                'role' -> 'tool'.
-                'tool_call_id' -> (tc at: 'id').
-                'content' -> resultJson
-            } asDictionary.
+    toolCalls do: [ :tc |
+        | functionName toolArgs toolResult resultJson |
+        functionName := (tc at: 'function') at: 'name'.
+        toolArgs := STONJSON fromString: ((tc at: 'function') at: 'arguments').
+
+        Transcript show: 'Executing: ', functionName; cr.
+
+        [
+            toolResult := (toolActions at: functionName) value: toolArgs.
+        ] on: Error do: [ :err |
+            toolResult := { 'error' -> err description } asDictionary.
         ].
-    ].
 
-    "--- Final Output ---"
-    finalText := assistantMessage at: 'content' ifAbsent: [ 'Task completed via tool calls.' ].
-    Transcript show: '=== Final Answer ==='; cr; show: finalText; cr.
-    ^ finalText
+        resultJson := STONJSON toString: toolResult.
+
+        messages add: {
+            'role' -> 'tool'.
+            'tool_call_id' -> (tc at: 'id').
+            'content' -> resultJson
+        } asDictionary.
+    ].
+].
+
+finalText := assistantMessage at: 'content' ifAbsent: [ '' ].
+finalText isEmpty ifTrue: [ finalText := 'Task completed via tool calls.' ].
+
+Transcript show: '=== Final Answer ==='; cr; show: finalText; cr.
+^ finalText
 ]
