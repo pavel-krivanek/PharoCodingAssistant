@@ -11,6 +11,12 @@ PharoCATool class >> execute: args [
 	self subclassResponsibility 
 ]
 
+{ #category : 'definition' }
+PharoCATool class >> isEnabled [ 
+
+	^ false
+]
+
 { #category : 'as yet unclassified' }
 PharoCATool class >> resolveClass: className [
 

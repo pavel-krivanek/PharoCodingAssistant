@@ -7,13 +7,27 @@ Class {
 
 { #category : 'TOREMOVE' }
 PharoCAToolDoIt class >> execute: args [
-
-	^ { 'result' -> (Smalltalk compiler evaluate: (args at: 'code')) } asDictionary 
-
+	Smalltalk compiler evaluate: (args at: 'code').
+	^ { 'status' -> 'ok' } asDictionary
 ]
 
 { #category : 'TOREMOVE' }
-PharoCAToolDoIt class >> toolName [ 
+PharoCAToolDoIt class >> toolDefinition [
+	^ {
+		'type' -> 'function'.
+		'function' -> {
+			'name' -> 'evaluate'.
+			'description' -> 'Evaluates Pharo code (DoIt). Returns status only.'.
+			'parameters' -> {
+				'type' -> 'object'.
+				'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary.
+				'required' -> #('code')
+			} asDictionary
+		} asDictionary
+	} asDictionary.
+]
 
-	^ #evaluate_expression
+{ #category : 'TOREMOVE' }
+PharoCAToolDoIt class >> toolName [
+	^ #evaluate
 ]
