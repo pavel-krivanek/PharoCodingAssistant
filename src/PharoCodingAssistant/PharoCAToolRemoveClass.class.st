@@ -17,6 +17,11 @@ PharoCAToolRemoveClass class >> execute: args [
 ]
 
 { #category : 'definition' }
+PharoCAToolRemoveClass class >> isEnabled [ 
+	^ false
+]
+
+{ #category : 'definition' }
 PharoCAToolRemoveClass class >> toolDefinition [
 	^ {
 		'type' -> 'function'.

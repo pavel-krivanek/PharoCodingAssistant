@@ -22,12 +22,16 @@ PharoCAToolListMethods class >> execute: args [
 
 	selectors := targetClass selectors.
 	protocol ifNotNil: [
-		selectors := (targetClass organization listAtCategoryNamed: protocol) ifNil: [ #() ].
+		| proto |
+		proto :=  targetClass protocolNamed: protocol ifAbsent: [ nil ].
+		proto ifNotNil: [ 
+			selectors := proto methodSelectors.
+		]
 	].
 
 	methods := (selectors asSortedCollection collect: [ :sel |
 		| cat |
-		cat := targetClass organization categoryOfElement: sel.
+		cat := (targetClass methodNamed: sel asSymbol) protocolName. 
 		{
 			'selector' -> sel asString.
 			'protocol' -> (cat ifNil: [ '' ])
