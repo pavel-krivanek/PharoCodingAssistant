@@ -1,3 +1,6 @@
+"
+Returns the superclass chain and subclasses for a given class.
+"
 Class {
 	#name : 'PharoCAToolGetClassHierarchy',
 	#superclass : 'PharoCATool',

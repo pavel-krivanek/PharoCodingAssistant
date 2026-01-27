@@ -1,3 +1,6 @@
+"
+Lists classes defined in a specified package.
+"
 Class {
 	#name : 'PharoCAToolListClassesInPackage',
 	#superclass : 'PharoCATool',

@@ -1,3 +1,6 @@
+"
+Creates or modifies a class using Fluid syntax.
+"
 Class {
 	#name : 'PharoCAToolDefineClass',
 	#superclass : 'PharoCATool',

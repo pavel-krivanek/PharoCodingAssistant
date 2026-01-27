@@ -1,3 +1,6 @@
+"
+Tool to compile a method into a class, handling instance/class side and protocol assignment.
+"
 Class {
 	#name : 'PharoCAToolCompileMethod',
 	#superclass : 'PharoCATool',

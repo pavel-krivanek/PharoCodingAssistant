@@ -1,3 +1,6 @@
+"
+Abstract superclass for all assistant tool commands, defining common behavior and interface.
+"
 Class {
 	#name : 'PharoCATool',
 	#superclass : 'Object',

@@ -1,5 +1,5 @@
 "
-Utility class providing tools for interacting with the Pharo Coding Assistant environment, including methods for inspecting and modifying classes, packages, and code.
+Sets the comment/description for a given class.
 "
 Class {
 	#name : 'PharoCAToolSetClassComment',

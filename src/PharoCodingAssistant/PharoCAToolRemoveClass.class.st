@@ -1,3 +1,6 @@
+"
+Removes a class from the system.
+"
 Class {
 	#name : 'PharoCAToolRemoveClass',
 	#superclass : 'PharoCATool',

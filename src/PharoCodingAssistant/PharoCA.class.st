@@ -1,3 +1,6 @@
+"
+Main entry point for the Pharo Coding Assistant, providing high‑level utilities and coordination of assistant tools.
+"
 Class {
 	#name : 'PharoCA',
 	#superclass : 'Object',
@@ -91,6 +94,7 @@ messages add: { 'role' -> 'user'. 'content' -> prompt } asDictionary.
             'content' -> resultJson
         } asDictionary.
     ].
+	World doOneCycle.
 ].
 
 finalText := assistantMessage at: 'content' ifAbsent: [ '' ].

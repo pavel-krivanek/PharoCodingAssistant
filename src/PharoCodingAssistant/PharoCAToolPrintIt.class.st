@@ -1,3 +1,6 @@
+"
+Tool to evaluate Pharo code and return its printString result.
+"
 Class {
 	#name : 'PharoCAToolPrintIt',
 	#superclass : 'PharoCATool',

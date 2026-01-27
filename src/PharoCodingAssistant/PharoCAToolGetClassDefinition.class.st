@@ -1,3 +1,6 @@
+"
+Provides the class definition string for a given class name.
+"
 Class {
 	#name : 'PharoCAToolGetClassDefinition',
 	#superclass : 'PharoCATool',

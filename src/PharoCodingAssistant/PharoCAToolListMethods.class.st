@@ -1,3 +1,6 @@
+"
+Lists methods of a class, optionally filtered by protocol and side.
+"
 Class {
 	#name : 'PharoCAToolListMethods',
 	#superclass : 'PharoCATool',

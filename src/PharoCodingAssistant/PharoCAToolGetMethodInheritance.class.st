@@ -1,3 +1,6 @@
+"
+Finds where a selector is implemented in the superclass chain and returns its source.
+"
 Class {
 	#name : 'PharoCAToolGetMethodInheritance',
 	#superclass : 'PharoCATool',

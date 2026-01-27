@@ -1,3 +1,6 @@
+"
+Tool to evaluate arbitrary Pharo code (DoIt) within the CAT environment.
+"
 Class {
 	#name : 'PharoCAToolDoIt',
 	#superclass : 'PharoCATool',

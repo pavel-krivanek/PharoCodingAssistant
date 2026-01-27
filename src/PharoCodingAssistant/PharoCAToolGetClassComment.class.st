@@ -1,3 +1,6 @@
+"
+Retrieves the comment/description of a class.
+"
 Class {
 	#name : 'PharoCAToolGetClassComment',
 	#superclass : 'PharoCATool',
