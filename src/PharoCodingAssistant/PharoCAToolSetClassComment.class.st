@@ -26,8 +26,8 @@ PharoCAToolSetClassComment class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'className' -> { 'type' -> 'string' }.
-					'comment' -> { 'type' -> 'string' }
+					'className' -> { 'type' -> 'string' } asDictionary.
+					'comment' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('className' 'comment')
 			} asDictionary

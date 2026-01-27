@@ -26,7 +26,7 @@ PharoCAToolRemoveClass class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'className' -> { 'type' -> 'string' }
+					'className' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('className')
 			} asDictionary

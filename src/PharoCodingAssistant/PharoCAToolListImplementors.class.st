@@ -34,7 +34,7 @@ PharoCAToolListImplementors class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'selector' -> { 'type' -> 'string' }
+					'selector' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('selector')
 			} asDictionary

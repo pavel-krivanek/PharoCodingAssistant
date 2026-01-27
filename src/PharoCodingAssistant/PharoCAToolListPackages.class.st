@@ -21,7 +21,7 @@ PharoCAToolListPackages class >> toolDefinition [
 			'description' -> 'Lists package names from PackageOrganizer default.'.
 			'parameters' -> {
 				'type' -> 'object'.
-				'properties' -> { } asDictionary.
+				'properties' -> { } asDictionary asDictionary.
 				'required' -> #()
 			} asDictionary
 		} asDictionary

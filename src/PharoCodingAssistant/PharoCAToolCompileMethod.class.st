@@ -40,10 +40,10 @@ PharoCAToolCompileMethod class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'className' -> { 'type' -> 'string' }.
-					'side' -> { 'type' -> 'string' }.
-					'source' -> { 'type' -> 'string' }.
-					'protocol' -> { 'type' -> 'string' }
+					'className' -> { 'type' -> 'string' } asDictionary.
+					'side' -> { 'type' -> 'string' } asDictionary.
+					'source' -> { 'type' -> 'string' } asDictionary.
+					'protocol' -> { 'type' -> 'string' }  asDictionary
 				} asDictionary.
 				'required' -> #('className' 'source')
 			} asDictionary

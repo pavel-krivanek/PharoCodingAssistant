@@ -25,7 +25,7 @@ PharoCAToolDefineClass class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'definition' -> { 'type' -> 'string' }
+					'definition' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('definition')
 			} asDictionary

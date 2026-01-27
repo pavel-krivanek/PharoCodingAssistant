@@ -13,12 +13,6 @@ PharoCAToolPrintIt class >> execute: args [
 ]
 
 { #category : 'definition' }
-PharoCAToolPrintIt class >> isEnabled [ 
-
-	^ true
-]
-
-{ #category : 'definition' }
 PharoCAToolPrintIt class >> toolDefinition [ 
 	^ {
         'type' -> 'function'.

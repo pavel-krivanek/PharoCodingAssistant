@@ -33,7 +33,7 @@ PharoCAToolListClassesInPackage class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'packageName' -> { 'type' -> 'string' }
+					'packageName' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('packageName')
 			} asDictionary

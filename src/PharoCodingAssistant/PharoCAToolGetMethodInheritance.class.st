@@ -51,9 +51,9 @@ PharoCAToolGetMethodInheritance class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'className' -> { 'type' -> 'string' }.
-					'side' -> { 'type' -> 'string' }.
-					'selector' -> { 'type' -> 'string' }
+					'className' -> { 'type' -> 'string' } asDictionary.
+					'side' -> { 'type' -> 'string' } asDictionary.
+					'selector' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('className' 'selector')
 			} asDictionary

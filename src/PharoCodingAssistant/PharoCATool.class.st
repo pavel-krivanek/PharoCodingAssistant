@@ -14,7 +14,7 @@ PharoCATool class >> execute: args [
 { #category : 'definition' }
 PharoCATool class >> isEnabled [ 
 
-	^ false
+	^ true
 ]
 
 { #category : 'as yet unclassified' }

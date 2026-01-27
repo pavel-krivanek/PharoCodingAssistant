@@ -51,9 +51,9 @@ PharoCAToolListMethods class >> toolDefinition [
 			'parameters' -> {
 				'type' -> 'object'.
 				'properties' -> {
-					'className' -> { 'type' -> 'string' }.
-					'side' -> { 'type' -> 'string' }.
-					'protocol' -> { 'type' -> 'string' }
+					'className' -> { 'type' -> 'string' } asDictionary.
+					'side' -> { 'type' -> 'string' } asDictionary.
+					'protocol' -> { 'type' -> 'string' } asDictionary
 				} asDictionary.
 				'required' -> #('className')
 			} asDictionary
