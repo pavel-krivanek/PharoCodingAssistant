@@ -1,3 +1,6 @@
+"
+Lists classes and methods that implement a given selector.
+"
 Class {
 	#name : 'PharoCAToolListImplementors',
 	#superclass : 'PharoCATool',

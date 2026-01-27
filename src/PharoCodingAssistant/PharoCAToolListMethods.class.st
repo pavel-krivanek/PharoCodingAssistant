@@ -1,5 +1,5 @@
 "
-Lists methods of a class, optionally filtered by protocol and side.
+Lists methods of a class, optionally filtered by protocol.
 "
 Class {
 	#name : 'PharoCAToolListMethods',

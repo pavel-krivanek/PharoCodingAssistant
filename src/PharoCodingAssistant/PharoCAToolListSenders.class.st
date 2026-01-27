@@ -1,3 +1,6 @@
+"
+Lists methods that send a given selector.
+"
 Class {
 	#name : 'PharoCAToolListSenders',
 	#superclass : 'PharoCATool',

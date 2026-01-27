@@ -1,3 +1,6 @@
+"
+Lists package names available in the system, optionally filtered by a substring.
+"
 Class {
 	#name : 'PharoCAToolListPackages',
 	#superclass : 'PharoCATool',
