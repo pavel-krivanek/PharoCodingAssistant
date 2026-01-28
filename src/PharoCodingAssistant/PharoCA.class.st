@@ -58,7 +58,7 @@ messages add: { 'role' -> 'user'. 'content' -> prompt } asDictionary.
         'tools' -> tools.
         'tool_choice' -> 'auto'.
         'temperature' -> 0.0.
-		  'reasoning_effort' => self reasoningEffort
+		  'reasoning_effort' -> self reasoningEffort
     } asDictionary.
 
     Transcript show: '>>> Sending Request (Turn ', iterations printString, ')...'; cr.
