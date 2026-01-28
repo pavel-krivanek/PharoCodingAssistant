@@ -4,6 +4,9 @@ Main entry point for the Pharo Coding Assistant, providing high‑level utilitie
 Class {
 	#name : 'PharoCA',
 	#superclass : 'Object',
+	#instVars : [
+		'reasoningEffort'
+	],
 	#category : 'PharoCodingAssistant',
 	#package : 'PharoCodingAssistant'
 }
@@ -12,6 +15,14 @@ Class {
 PharoCA >> enabledTolls [ 
 
 	^ PharoCATool allSubclasses select: [ :each | each isEnabled ]
+]
+
+{ #category : 'as yet unclassified' }
+PharoCA >> initialize [
+
+	super initialize.
+	
+	reasoningEffort := #high.
 ]
 
 { #category : 'as yet unclassified' }
@@ -46,7 +57,8 @@ messages add: { 'role' -> 'user'. 'content' -> prompt } asDictionary.
         'messages' -> messages asArray.
         'tools' -> tools.
         'tool_choice' -> 'auto'.
-        'temperature' -> 0.0
+        'temperature' -> 0.0.
+		  'reasoning_effort' => self reasoningEffort
     } asDictionary.
 
     Transcript show: '>>> Sending Request (Turn ', iterations printString, ')...'; cr.
@@ -102,4 +114,16 @@ finalText isEmpty ifTrue: [ finalText := 'Task completed via tool calls.' ].
 
 Transcript show: '=== Final Answer ==='; cr; show: finalText; cr.
 ^ finalText
+]
+
+{ #category : 'accessing' }
+PharoCA >> reasoningEffort [
+
+	^ reasoningEffort
+]
+
+{ #category : 'accessing' }
+PharoCA >> reasoningEffort: anObject [
+
+	reasoningEffort := anObject
 ]
