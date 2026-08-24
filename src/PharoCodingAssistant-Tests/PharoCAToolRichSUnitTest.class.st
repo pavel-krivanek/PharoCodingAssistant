@@ -12,7 +12,7 @@ PharoCAToolRichSUnitTest >> testMethodClassTagAndSelectionScopes [
 	class := registry executeNamed: 'run_tests' arguments: { 'kind' -> 'class'. 'className' -> 'PharoCATestFixtureTestCase' } asDictionary.
 	self assert: (((class at: 'result') at: 'runCount')) equals: 2.
 	tag := registry executeNamed: 'run_tests' arguments: { 'kind' -> 'tag'. 'package' -> 'PharoCodingAssistant-Tests'. 'tag' -> 'Fixtures' } asDictionary.
-	self assert: (((tag at: 'result') at: 'runCount')) equals: 2.
+	self assert: (((tag at: 'result') at: 'runCount')) equals: 3.
 	selection := registry executeNamed: 'run_tests' arguments: { 'kind' -> 'selection'. 'tests' -> #('PharoCATestFixtureTestCase>>testSecondPassingTest') } asDictionary.
 	self assert: (((selection at: 'result') at: 'runCount')) equals: 1
 ]

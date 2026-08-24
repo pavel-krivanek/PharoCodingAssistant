@@ -97,6 +97,23 @@ PharoCAToolSearchMethodSourceTest >> testPaginationCursorIsBoundToSearchScope [
 	] raise: Error
 ]
 
+
+{ #category : 'tests' }
+PharoCAToolSearchMethodSourceTest >> testOutOfScopeCursorIsRejectedBeforeImageWideTraversal [
+	| cursor wrongScope errorText |
+	wrongScope := 'search_method_source|PharoCA|false||||'.
+	cursor := PharoCAToolPagination cursorForOffset: 1 scope: wrongScope.
+	errorText := [
+		PharoCATestScopedSearchMethodSourceTool execute: {
+			'query' -> 'PharoCATool'.
+			'limit' -> 1.
+			'cursor' -> cursor } asDictionary.
+		''
+	] on: Error do: [ :error | error messageText ].
+	self assert: (errorText includesSubstring: 'pagination cursor').
+	self deny: (errorText includesSubstring: 'image-wide traversal')
+]
+
 { #category : 'tests' }
 PharoCAToolSearchMethodSourceTest >> testRegistryValidatesQueryAndPaginationTypes [
 	| registry missing tooLarge wrongCase |

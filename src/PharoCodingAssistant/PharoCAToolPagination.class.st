@@ -32,8 +32,7 @@ PharoCAToolPagination class >> pageItems: aCollection arguments: arguments scope
 	| items limit offset endIndex pageItems hasMore nextCursor |
 	items := aCollection asArray.
 	limit := arguments at: 'limit' ifAbsent: [ self defaultItemLimit ].
-	self validateItemLimit: limit.
-	offset := self offsetFromCursor: (arguments at: 'cursor' ifAbsent: [ nil ]) scope: scope.
+	offset := self itemOffsetFromArguments: arguments scope: scope.
 	offset := offset min: items size.
 	endIndex := (offset + limit) min: items size.
 	pageItems := offset < endIndex
@@ -53,6 +52,15 @@ PharoCAToolPagination class >> pageItems: aCollection arguments: arguments scope
 			'nextCursor' -> nextCursor
 		} asDictionary
 	} asDictionary
+]
+
+
+{ #category : 'pagination' }
+PharoCAToolPagination class >> itemOffsetFromArguments: arguments scope: scope [
+	| limit |
+	limit := arguments at: 'limit' ifAbsent: [ self defaultItemLimit ].
+	self validateItemLimit: limit.
+	^ self offsetFromCursor: (arguments at: 'cursor' ifAbsent: [ nil ]) scope: scope
 ]
 
 { #category : 'pagination' }

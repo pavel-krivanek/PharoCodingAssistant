@@ -6,11 +6,36 @@ Class { #name : 'PharoCAToolSearchAST', #superclass : 'PharoCATool', #category :
 { #category : 'definition' } PharoCAToolSearchAST class >> toolName [ ^ #search_ast ]
 { #category : 'definition' }
 PharoCAToolSearchAST class >> llmDefinition [
- ^ PharoCALLMToolDefinition name:'search_ast' description:'Searches live installed methods with Pharo OCParseTreeSearcher native pattern syntax (for example `@receiver at: `@arg). Optional package/tag/class filters strongly narrow scope. Returns matched node source/ranges and method metadata; cursor-paginated.' parameters:{
+ ^ PharoCALLMToolDefinition name:'search_ast' description:'Searches live installed methods with Pharo OCParseTreeSearcher native pattern syntax (for example `@receiver at: `@arg). Optional package/tag/class filters strongly narrow scope. Returns matched node source/ranges, captured pattern bindings, and method metadata; cursor-paginated.' parameters:{
  'type'->'object'. 'properties'->{
  'pattern'->{ 'type'->'string' } asDictionary. 'package'->{ 'type'->'string' } asDictionary. 'tag'->{ 'type'->'string' } asDictionary. 'className'->{ 'type'->'string' } asDictionary.
  'limit'->{ 'type'->'integer'. 'minimum'->1. 'maximum'->200 } asDictionary. 'cursor'->{ 'type'->'string' } asDictionary } asDictionary.
  'required'->#('pattern') } asDictionary ]
+{ #category : 'private' }
+PharoCAToolSearchAST class >> bindingNodeSummary: value source: source [
+ | item |
+ (value respondsTo:#start) ifFalse:[^ {'className'->value class name asString. 'preview'->(PharoCAObjectPresenter previewOf:value)} asDictionary].
+ item:={'type'->value class name asString. 'start'->([value start] on:Error do:[:error|nil]). 'stop'->([value stop] on:Error do:[:error|nil]). 'source'->(PharoCAToolGetMethodAST snippetOf:value source:source)} asDictionary.
+ ^ item
+]
+
+{ #category : 'private' }
+PharoCAToolSearchAST class >> bindingValueSummary: value source: source [
+ (value isCollection and:[value isString not and:[(value respondsTo:#start) not]]) ifTrue:[
+  ^ ((value first:(value size min:20)) collect:[:each|self bindingNodeSummary:each source:source]) asArray ].
+ ^ self bindingNodeSummary:value source:source
+]
+
+{ #category : 'private' }
+PharoCAToolSearchAST class >> bindingsFrom: searcher source: source [
+ | bindings |
+ bindings:=Dictionary new.
+ searcher context keysAndValuesDo:[:key :value| |name|
+  name:=(key respondsTo:#name) ifTrue:[key name asString] ifFalse:[key printString].
+  bindings at:name put:(self bindingValueSummary:value source:source)].
+ ^ bindings
+]
+
 { #category : 'execution' }
 PharoCAToolSearchAST class >> execute: args context: context [
  | pattern packageName tagName className methods matches searcher currentMethod currentSource skipped page scope |
@@ -22,6 +47,7 @@ PharoCAToolSearchAST class >> execute: args context: context [
   summary:=PharoCAImageNavigation methodSummary:currentMethod. item:=summary copy.
   text:=PharoCAToolGetMethodAST snippetOf:node source:currentSource.
   item at:'nodeType' put:node class name; at:'start' put:node start; at:'stop' put:node stop; at:'match' put:text.
+  item at:'bindings' put:(self bindingsFrom:searcher source:currentSource).
   answer add:item. answer ].
  methods doWithIndex:[:method :index|
   (index \\ 100=0) ifTrue:[context checkActive].

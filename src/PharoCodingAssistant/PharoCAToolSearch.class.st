@@ -23,12 +23,13 @@ PharoCAToolSearch class >> toolName [ ^ #tool_search ]
 PharoCAToolSearch class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'tool_search'
-		description: 'Searches all registered tools, including inactive packs. Returns name, description, pack, capability, execution mode, availability and active state. Results are cursor-paginated.'
+		description: 'Searches and deterministically ranks all registered tools, including inactive packs. Optional task text improves relevance ranking. Returns name, description, pack, capability, execution mode, availability and active state. Results are cursor-paginated.'
 		parameters: {
 			'type' -> 'object'.
 			'properties' -> {
 				'query' -> { 'type' -> 'string' } asDictionary.
 				'pack' -> { 'type' -> 'string' } asDictionary.
+				'task' -> { 'type' -> 'string'. 'maxLength' -> 2000 } asDictionary.
 				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
 				'cursor' -> { 'type' -> 'string' } asDictionary
 			} asDictionary.

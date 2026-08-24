@@ -162,7 +162,7 @@ PharoCADebugTool class >> nodeAtPreorderIndex: index inMethod: method [
 PharoCADebugTool class >> summaryForDebugPoint: point context: context [
 	| handle |
 	handle := context requireRuntimeHandleRegistry handleForExisting: point kind: #debugPoint.
-	^ {
+	^ self enrichDebugPointSummary: ({
 		'handle' -> handle.
 		'type' -> ([ point type asString ] on: Error do: [ :error | point class name asString ]).
 		'name' -> ([ point name asString ] on: Error do: [ :error | '' ]).
@@ -170,7 +170,7 @@ PharoCADebugTool class >> summaryForDebugPoint: point context: context [
 		'scope' -> ([ point scopeString ] on: Error do: [ :error | '' ]).
 		'enabled' -> ([ point enabled ] on: Error do: [ :error | false ]).
 		'managed' -> handle notNil
-	} asDictionary
+	} asDictionary) point: point
 ]
 
 { #category : 'private' }
@@ -180,4 +180,44 @@ PharoCADebugTool class >> registerDebugPoint: point context: context [
 		kind: #debugPoint
 		metadata: { 'managed' -> true } asDictionary
 		cleanup: [ :debugPoint :metadata | [ debugPoint remove ] on: Error do: [ :error | ] ]
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> configureDebugPoint: point fromArguments: args [
+	| condition once countHits |
+	condition := args at: 'condition' ifAbsent: [ nil ].
+	condition ifNotNil: [
+		condition isEmpty ifTrue: [ Error signal: 'Debug-point condition must not be empty' ].
+		point addBehavior: (ConditionBehavior new condition: condition; yourself) ].
+	once := args at: 'once' ifAbsent: [ false ].
+	once ifTrue: [ point addBehavior: OnceBehavior new ].
+	countHits := args at: 'countHits' ifAbsent: [ false ].
+	countHits ifTrue: [ point addBehavior: CountBehavior new ].
+	^ point
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> behaviorSummaryForDebugPoint: point [
+	| items condition count |
+	items := OrderedCollection new.
+	condition := [ point getBehavior: ConditionBehavior ] on: Error do: [ :error | nil ].
+	condition ifNotNil: [ items add: { 'type' -> 'condition'. 'expression' -> condition condition } asDictionary ].
+	([ point getBehavior: OnceBehavior ] on: Error do: [ :error | nil ]) ifNotNil: [ items add: { 'type' -> 'once' } asDictionary ].
+	count := [ point getBehavior: CountBehavior ] on: Error do: [ :error | nil ].
+	count ifNotNil: [ items add: { 'type' -> 'count'. 'hits' -> count count } asDictionary ].
+	^ items asArray
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> enrichDebugPointSummary: summary point: point [
+	| behaviors history |
+	behaviors := self behaviorSummaryForDebugPoint: point.
+	behaviors isEmpty ifFalse: [ summary at: 'behaviors' put: behaviors ].
+	(point isKindOf: WatchDebugPoint) ifTrue: [
+		summary at: 'historyLimit' put: point limit.
+		history := point history.
+		summary at: 'historyCount' put: history size.
+		history isEmpty ifFalse: [
+			summary at: 'history' put: ((history first: (history size min: 5)) collect: [ :value | PharoCAObjectPresenter previewOf: value ]) asArray ] ].
+	^ summary
 ]

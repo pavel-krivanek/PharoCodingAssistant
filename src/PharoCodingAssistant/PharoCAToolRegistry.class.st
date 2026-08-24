@@ -44,6 +44,7 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolGetPackageDependencies
 		PharoCAToolGetMethodAST
 		PharoCAToolSearchAST
+		PharoCAToolASTRewritePreview
 		PharoCAToolCheckCode
 		PharoCAToolEvaluateExpression
 		PharoCAToolObjectSummary
@@ -54,9 +55,11 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolTestResults
 		PharoCAToolTestFailure
 		PharoCAToolTestRerun
+		PharoCAToolTestCoverage
 		PharoCAToolTranscriptStatus
 		PharoCAToolTranscriptTail
 		PharoCAToolTranscriptClear
+		PharoCAToolProfileExpression
 		PharoCAToolDebugStart
 		PharoCAToolDebugAttachProcess
 		PharoCAToolDebugStatus
@@ -817,19 +820,51 @@ PharoCAToolRegistry >> metadataForTool: tool session: aSession [
 ]
 
 { #category : 'catalog' }
+PharoCAToolRegistry >> catalogTokensFor: text [
+ | normalized |
+ normalized:=String streamContents:[:stream| text asString asLowercase do:[:ch| (ch isAlphaNumeric or:[ch=$_]) ifTrue:[stream nextPut:ch] ifFalse:[stream nextPut:$ ]]].
+ ^ ((normalized findTokens:' ') select:[:each|each size>=3]) asSet asArray asSortedCollection asArray
+]
+
+{ #category : 'catalog' }
+PharoCAToolRegistry >> catalogRankFor: metadata query: query task: task [
+ | score name description pack capability tokens |
+ score:=0. name:=(metadata at:'name') asLowercase. description:=(metadata at:'description') asLowercase. pack:=(metadata at:'pack') asLowercase. capability:=(metadata at:'capability') asLowercase.
+ query isEmpty ifFalse:[
+  name=query ifTrue:[score:=score+10000] ifFalse:[
+   (name beginsWith:query) ifTrue:[score:=score+7000] ifFalse:[
+    (name includesSubstring:query) ifTrue:[score:=score+5000] ifFalse:[
+     ((pack=query) or:[capability=query]) ifTrue:[score:=score+3000] ifFalse:[(description includesSubstring:query) ifTrue:[score:=score+1000]]]]]].
+ tokens:=self catalogTokensFor:task.
+ tokens do:[:token|
+  name=token ifTrue:[score:=score+300].
+  (name includesSubstring:token) ifTrue:[score:=score+120].
+  pack=token ifTrue:[score:=score+90].
+  capability=token ifTrue:[score:=score+70].
+  (description includesSubstring:token) ifTrue:[score:=score+20]].
+ (metadata at:'active') ifTrue:[score:=score+10].
+ (metadata at:'available') ifTrue:[score:=score+5].
+ ^ score
+]
+
+{ #category : 'catalog' }
 PharoCAToolRegistry >> searchCatalog: query pack: packName arguments: arguments session: aSession [
-	| normalizedQuery normalizedPack matches page scope |
+	| normalizedQuery normalizedPack task matches page scope |
 	normalizedQuery := query asString asLowercase.
 	normalizedPack := packName ifNil: [ nil ] ifNotNil: [ packName asString asLowercase ].
-	matches := self tools collect: [ :tool | self metadataForTool: tool session: aSession ].
+	task := (arguments at:'task' ifAbsent:['']) asString asLowercase.
+	matches := self tools collect: [ :tool | |metadata| metadata:=self metadataForTool: tool session:aSession. metadata at:'rankScore' put:(self catalogRankFor:metadata query:normalizedQuery task:task). metadata ].
 	normalizedPack ifNotNil: [
 		matches := matches select: [ :metadata | (metadata at: 'pack') asLowercase = normalizedPack ] ].
 	normalizedQuery isEmpty ifFalse: [
 		matches := matches select: [ :metadata |
 			#('name' 'description' 'pack' 'capability') anySatisfy: [ :key |
 				(metadata at: key) asString asLowercase includesSubstring: normalizedQuery ] ] ].
-	matches := (matches asSortedCollection: [ :a :b | (a at: 'name') <= (b at: 'name') ]) asArray.
-	scope := 'tool_search|', normalizedQuery, '|', (normalizedPack ifNil: [ '' ]).
+	matches := (matches asSortedCollection: [ :a :b |
+		(a at:'rankScore')=(b at:'rankScore')
+			ifTrue:[(a at:'name') <= (b at:'name')]
+			ifFalse:[(a at:'rankScore') > (b at:'rankScore')] ]) asArray.
+	scope := 'tool_search|', normalizedQuery, '|', (normalizedPack ifNil: [ '' ]), '|', task.
 	page := PharoCAToolPagination pageItems: matches arguments: arguments scope: scope.
 	^ {
 		'tools' -> (page at: 'items').

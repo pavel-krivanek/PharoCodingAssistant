@@ -20,9 +20,9 @@ PharoCAToolRegistryTest >> testDefaultRegistryContainsExplicitToolSet [
 	names := registry tools collect: [ :tool | tool toolName ].
 	self assert: names asArray equals: #(
 		tool_search tool_enable tool_disable get_method get_class_summary list_package_tags search_classes search_selectors search_method_source
-		find_references find_slot_accesses find_pragmas get_package_dependencies get_method_ast search_ast
+		find_references find_slot_accesses find_pragmas get_package_dependencies get_method_ast search_ast ast_rewrite_preview
 		check_code evaluate_expression object_summary object_slots object_send object_release
-		test_discover test_results test_failure test_rerun transcript_status transcript_tail transcript_clear
+		test_discover test_results test_failure test_rerun test_coverage transcript_status transcript_tail transcript_clear profile_expression
 		debug_start debug_attach_process debug_status debug_stack debug_frame debug_step debug_continue debug_evaluate debug_restart debug_resume debug_terminate
 		debug_points debug_set_breakpoint debug_set_watchpoint debug_remove_point process_list process_stack process_cpu_sample process_suspend process_resume process_set_priority process_terminate process_debug
 		refactor_rename_class refactor_rename_method refactor_rename_instance_variable refactor_rename_local refactor_rename_package

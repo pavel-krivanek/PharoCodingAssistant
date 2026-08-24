@@ -681,11 +681,13 @@ Specific tools can also be allowed or excluded with `tools.allow` and `tools.exc
 
 The tool registry can contain more tools than are advertised to the model on every request. The original tool set remains in the default `core` pack, while larger/newer families can be activated lazily per durable session. The `catalog` pack is always active and contains:
 
-- `tool_search` — search the complete registered tool catalog, including inactive packs;
+- `tool_search` — search the complete registered tool catalog, including inactive packs; an optional `task` hint produces deterministic task-aware ranking and every row reports `rankScore`, current `profile`, and `availabilityReason`;
 - `tool_enable` — activate a pack for the current session;
 - `tool_disable` — deactivate a pack for the current session (the `catalog` pack itself cannot be disabled).
 
 Pack activation is session-scoped and persisted with the session. It changes the schemas advertised on the **next model request**, including the next round of the same running agent. It does not bypass the selected tool profile or explicit `tools.allow`/`tools.exclude` policy.
+
+Iteration 055 also puts an explicit context budget around this catalog architecture. In the supplied image all 131 registered tool parameter schemas total about 23.5K serialized JSON characters before lazy-pack filtering, while the default active surface is only 22 definitions (~7.5K characters). Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 25 tools / 10,000 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
 
 The lazy `browse` pack contains the Pharo-native browsing and structural-search tools. Iteration 048 introduced the pack and iteration 049 expanded it substantially:
 
@@ -700,7 +702,8 @@ The lazy `browse` pack contains the Pharo-native browsing and structural-search 
 - `find_pragmas` — exact pragma occurrence search with compact argument rendering;
 - `get_package_dependencies` — direct package dependencies derived from superclass/trait relations and referenced classes;
 - `get_method_ast` — paginated flat preorder projection of the real Opal AST;
-- `search_ast` — structural code search using Pharo's native `OCParseTreeSearcher` pattern language.
+- `search_ast` — structural code search using Pharo's native `OCParseTreeSearcher` pattern language, including native pattern-capture bindings;
+- `ast_rewrite_preview` — parses a fresh copy of one installed method and previews an `OCParseTreeRewriter` expression/method rewrite without mutating live code.
 
 The agent can therefore discover a capability with `tool_search`, enable `browse`, and use these tools on the next model request — including the next round of the same run — without carrying every future tool schema in every ordinary request.
 
@@ -741,9 +744,12 @@ The richer SUnit tools keep large defect information out of the initial tool res
 - `run_tests` — executes method, class, package, tag, or explicit-selection scopes and returns a compact `test-run-N` identifier and summary;
 - `test_results` — retrieves deterministically ordered, paginated per-test status rows;
 - `test_failure` — retrieves the original captured exception class/message and a bounded signaler stack for one failure/error;
-- `test_rerun` — reruns the exact scope/specification of a previous test run.
+- `test_rerun` — reruns the exact scope/specification of a previous test run;
+- `test_coverage` — runs an explicit SUnit scope under Pharo's native `CoverageCollector` and returns bounded method/sequence coverage totals plus a caller-limited uncovered-method list.
 
 `run_tests` is deterministic unless shuffling is explicitly requested. A supplied shuffle seed is retained in the test-run specification and reused by `test_rerun`. Execution performs cooperative cancellation checks between individual SUnit tests rather than forcefully terminating arbitrary Pharo processes. Test-run records are transient and session-scoped.
+
+`test_coverage` uses the same test scopes but has a separate explicit coverage scope (`method`, `class`, `package`, `tag`, or `selection`). Coverage instrumentation is capped at 2,000 methods, explicit selections at 500 methods, and uncovered details at the requested `detailLimit`; it does not rerun the test suite merely to paginate additional coverage rows.
 
 #### `runtime` pack
 
@@ -751,9 +757,10 @@ Transcript access is exposed through a single image-level announcement bridge an
 
 - `transcript_status` — reports the current Transcript implementation and capture-buffer status;
 - `transcript_tail` — returns entries after a monotonically increasing sequence cursor, with a bounded limit;
-- `transcript_clear` — clears both the Pharo Transcript and the assistant capture buffer.
+- `transcript_clear` — clears both the Pharo Transcript and the assistant capture buffer;
+- `profile_expression` — evaluates an expression under Pharo's native `TimeProfiler` / `MessageTally` sampling profiler and returns a bounded list of leaf/self-time hotspots plus the normal transient result-object handle.
 
-Interactive Transcript implementations announce entries and can therefore be tailed without polling the UI. In a headless image `Transcript` may be `NonInteractiveTranscript`, which writes to stdio and does not provide the same announcement stream; `transcript_status` reports the actual capture capability instead of claiming completeness.
+Interactive Transcript implementations announce entries and can therefore be tailed without polling the UI. In a headless image `Transcript` may be `NonInteractiveTranscript`, which writes to stdio and does not provide the same announcement stream; `transcript_status` reports the actual capture capability instead of claiming completeness. `profile_expression` requires the normal `evaluation` capability, is exclusive like other evaluation tools, and should be interpreted as sampling diagnostics rather than a deterministic microbenchmark.
 
 
 Iteration 051 adds two more lazy packs for live debugging and process control.
@@ -775,7 +782,7 @@ The debugger pack is based on Pharo 14's real `SindarinDebugger`, `DebugSession`
 
 Debugger handles (`debug-N`) are **strong and session-scoped**. They do not expire while an agent is reasoning because silently expiring a suspended execution would be unsafe. A durable session does not serialize these runtime handles. Session cleanup terminates executions owned by `debug_start`, removes assistant-installed DebugPoints, and releases runtime references. An attached external process is not silently terminated on cleanup.
 
-Breakpoints use the same preorder AST node indexes returned by `get_method_ast`. Watchpoints can be class-wide or scoped to an existing `obj-N` object handle and support `read`, `write`, or `all` access. Only DebugPoints created by the current assistant session receive removable `point-N` handles; pre-existing user DebugPoints are visible but are not made removable through this API.
+Breakpoints use the same preorder AST node indexes returned by `get_method_ast`. They can be class-wide or scoped to an existing compatible `obj-N` receiver. Watchpoints can likewise be class-wide or object-scoped and support `read`, `write`, or `all` access. Assistant-created breakpoints/watchpoints can carry a Pharo DebugPoint condition, one-shot behavior, hit-count behavior, and (for watchpoints) a bounded history limit. Point summaries expose these behaviors and only a small recent-history preview. Only DebugPoints created by the current assistant session receive removable `point-N` handles; pre-existing user DebugPoints are visible but are not made removable through this API.
 
 Example:
 
@@ -1225,3 +1232,7 @@ webServer url.
 ```
 
 This is the recommended steady-state startup shape: configure providers/models/agents once, save the runtime profile, then let `reloadResources` restore it on subsequent starts.
+
+### Source-search runtime note
+
+Image-wide `search_method_source` searches only retrievable source text (`CompiledMethod>>sourceCodeOrNil`). It deliberately skips methods without real source instead of invoking Pharo's `codeForNoSource` reconstruction path. Pagination cursor/limit validation also happens before image-wide traversal, so invalid continuation cursors fail without rescanning the image.

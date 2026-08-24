@@ -214,7 +214,7 @@ PharoCAToolCatalogTest >> testToolSearchCanFilterByPackAndReportsActivePacks [
 		arguments: Dictionary new
 		session: session.
 	self assert: ((result at: 'tools') collect: [ :each | each at: 'name' ]) asSet
-		equals: #('get_method' 'get_class_summary' 'list_package_tags' 'search_classes' 'search_selectors' 'search_method_source' 'find_references' 'find_slot_accesses' 'find_pragmas' 'get_package_dependencies' 'get_method_ast' 'search_ast') asSet.
+		equals: #('get_method' 'get_class_summary' 'list_package_tags' 'search_classes' 'search_selectors' 'search_method_source' 'find_references' 'find_slot_accesses' 'find_pragmas' 'get_package_dependencies' 'get_method_ast' 'search_ast' 'ast_rewrite_preview') asSet.
 	self assert: ((result at: 'tools') allSatisfy: [ :each | (each at: 'pack') = 'browse' and: [ (each at: 'active') not ] ]).
 	self assert: (result at: 'activePacks') equals: #('catalog' 'core')
 ]
@@ -270,4 +270,35 @@ PharoCAToolCatalogTest >> testCatalogToolSchemasRejectMissingOrWrongArguments [
 	disableWrongType := registry executeNamed: 'tool_disable' arguments: { 'pack' -> 42 } asDictionary.
 	self deny: (disableWrongType at: 'ok').
 	self assert: ((disableWrongType at: 'error') at: 'type') equals: 'invalid_arguments'
+]
+
+{ #category : 'tests' }
+PharoCAToolCatalogTest >> testExactNameRankingDominatesAndIsExplicit [
+ | agent session result first |
+ agent:=PharoCA new. session:=agent newSession.
+ result:=agent toolRegistry searchCatalog:'evaluate' pack:nil arguments:{'limit'->20} asDictionary session:session.
+ first:=(result at:'tools') first.
+ self assert:(first at:'name') equals:'evaluate'.
+ self assert:(first at:'rankScore') > 0
+]
+
+{ #category : 'tests' }
+PharoCAToolCatalogTest >> testTaskRankingPrefersCoverageToolDeterministically [
+ | agent session first second names1 names2 |
+ agent:=PharoCA new. session:=agent newSession.
+ first:=agent toolRegistry searchCatalog:'' pack:nil arguments:{'task'->'run test coverage for changed methods'.'limit'->20} asDictionary session:session.
+ second:=agent toolRegistry searchCatalog:'' pack:nil arguments:{'task'->'run test coverage for changed methods'.'limit'->20} asDictionary session:session.
+ names1:=(first at:'tools') collect:[:each|each at:'name'].
+ names2:=(second at:'tools') collect:[:each|each at:'name'].
+ self assert:names1 equals:names2.
+ self assert:names1 first equals:'test_coverage'
+]
+
+{ #category : 'tests' }
+PharoCAToolCatalogTest >> testCatalogCursorIsBoundToTaskRankingContext [
+ | agent session first cursor |
+ agent:=PharoCA new. session:=agent newSession.
+ first:=agent toolRegistry searchCatalog:'' pack:nil arguments:{'task'->'debug process'.'limit'->2} asDictionary session:session.
+ cursor:=(first at:'page') at:'nextCursor'.
+ self should:[agent toolRegistry searchCatalog:'' pack:nil arguments:{'task'->'test coverage'.'limit'->2.'cursor'->cursor} asDictionary session:session] raise:Error
 ]

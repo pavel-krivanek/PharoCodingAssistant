@@ -2,11 +2,12 @@ Class { #name : 'PharoCAToolTestDiscoverTest', #superclass : 'TestCase', #catego
 
 { #category : 'tests' }
 PharoCAToolTestDiscoverTest >> testDiscoversTestsWithPackageAndTagFilters [
-	| result row |
+	| result rows row |
 	result := PharoCAToolTestDiscover execute: { 'query' -> 'FixtureTestCase'. 'package' -> 'PharoCodingAssistant-Tests'. 'tag' -> 'Fixtures' } asDictionary.
-	self assert: ((result at: 'page') at: 'total') equals: 1.
-	row := (result at: 'tests') first.
-	self assert: (row at: 'className') equals: 'PharoCATestFixtureTestCase'.
+	self assert: ((result at: 'page') at: 'total') equals: 2.
+	rows := result at: 'tests'.
+	self assert: (rows collect: [ :each | each at: 'className' ]) equals: #('PharoCATestCoverageFixtureTestCase' 'PharoCATestFixtureTestCase').
+	row := rows second.
 	self assert: (row at: 'selectors') equals: #('testFirstPassingTest' 'testSecondPassingTest')
 ]
 

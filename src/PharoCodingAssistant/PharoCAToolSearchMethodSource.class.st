@@ -69,7 +69,7 @@ PharoCAToolSearchMethodSource class >> source: source matchesQuery: query matchC
 { #category : 'private' }
 PharoCAToolSearchMethodSource class >> imageWideMethodsWithSourceString: query matchCase: matchCase context: context [
 	"Pharo 14's SystemNavigation source search assumes every installed method has retrievable source.
-	Mirror its optimized allBehaviorsDo:/selectorsDo: traversal, but tolerate generated/FFI methods whose sourceCode is nil."
+	Mirror its optimized allBehaviorsDo:/selectorsDo: traversal, but tolerate generated/FFI methods without retrievable source. Source-text search must not trigger source reconstruction/decompilation."
 	| matches behaviorCount |
 	matches := OrderedCollection new.
 	behaviorCount := 0.
@@ -79,7 +79,7 @@ PharoCAToolSearchMethodSource class >> imageWideMethodsWithSourceString: query m
 		behavior selectorsDo: [ :selector |
 			| method source |
 			method := behavior >> selector.
-			source := method sourceCode.
+			source := method sourceCodeOrNil.
 			(source isString and: [ source includesSubstring: query caseSensitive: matchCase ]) ifTrue: [
 				matches add: method ] ] ].
 	^ matches
@@ -94,9 +94,10 @@ PharoCAToolSearchMethodSource class >> scopedMethodsMatching: query matchCase: m
 		className: classFilter
 		context: context.
 	matches := OrderedCollection new.
-	candidates doWithIndex: [ :method :index |
+	candidates doWithIndex: [ :method :index | | source |
 		(index \\ 100 = 0) ifTrue: [ context checkActive ].
-		(self source: method sourceCode matchesQuery: query matchCase: matchCase) ifTrue: [
+		source := method sourceCodeOrNil.
+		(source isString and: [ self source: source matchesQuery: query matchCase: matchCase ]) ifTrue: [
 			matches add: method ] ].
 	^ matches
 ]
@@ -129,6 +130,10 @@ PharoCAToolSearchMethodSource class >> execute: args context: context [
 	tagFilter := args at: 'tag' ifAbsent: [ nil ].
 	classFilter := args at: 'className' ifAbsent: [ nil ].
 	PharoCAImageNavigation validatePackage: packageFilter tag: tagFilter className: classFilter.
+	scope := 'search_method_source|', query, '|', matchCase asString, '|',
+		(packageFilter ifNil: [ '' ]), '|', (tagFilter ifNil: [ '' ]), '|', (classFilter ifNil: [ '' ]).
+	"Validate cursor/limit before any potentially expensive image-wide source traversal."
+	PharoCAToolPagination itemOffsetFromArguments: args scope: scope.
 	methods := self
 		methodsMatching: query
 		matchCase: matchCase
@@ -144,8 +149,8 @@ PharoCAToolSearchMethodSource class >> execute: args context: context [
 		package := baseClass package.
 		tag := PharoCAImageNavigation tagNameOfClass: baseClass.
 		side := method methodClass isMeta ifTrue: [ 'class' ] ifFalse: [ 'instance' ].
-		source := method sourceCode.
-		matches add: {
+		source := method sourceCodeOrNil.
+		source ifNotNil: [ matches add: {
 			'className' -> baseClass name.
 			'side' -> side.
 			'selector' -> method selector asString.
@@ -153,15 +158,13 @@ PharoCAToolSearchMethodSource class >> execute: args context: context [
 			'package' -> package name.
 			'tag' -> tag.
 			'snippet' -> (self snippetFor: source query: query matchCase: matchCase)
-		} asDictionary ].
+		} asDictionary ] ].
 	matches := (matches asSortedCollection: [ :a :b |
 		(a at: 'className') = (b at: 'className')
 			ifTrue: [ (a at: 'side') = (b at: 'side')
 				ifTrue: [ (a at: 'selector') <= (b at: 'selector') ]
 				ifFalse: [ (a at: 'side') <= (b at: 'side') ] ]
 			ifFalse: [ (a at: 'className') <= (b at: 'className') ] ]) asArray.
-	scope := 'search_method_source|', query, '|', matchCase asString, '|',
-		(packageFilter ifNil: [ '' ]), '|', (tagFilter ifNil: [ '' ]), '|', (classFilter ifNil: [ '' ]).
 	page := PharoCAToolPagination pageItems: matches arguments: args scope: scope.
 	^ {
 		'query' -> query.

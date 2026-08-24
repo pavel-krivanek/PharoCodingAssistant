@@ -14,6 +14,7 @@ PharoCAToolExecutionPackContractTest >> testNewToolsHaveExpectedPackCapabilityAn
 		PharoCAToolTestResults -> #(#testing #testing #parallelSafe).
 		PharoCAToolTestFailure -> #(#testing #testing #parallelSafe).
 		PharoCAToolTestRerun -> #(#testing #testing #sequential).
+		PharoCAToolTestCoverage -> #(#testing #testing #exclusiveMutation).
 		PharoCAToolTranscriptStatus -> #(#runtime #inspection #parallelSafe).
 		PharoCAToolTranscriptTail -> #(#runtime #inspection #parallelSafe).
 		PharoCAToolTranscriptClear -> #(#runtime #coding #sequential)
