@@ -9,7 +9,8 @@ Class {
 		'providers'
 	],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'accessing' }

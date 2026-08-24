@@ -10,7 +10,8 @@ Class {
 		'agent'
 	],
 	#category : 'PharoCodingAssistant-Runtime',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Runtime'
 }
 
 { #category : 'instance creation' }

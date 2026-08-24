@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'protocol', 'outputMutex' ],
 	#category : 'PharoCodingAssistant-Protocol',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Protocol'
 }
 
 

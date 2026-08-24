@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'message', 'finishReason', 'usage' ],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'instance creation' }

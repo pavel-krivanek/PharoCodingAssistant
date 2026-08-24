@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAAgentSessionTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Sessions',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Sessions'
 }
 
 { #category : 'private' }

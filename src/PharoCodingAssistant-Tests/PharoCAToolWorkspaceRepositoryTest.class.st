@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolWorkspaceRepositoryTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Tools-Workspace',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Tools-Workspace'
 }
 
 { #category : 'private' }

@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAExtension',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Extensions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Extensions'
 }
 
 { #category : 'lifecycle' }

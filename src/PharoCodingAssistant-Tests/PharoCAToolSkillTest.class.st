@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolSkillTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Skills',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Skills'
 }
 
 { #category : 'private' }

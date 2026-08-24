@@ -12,7 +12,8 @@ Class {
 		'credentialName'
 	],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'accessing' }

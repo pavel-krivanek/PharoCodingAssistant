@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'maximumSourceCharacters', 'maximumSummaryCharacters', 'maximumOutputTokens' ],
 	#category : 'PharoCodingAssistant-Context',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Context'
 }
 
 { #category : 'initialization' }

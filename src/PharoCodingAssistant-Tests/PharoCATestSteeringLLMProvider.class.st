@@ -4,7 +4,8 @@ Class {
 	#superclass : 'PharoCALLMProvider',
 	#instVars : [ 'requestCount', 'payloads', 'releaseSemaphore' ],
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'private' }

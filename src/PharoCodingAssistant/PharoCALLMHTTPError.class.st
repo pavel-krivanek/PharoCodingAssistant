@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Error',
 	#instVars : [ 'statusCode', 'responseBody' ],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'instance creation' }

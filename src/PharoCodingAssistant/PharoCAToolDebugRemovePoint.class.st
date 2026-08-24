@@ -1,0 +1,8 @@
+Class { #name : 'PharoCAToolDebugRemovePoint', #superclass : 'PharoCADebugTool', #category : 'PharoCodingAssistant-Tools-Pharo', #package : 'PharoCodingAssistant', #tag : 'Tools-Pharo' }
+{ #category : 'definition' } PharoCAToolDebugRemovePoint class >> toolName [ ^ #debug_remove_point ]
+{ #category : 'execution' } PharoCAToolDebugRemovePoint class >> executionMode [ ^ #exclusiveMutation ]
+{ #category : 'definition' } PharoCAToolDebugRemovePoint class >> llmDefinition [ ^ PharoCALLMToolDefinition name:'debug_remove_point' description:'Removes a breakpoint/watchpoint created by this assistant session. Pre-existing user DebugPoints are intentionally not removable by this handle API.' parameters:{'type'->'object'.'properties'->{'pointHandle'->{'type'->'string'} asDictionary} asDictionary.'required'->#('pointHandle')} asDictionary ]
+{ #category : 'execution' } PharoCAToolDebugRemovePoint class >> execute: args [ ^ self execute:args context:PharoCAToolExecutionContext unlimited ]
+{ #category : 'execution' }
+PharoCAToolDebugRemovePoint class >> execute: args context: context [ | h registry point before |
+ h:=args at:'pointHandle'. registry:=context requireRuntimeHandleRegistry. ((registry metadataAt:h kind:#debugPoint) at:'managed' ifAbsent:[false]) ifFalse:[Error signal:'DebugPoint is not owned by this assistant session']. point:=registry objectAt:h kind:#debugPoint. before:=self summaryForDebugPoint:point context:context. point remove. registry forget:h. context recordChangeKind:#debugPointRemoved target:(before at:'target') before:before after:nil metadata:{'runtimeOnly'->true} asDictionary. ^ {'pointHandle'->h.'removed'->true} asDictionary ]

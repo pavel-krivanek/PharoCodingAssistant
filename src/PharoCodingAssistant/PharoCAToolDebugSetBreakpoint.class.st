@@ -1,0 +1,10 @@
+Class { #name : 'PharoCAToolDebugSetBreakpoint', #superclass : 'PharoCADebugTool', #category : 'PharoCodingAssistant-Tools-Pharo', #package : 'PharoCodingAssistant', #tag : 'Tools-Pharo' }
+{ #category : 'definition' } PharoCAToolDebugSetBreakpoint class >> toolName [ ^ #debug_set_breakpoint ]
+{ #category : 'execution' } PharoCAToolDebugSetBreakpoint class >> executionMode [ ^ #exclusiveMutation ]
+{ #category : 'definition' }
+PharoCAToolDebugSetBreakpoint class >> llmDefinition [ ^ PharoCALLMToolDefinition name:'debug_set_breakpoint' description:'Installs a Pharo BreakDebugPoint on a method AST node selected by preorder nodeIndex (same indexing as get_method_ast). The point is automatically removed on session cleanup.' parameters:{'type'->'object'.'properties'->{'className'->{'type'->'string'} asDictionary.'selector'->{'type'->'string'} asDictionary.'side'->{'type'->'string'.'enum'->#('instance' 'class')} asDictionary.'nodeIndex'->{'type'->'integer'.'minimum'->1.'maximum'->100000} asDictionary} asDictionary.'required'->#('className' 'selector' 'nodeIndex')} asDictionary ]
+{ #category : 'execution' } PharoCAToolDebugSetBreakpoint class >> execute: args [ ^ self execute:args context:PharoCAToolExecutionContext unlimited ]
+{ #category : 'execution' }
+PharoCAToolDebugSetBreakpoint class >> execute: args context: context [ | cls side behavior method node point handle result |
+ cls:=PharoCAImageNavigation classNamed:(args at:'className'). side:=args at:'side' ifAbsent:['instance']. behavior:=side='class' ifTrue:[cls class] ifFalse:[cls]. method:=behavior compiledMethodAt:(args at:'selector') asSymbol ifAbsent:[Error signal:'Local method not found'].
+ node:=self nodeAtPreorderIndex:(args at:'nodeIndex') inMethod:method. point:=DebugPointManager installNew:BreakDebugPoint on:node. handle:=self registerDebugPoint:point context:context. result:=self summaryForDebugPoint:point context:context. result at:'handle' put:handle. context recordChangeKind:#debugPointInstalled target:(cls name,'>>',(args at:'selector')) before:nil after:result metadata:{'runtimeOnly'->true} asDictionary. ^ result ]

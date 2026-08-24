@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAToolPagination',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Tools',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'defaults' }

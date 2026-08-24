@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolTestCase',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'asserting' }

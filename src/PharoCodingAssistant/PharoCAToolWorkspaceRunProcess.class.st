@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAToolWorkspaceRunProcess',
 	#superclass : 'PharoCAWorkspaceTool',
 	#category : 'PharoCodingAssistant-Tools-Workspace',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools-Workspace'
 }
 
 { #category : 'definition' }

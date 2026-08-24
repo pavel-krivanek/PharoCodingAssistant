@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCARunTelemetryTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Observability',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Observability'
 }
 
 { #category : 'private' }

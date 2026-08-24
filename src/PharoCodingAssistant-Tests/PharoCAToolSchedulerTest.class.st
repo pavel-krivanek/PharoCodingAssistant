@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolSchedulerTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Tools',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Tools'
 }
 
 { #category : 'running' }

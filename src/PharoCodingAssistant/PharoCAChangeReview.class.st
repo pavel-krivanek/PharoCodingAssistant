@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAChangeReview',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Changes',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Changes'
 }
 
 { #category : 'defaults' }

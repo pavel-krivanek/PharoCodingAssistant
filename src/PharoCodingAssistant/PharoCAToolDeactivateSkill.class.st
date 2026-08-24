@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAToolDeactivateSkill',
 	#superclass : 'PharoCATool',
 	#category : 'PharoCodingAssistant-Skills',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Skills'
 }
 
 { #category : 'definition' }

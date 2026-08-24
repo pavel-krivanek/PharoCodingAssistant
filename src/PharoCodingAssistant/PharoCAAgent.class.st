@@ -20,7 +20,8 @@ Class {
 		'activeRunsMutex'
 	],
 	#category : 'PharoCodingAssistant-Core',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }
 
 { #category : 'configuration' }
@@ -147,9 +148,7 @@ PharoCAAgent >> executeRun: run prompt: aPrompt [
 	conversation ensureSystem: configuration systemPrompt.
 	conversation addUserMessage: run inputMessage.
 
-	tools := activeModel supportsTools
-		ifTrue: [ toolRegistry llmDefinitions ]
-		ifFalse: [ #() ].
+	tools := #().
 
 	run emit: #started payload: aPrompt.
 	iterations := 0.
@@ -164,6 +163,9 @@ PharoCAAgent >> executeRun: run prompt: aPrompt [
 		run iterations: iterations.
 		run beginAssistantResponse.
 		run emit: #modelRequestStarted payload: iterations.
+		tools := activeModel supportsTools
+			ifTrue: [ toolRegistry llmDefinitionsForSession: run session ]
+			ifFalse: [ #() ].
 
 		round := self
 			performModelRequestForRun: run

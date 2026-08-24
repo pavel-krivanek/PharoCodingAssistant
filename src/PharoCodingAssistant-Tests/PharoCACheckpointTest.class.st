@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCACheckpointTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Changes',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Changes'
 }
 
 { #category : 'private' }

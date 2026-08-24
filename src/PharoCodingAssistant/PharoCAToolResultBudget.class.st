@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'maximumSerializedCharacters' ],
 	#category : 'PharoCodingAssistant-Tools',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'instance creation' }

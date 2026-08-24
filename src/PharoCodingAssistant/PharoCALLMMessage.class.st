@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'role', 'contentParts', 'toolCalls', 'toolCallId', 'reasoning' ],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'instance creation' }

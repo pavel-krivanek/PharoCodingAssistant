@@ -2,6 +2,7 @@
 Class {
 	#name : 'PharoCA',
 	#superclass : 'PharoCAAgent',
-	#category : 'PharoCodingAssistant',
-	#package : 'PharoCodingAssistant'
+	#category : 'PharoCodingAssistant-Core',
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }

@@ -2,9 +2,10 @@
 Class {
 	#name : 'PharoCAToolRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'toolsByName', 'toolNames', 'resultBudget', 'scheduler', 'environment', 'profile', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore' ],
+	#instVars : [ 'toolsByName', 'toolNames', 'resultBudget', 'scheduler', 'environment', 'profile', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore', 'activePackNamesBySessionId', 'packMutex', 'objectHandleRegistriesBySessionId', 'testRunStoresBySessionId', 'transcriptBuffer', 'runtimeHandleRegistriesBySessionId' ],
 	#category : 'PharoCodingAssistant-Tools',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'instance creation' }
@@ -21,8 +22,109 @@ PharoCAToolRegistry class >> defaultInEnvironment: anEnvironment [
 ]
 
 { #category : 'defaults' }
+PharoCAToolRegistry class >> defaultActivePackNames [
+	^ #(catalog core)
+]
+
+{ #category : 'defaults' }
 PharoCAToolRegistry class >> defaultToolClassNames [
 	^ #(
+		PharoCAToolSearch
+		PharoCAToolEnable
+		PharoCAToolDisable
+		PharoCAToolGetMethod
+		PharoCAToolGetClassSummary
+		PharoCAToolListPackageTags
+		PharoCAToolSearchClasses
+		PharoCAToolSearchSelectors
+		PharoCAToolSearchMethodSource
+		PharoCAToolFindReferences
+		PharoCAToolFindSlotAccesses
+		PharoCAToolFindPragmas
+		PharoCAToolGetPackageDependencies
+		PharoCAToolGetMethodAST
+		PharoCAToolSearchAST
+		PharoCAToolCheckCode
+		PharoCAToolEvaluateExpression
+		PharoCAToolObjectSummary
+		PharoCAToolObjectSlots
+		PharoCAToolObjectSend
+		PharoCAToolObjectRelease
+		PharoCAToolTestDiscover
+		PharoCAToolTestResults
+		PharoCAToolTestFailure
+		PharoCAToolTestRerun
+		PharoCAToolTranscriptStatus
+		PharoCAToolTranscriptTail
+		PharoCAToolTranscriptClear
+		PharoCAToolDebugStart
+		PharoCAToolDebugAttachProcess
+		PharoCAToolDebugStatus
+		PharoCAToolDebugStack
+		PharoCAToolDebugFrame
+		PharoCAToolDebugStep
+		PharoCAToolDebugContinue
+		PharoCAToolDebugEvaluate
+		PharoCAToolDebugRestart
+		PharoCAToolDebugResume
+		PharoCAToolDebugTerminate
+		PharoCAToolDebugPoints
+		PharoCAToolDebugSetBreakpoint
+		PharoCAToolDebugSetWatchpoint
+		PharoCAToolDebugRemovePoint
+		PharoCAToolProcessList
+		PharoCAToolProcessStack
+		PharoCAToolProcessCpuSample
+		PharoCAToolProcessSuspend
+		PharoCAToolProcessResume
+		PharoCAToolProcessSetPriority
+		PharoCAToolProcessTerminate
+		PharoCAToolProcessDebug
+		PharoCAToolRefactorRenameClass
+		PharoCAToolRefactorRenameMethod
+		PharoCAToolRefactorRenameInstanceVariable
+		PharoCAToolRefactorRenameLocal
+		PharoCAToolRefactorRenamePackage
+		PharoCAToolRefactorExtractMethod
+		PharoCAToolRefactorExtractTemporary
+		PharoCAToolRefactorInlineMethod
+		PharoCAToolRefactorMoveMethod
+		PharoCAToolRefactorPullUpMethod
+		PharoCAToolRefactorPushDownMethod
+		PharoCAToolRefactorAddParameter
+		PharoCAToolRefactorRemoveParameter
+		PharoCAToolRefactorPreviewDetails
+		PharoCAToolRefactorApply
+		PharoCAToolRefactorDiscard
+		PharoCAToolTonelParse
+		PharoCAToolTonelValidatePackage
+		PharoCAToolTonelSerializeClass
+		PharoCAToolTonelExportClass
+		PharoCAToolTonelExportPackage
+		PharoCAToolTonelImportPreview
+		PharoCAToolTonelImportApply
+		PharoCAToolIcebergListRepositories
+		PharoCAToolIcebergRepositoryInfo
+		PharoCAToolIcebergStatus
+		PharoCAToolIcebergDiff
+		PharoCAToolIcebergLog
+		PharoCAToolIcebergCommitInfo
+		PharoCAToolIcebergBranches
+		PharoCAToolIcebergRemotes
+		PharoCAToolIcebergPackages
+		PharoCAToolIcebergCommit
+		PharoCAToolIcebergFetch
+		PharoCAToolIcebergPull
+		PharoCAToolIcebergPush
+		PharoCAToolIcebergCreateBranch
+		PharoCAToolIcebergSwitch
+		PharoCAToolIcebergAddRemote
+		PharoCAToolIcebergRemoveRemote
+		PharoCAToolIcebergLoadPackage
+		PharoCAToolIcebergUnloadPackage
+		PharoCAToolIcebergDiscardChanges
+		PharoCAToolIcebergClone
+		PharoCAToolIcebergAddLocalRepository
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
 		PharoCAToolDeactivateSkill
@@ -67,10 +169,28 @@ PharoCAToolRegistry >> llmDefinitions [
 ]
 
 { #category : 'accessing' }
+PharoCAToolRegistry >> llmDefinitionsForSession: aSession [
+	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
+]
+
+{ #category : 'accessing' }
+PharoCAToolRegistry >> definitionsForSession: aSession [
+	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
+]
+
+{ #category : 'accessing' }
 PharoCAToolRegistry >> enabledTools [
+	^ self enabledToolsForSession: nil
+]
+
+{ #category : 'accessing' }
+PharoCAToolRegistry >> enabledToolsForSession: aSession [
+	| activePacks |
+	activePacks := self activePackNamesForSession: aSession.
 	^ self tools select: [ :tool |
 		tool isEnabled and: [
-			(profile allowsTool: tool) and: [ tool requiresWorkspace not or: [ workspace notNil ] ] ] ]
+			(activePacks includes: tool toolPack asString) and: [
+				(profile allowsTool: tool) and: [ tool requiresWorkspace not or: [ workspace notNil ] ] ] ] ]
 ]
 
 { #category : 'executing' }
@@ -273,6 +393,10 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 	context workspace ifNil: [ context workspace: workspace ].
 	context workspaceCommandRunner ifNil: [ context workspaceCommandRunner: workspaceCommandRunner ].
 	context workspaceOutputStore ifNil: [ context workspaceOutputStore: workspaceOutputStore ].
+	context objectHandleRegistry ifNil: [ context objectHandleRegistry: (self objectHandleRegistryForRun: context run) ].
+	context testRunStore ifNil: [ context testRunStore: (self testRunStoreForRun: context run) ].
+	context transcriptBuffer ifNil: [ context transcriptBuffer: transcriptBuffer ].
+	context runtimeHandleRegistry ifNil: [ context runtimeHandleRegistry: (self runtimeHandleRegistryForRun: context run) ].
 	activeScheduler := context environment ifNil: [ scheduler ] ifNotNil: [ :env | env scheduler ].
 	[
 		[
@@ -364,6 +488,12 @@ PharoCAToolRegistry >> initialize [
 	profile := PharoCAToolProfile coding.
 	workspaceCommandRunner := PharoCAWorkspaceCommandRunner new.
 	workspaceOutputStore := PharoCAWorkspaceOutputStore new.
+	activePackNamesBySessionId := Dictionary new.
+	packMutex := Semaphore forMutualExclusion.
+	objectHandleRegistriesBySessionId := Dictionary new.
+	testRunStoresBySessionId := Dictionary new.
+	runtimeHandleRegistriesBySessionId := Dictionary new.
+	transcriptBuffer := PharoCATranscriptBuffer current.
 	environment := PharoCAEnvironment currentImage.
 	scheduler := environment scheduler
 ]
@@ -529,7 +659,7 @@ PharoCAToolRegistry >> validateArguments: arguments forTool: tool [
 
 { #category : 'validation' }
 PharoCAToolRegistry >> validationProblemFor: value schema: schema path: path [
-	| type enum items minimum maximum |
+	| type enum items minimum maximum minLength maxLength minItems maxItems |
 	type := schema at: 'type' ifAbsent: [ nil ].
 	type ifNotNil: [
 		((self value: value matchesJSONType: type) not) ifTrue: [
@@ -545,6 +675,17 @@ PharoCAToolRegistry >> validationProblemFor: value schema: schema path: path [
 		maximum := schema at: 'maximum'.
 		value > maximum ifTrue: [
 			^ 'Argument ', path, ' must be at most ', maximum asString ] ].
+	(value isString and: [ schema includesKey: 'minLength' ]) ifTrue: [
+		minLength := schema at: 'minLength'.
+		value size < minLength ifTrue: [ ^ 'Argument ', path, ' must contain at least ', minLength asString, ' characters' ] ].
+	(value isString and: [ schema includesKey: 'maxLength' ]) ifTrue: [
+		maxLength := schema at: 'maxLength'.
+		value size > maxLength ifTrue: [ ^ 'Argument ', path, ' must contain at most ', maxLength asString, ' characters' ] ].
+	(type = 'array' and: [ value isCollection and: [ value isString not ] ]) ifTrue: [
+		minItems := schema at: 'minItems' ifAbsent: [ nil ].
+		maxItems := schema at: 'maxItems' ifAbsent: [ nil ].
+		(minItems notNil and: [ value size < minItems ]) ifTrue: [ ^ 'Argument ', path, ' must contain at least ', minItems asString, ' items' ].
+		(maxItems notNil and: [ value size > maxItems ]) ifTrue: [ ^ 'Argument ', path, ' must contain at most ', maxItems asString, ' items' ] ].
 	(type = 'array' and: [ value isCollection and: [ value isString not ] ]) ifTrue: [
 		items := schema at: 'items' ifAbsent: [ nil ].
 		items ifNotNil: [
@@ -568,6 +709,124 @@ PharoCAToolRegistry >> value: value matchesJSONType: type [
 ]
 
 
+{ #category : 'tool packs' }
+PharoCAToolRegistry >> activePackNamesForSession: aSession [
+	| names |
+	aSession ifNil: [ ^ (self class defaultActivePackNames collect: [ :each | each asString ]) asArray ].
+	packMutex wait.
+	[
+		names := (activePackNamesBySessionId
+			at: aSession id
+			ifAbsentPut: [ self class defaultActivePackNames asSet ]) copy
+	] ensure: [ packMutex signal ].
+	^ (names asSortedCollection collect: [ :each | each asString ]) asArray
+]
+
+{ #category : 'tool packs' }
+PharoCAToolRegistry >> activatePackNamed: aName forSession: aSession [
+	| packName names changed |
+	aSession ifNil: [ Error signal: 'Tool pack activation requires a session' ].
+	packName := aName asString asLowercase asSymbol.
+	(self packNames includes: packName asString) ifFalse: [ Error signal: 'Unknown tool pack: ', aName asString ].
+	changed := false.
+	packMutex wait.
+	[
+		names := activePackNamesBySessionId at: aSession id ifAbsentPut: [ self class defaultActivePackNames asSet ].
+		(names includes: packName) ifFalse: [ names add: packName. changed := true ]
+	] ensure: [ packMutex signal ].
+	^ changed
+]
+
+{ #category : 'tool packs' }
+PharoCAToolRegistry >> deactivatePackNamed: aName forSession: aSession [
+	| packName names changed |
+	aSession ifNil: [ Error signal: 'Tool pack deactivation requires a session' ].
+	packName := aName asString asLowercase asSymbol.
+	packName = #catalog ifTrue: [ Error signal: 'The catalog pack cannot be disabled' ].
+	(self packNames includes: packName asString) ifFalse: [ Error signal: 'Unknown tool pack: ', aName asString ].
+	changed := false.
+	packMutex wait.
+	[
+		names := activePackNamesBySessionId at: aSession id ifAbsentPut: [ self class defaultActivePackNames asSet ].
+		(names includes: packName) ifTrue: [ names remove: packName. changed := true ]
+	] ensure: [ packMutex signal ].
+	^ changed
+]
+
+{ #category : 'tool packs' }
+PharoCAToolRegistry >> restoreActivePackNames: names forSession: aSession [
+	| normalized |
+	normalized := (names collect: [ :each | each asString asLowercase asSymbol ]) asSet.
+	normalized add: #catalog.
+	normalized do: [ :each |
+		(self packNames includes: each asString) ifFalse: [ Error signal: 'Cannot restore unknown tool pack: ', each asString ] ].
+	packMutex wait.
+	[ activePackNamesBySessionId at: aSession id put: normalized ] ensure: [ packMutex signal ]
+]
+
+{ #category : 'tool packs' }
+PharoCAToolRegistry >> clearPackStateForSession: aSession [
+	| objectRegistry runtimeRegistry |
+	packMutex wait.
+	[
+		activePackNamesBySessionId removeKey: aSession id ifAbsent: [ ].
+		objectRegistry := objectHandleRegistriesBySessionId removeKey: aSession id ifAbsent: [ nil ].
+		testRunStoresBySessionId removeKey: aSession id ifAbsent: [ ].
+		runtimeRegistry := runtimeHandleRegistriesBySessionId removeKey: aSession id ifAbsent: [ nil ]
+	] ensure: [ packMutex signal ].
+	objectRegistry ifNotNil: [ objectRegistry releaseAll ].
+	runtimeRegistry ifNotNil: [ runtimeRegistry releaseAll ]
+]
+
+{ #category : 'tool packs' }
+PharoCAToolRegistry >> packNames [
+	^ (((self tools collect: [ :tool | tool toolPack asString ]) asSet) asSortedCollection) asArray
+]
+
+{ #category : 'catalog' }
+PharoCAToolRegistry >> metadataForTool: tool session: aSession [
+	| definition activePacks available |
+	definition := tool llmDefinition.
+	activePacks := self activePackNamesForSession: aSession.
+	available := tool isEnabled
+		and: [ (profile allowsTool: tool)
+		and: [ tool requiresWorkspace not or: [ workspace notNil ] ] ].
+	^ {
+		'name' -> tool toolName asString.
+		'description' -> definition description.
+		'pack' -> tool toolPack asString.
+		'capability' -> tool capability asString.
+		'executionMode' -> tool executionMode asString.
+		'active' -> (activePacks includes: tool toolPack asSymbol).
+		'available' -> available.
+		'requiresWorkspace' -> tool requiresWorkspace
+	} asDictionary
+]
+
+{ #category : 'catalog' }
+PharoCAToolRegistry >> searchCatalog: query pack: packName arguments: arguments session: aSession [
+	| normalizedQuery normalizedPack matches page scope |
+	normalizedQuery := query asString asLowercase.
+	normalizedPack := packName ifNil: [ nil ] ifNotNil: [ packName asString asLowercase ].
+	matches := self tools collect: [ :tool | self metadataForTool: tool session: aSession ].
+	normalizedPack ifNotNil: [
+		matches := matches select: [ :metadata | (metadata at: 'pack') asLowercase = normalizedPack ] ].
+	normalizedQuery isEmpty ifFalse: [
+		matches := matches select: [ :metadata |
+			#('name' 'description' 'pack' 'capability') anySatisfy: [ :key |
+				(metadata at: key) asString asLowercase includesSubstring: normalizedQuery ] ] ].
+	matches := (matches asSortedCollection: [ :a :b | (a at: 'name') <= (b at: 'name') ]) asArray.
+	scope := 'tool_search|', normalizedQuery, '|', (normalizedPack ifNil: [ '' ]).
+	page := PharoCAToolPagination pageItems: matches arguments: arguments scope: scope.
+	^ {
+		'tools' -> (page at: 'items').
+		'packs' -> self packNames.
+		'activePacks' -> (self activePackNamesForSession: aSession).
+		'page' -> (page at: 'page')
+	} asDictionary
+]
+
+
 { #category : 'workspace' }
 PharoCAToolRegistry >> workspace [ ^ workspace ]
 
@@ -586,3 +845,72 @@ PharoCAToolRegistry >> workspaceOutputStore [ ^ workspaceOutputStore ]
 
 { #category : 'workspace' }
 PharoCAToolRegistry >> workspaceOutputStore: aStore [ workspaceOutputStore := aStore ]
+
+
+{ #category : 'objects' }
+PharoCAToolRegistry >> objectHandleRegistryForRun: aRun [
+	^ self objectHandleRegistryForSession: (aRun ifNil: [ nil ] ifNotNil: [ aRun session ])
+]
+
+{ #category : 'objects' }
+PharoCAToolRegistry >> objectHandleRegistryForSession: aSession [
+	| key registry |
+	key := aSession ifNil: [ '__direct__' ] ifNotNil: [ aSession id ].
+	packMutex critical: [
+		registry := objectHandleRegistriesBySessionId
+			at: key
+			ifAbsentPut: [ PharoCAObjectHandleRegistry new ] ].
+	^ registry
+]
+
+{ #category : 'objects' }
+PharoCAToolRegistry >> releaseObjectHandlesForSession: aSession [
+	| key registry |
+	key := aSession ifNil: [ '__direct__' ] ifNotNil: [ aSession id ].
+	packMutex critical: [ registry := objectHandleRegistriesBySessionId removeKey: key ifAbsent: [ nil ] ].
+	registry ifNotNil: [ registry releaseAll ].
+	^ registry notNil
+]
+
+
+{ #category : 'testing-tools' }
+PharoCAToolRegistry >> testRunStoreForRun: aRun [
+	^ self testRunStoreForSession: (aRun ifNil: [ nil ] ifNotNil: [ aRun session ])
+]
+
+{ #category : 'testing-tools' }
+PharoCAToolRegistry >> testRunStoreForSession: aSession [
+	| key store |
+	key := aSession ifNil: [ '__direct__' ] ifNotNil: [ aSession id ].
+	packMutex critical: [ store := testRunStoresBySessionId at: key ifAbsentPut: [ PharoCATestRunStore new ] ].
+	^ store
+]
+
+{ #category : 'transcript' }
+PharoCAToolRegistry >> transcriptBuffer [ ^ transcriptBuffer ]
+
+
+{ #category : 'runtime-handles' }
+PharoCAToolRegistry >> runtimeHandleRegistryForRun: aRun [
+	^ self runtimeHandleRegistryForSession: (aRun ifNil: [ nil ] ifNotNil: [ aRun session ])
+]
+
+{ #category : 'runtime-handles' }
+PharoCAToolRegistry >> runtimeHandleRegistryForSession: aSession [
+	| key registry |
+	key := aSession ifNil: [ '__direct__' ] ifNotNil: [ aSession id ].
+	packMutex critical: [
+		registry := runtimeHandleRegistriesBySessionId
+			at: key
+			ifAbsentPut: [ PharoCARuntimeHandleRegistry new ] ].
+	^ registry
+]
+
+{ #category : 'runtime-handles' }
+PharoCAToolRegistry >> releaseRuntimeHandlesForSession: aSession [
+	| key registry |
+	key := aSession ifNil: [ '__direct__' ] ifNotNil: [ aSession id ].
+	packMutex critical: [ registry := runtimeHandleRegistriesBySessionId removeKey: key ifAbsent: [ nil ] ].
+	registry ifNotNil: [ registry releaseAll ].
+	^ registry notNil
+]

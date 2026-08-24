@@ -13,7 +13,8 @@ Class {
 		'protocol'
 	],
 	#category : 'PharoCodingAssistant-Tests-Protocol',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Protocol'
 }
 
 { #category : 'private' }

@@ -3,7 +3,8 @@ Class {
 	#superclass : 'PharoCATestFixtureParent',
 	#instVars : [ 'childSlot' ],
 	#category : 'PharoCodingAssistant-Tests-Fixtures',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Fixtures'
 }
 
 { #category : 'fixture-local' }

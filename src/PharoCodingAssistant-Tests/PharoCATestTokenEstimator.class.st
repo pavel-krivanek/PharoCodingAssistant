@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCATestTokenEstimator',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'estimating' }

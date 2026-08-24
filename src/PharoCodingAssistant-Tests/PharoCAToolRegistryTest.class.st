@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolRegistryTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Tools',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Tools'
 }
 
 { #category : 'private' }
@@ -18,6 +19,20 @@ PharoCAToolRegistryTest >> testDefaultRegistryContainsExplicitToolSet [
 	registry := PharoCAToolRegistry default.
 	names := registry tools collect: [ :tool | tool toolName ].
 	self assert: names asArray equals: #(
+		tool_search tool_enable tool_disable get_method get_class_summary list_package_tags search_classes search_selectors search_method_source
+		find_references find_slot_accesses find_pragmas get_package_dependencies get_method_ast search_ast
+		check_code evaluate_expression object_summary object_slots object_send object_release
+		test_discover test_results test_failure test_rerun transcript_status transcript_tail transcript_clear
+		debug_start debug_attach_process debug_status debug_stack debug_frame debug_step debug_continue debug_evaluate debug_restart debug_resume debug_terminate
+		debug_points debug_set_breakpoint debug_set_watchpoint debug_remove_point process_list process_stack process_cpu_sample process_suspend process_resume process_set_priority process_terminate process_debug
+		refactor_rename_class refactor_rename_method refactor_rename_instance_variable refactor_rename_local refactor_rename_package
+		refactor_extract_method refactor_extract_temporary refactor_inline_method refactor_move_method refactor_pull_up_method refactor_push_down_method
+		refactor_add_parameter refactor_remove_parameter refactor_preview_details refactor_apply refactor_discard
+		tonel_parse tonel_validate_package tonel_serialize_class tonel_export_class tonel_export_package tonel_import_preview tonel_import_apply iceberg_list_repositories iceberg_repository_info iceberg_status iceberg_diff iceberg_log iceberg_commit_info
+		iceberg_branches iceberg_remotes iceberg_packages
+		iceberg_commit iceberg_fetch iceberg_pull iceberg_push iceberg_create_branch iceberg_switch
+		iceberg_add_remote iceberg_remove_remote iceberg_load_package iceberg_unload_package iceberg_discard_changes
+		iceberg_clone iceberg_add_local_repository
 		activate_skill compile_method deactivate_skill define_class evaluate get_class_comment get_class_definition
 		get_class_hierarchy get_method_inheritance get_package_comment list_classes_in_package
 		list_implementors list_methods list_packages list_senders list_skills evaluate_and_print
@@ -35,7 +50,7 @@ PharoCAToolRegistryTest >> testDefinitionsContainOnlyEnabledTools [
 	self deny: (names includes: 'remove_class').
 	self deny: (names includes: 'evaluate').
 	self deny: (names includes: 'evaluate_and_print').
-	self assert: names size equals: 17
+	self assert: names size equals: 20
 ]
 
 { #category : 'tests' }

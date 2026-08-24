@@ -17,7 +17,8 @@ Class {
 		'metadata'
 	],
 	#category : 'PharoCodingAssistant-Changes',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Changes'
 }
 
 { #category : 'instance creation' }

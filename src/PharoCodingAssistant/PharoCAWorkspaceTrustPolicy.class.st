@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'trustedIdentifiers', 'defaultTrusted', 'mutex' ],
 	#category : 'PharoCodingAssistant-Workspace',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Workspace'
 }
 
 { #category : 'instance creation' }

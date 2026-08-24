@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCATokenEstimator',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Context',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Context'
 }
 
 { #category : 'estimating' }

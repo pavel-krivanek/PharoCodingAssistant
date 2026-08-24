@@ -3,7 +3,8 @@ Class {
 	#superclass : 'PharoCAWorkspaceCommandRunner',
 	#instVars : [ 'results', 'requests' ],
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'initialization' }

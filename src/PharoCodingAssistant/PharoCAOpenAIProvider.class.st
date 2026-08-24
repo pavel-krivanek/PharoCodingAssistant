@@ -12,7 +12,8 @@ Class {
 		'modelListUrl'
 	],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'accessing' }

@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'entries', 'order', 'mutex', 'maximumEntries' ],
 	#category : 'PharoCodingAssistant-Workspace',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Workspace'
 }
 
 { #category : 'initialization' }

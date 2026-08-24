@@ -39,7 +39,8 @@ Class {
 	],
 	#classVars : [ 'LayoutBindingGeneration', 'LayoutBindingMutex' ],
 	#category : 'PharoCodingAssistant-Core',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }
 
 

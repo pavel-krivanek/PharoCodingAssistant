@@ -10,7 +10,8 @@ Class {
 		'defaultAgentId'
 	],
 	#category : 'PharoCodingAssistant-Adapters',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Adapters'
 }
 
 { #category : 'accessing' }

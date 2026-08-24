@@ -10,7 +10,8 @@ Class {
 		'modelRegistry'
 	],
 	#category : 'PharoCodingAssistant-Runtime',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Runtime'
 }
 
 { #category : 'accessing' }

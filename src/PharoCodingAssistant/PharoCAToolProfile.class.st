@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'name', 'capabilities', 'allowedToolNames', 'excludedToolNames' ],
 	#category : 'PharoCodingAssistant-Tools',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'instance creation' }
@@ -30,7 +31,7 @@ PharoCAToolProfile class >> readOnly [
 PharoCAToolProfile class >> coding [
 	^ self new
 		name: 'coding';
-		capabilities: #(inspection session coding testing);
+		capabilities: #(inspection session coding testing refactoring);
 		yourself
 ]
 
@@ -38,7 +39,7 @@ PharoCAToolProfile class >> coding [
 PharoCAToolProfile class >> full [
 	^ self new
 		name: 'full';
-		capabilities: #(inspection session coding testing evaluation destructive process);
+		capabilities: #(inspection session coding testing evaluation debugging refactoring destructive process);
 		yourself
 ]
 

@@ -675,6 +675,223 @@ A project can select one through `settings.json`:
 
 Specific tools can also be allowed or excluded with `tools.allow` and `tools.exclude` arrays.
 
+### Tool packs and lazy discovery
+
+The tool registry can contain more tools than are advertised to the model on every request. The original tool set remains in the default `core` pack, while larger/newer families can be activated lazily per durable session. The `catalog` pack is always active and contains:
+
+- `tool_search` — search the complete registered tool catalog, including inactive packs;
+- `tool_enable` — activate a pack for the current session;
+- `tool_disable` — deactivate a pack for the current session (the `catalog` pack itself cannot be disabled).
+
+Pack activation is session-scoped and persisted with the session. It changes the schemas advertised on the **next model request**, including the next round of the same running agent. It does not bypass the selected tool profile or explicit `tools.allow`/`tools.exclude` policy.
+
+The lazy `browse` pack contains the Pharo-native browsing and structural-search tools. Iteration 048 introduced the pack and iteration 049 expanded it substantially:
+
+- `get_method` — exact local method source plus package/tag/protocol/pragma metadata;
+- `get_class_summary` — superclass, package/tag, slots, class variables, traits and method/subclass counts;
+- `list_package_tags` — real Pharo package tags and class counts without mutating package organization;
+- `search_classes` — class-name search with exact/prefix/substring and package/tag filters;
+- `search_selectors` — implemented-selector search with package/tag/class filters and implementation counts;
+- `search_method_source` — paginated live-image source search returning compact snippets and metadata; class/package/tag filters narrow the candidate methods *before* source scanning, so scoped searches do not traverse source for the complete image;
+- `find_references` — references to an installed Smalltalk global binding;
+- `find_slot_accesses` — structural reads/writes/accesses of a named instance slot;
+- `find_pragmas` — exact pragma occurrence search with compact argument rendering;
+- `get_package_dependencies` — direct package dependencies derived from superclass/trait relations and referenced classes;
+- `get_method_ast` — paginated flat preorder projection of the real Opal AST;
+- `search_ast` — structural code search using Pharo's native `OCParseTreeSearcher` pattern language.
+
+The agent can therefore discover a capability with `tool_search`, enable `browse`, and use these tools on the next model request — including the next round of the same run — without carrying every future tool schema in every ordinary request.
+
+
+Iteration 050 adds three additional lazy packs for stateful runtime work. They use session-scoped transient stores, so live object handles and detailed test-run records do not survive image/session restoration.
+
+#### `execution` pack
+
+The `execution` pack provides safer code checking plus explicit live-object interaction:
+
+- `check_code` — parses/compiles a Pharo expression with Opal without executing it; returns validity, AST class/node count, and compiler notices;
+- `evaluate_expression` — evaluates with `OpalEvaluator`, returns elapsed time, bounded `printString`, result class, and an opaque `obj-N` handle;
+- `object_summary` — side-effect-conscious class/slot summary for a live handle;
+- `object_slots` — paginated slot inspection; non-immediate slot values receive child handles only when their page is requested;
+- `object_send` — sends a selector to a live handle, with JSON literal arguments or `{"handle":"obj-N"}` references;
+- `object_release` — releases a transient handle explicitly.
+
+Object handles are isolated by durable assistant session and have a sliding TTL. They are deliberately **not persisted**: reopening an old conversation cannot resurrect arbitrary object identities from an earlier image lifetime.
+
+Enabling the `execution` pack does not itself authorize arbitrary execution. `check_code`, `object_summary`, `object_slots`, and `object_release` use inspection capability, whereas `evaluate_expression` and `object_send` require the `evaluation` capability and execute exclusively. The active tool profile/allow/exclude policy remains authoritative.
+
+A typical exploratory sequence is:
+
+```text
+tool_enable pack:"execution"
+check_code code:"OrderedCollection new add: 1; yourself"
+evaluate_expression code:"OrderedCollection with: 1 with: 2"
+object_slots handle:"obj-1" limit:20
+object_send handle:"obj-1" selector:"size"
+object_release handle:"obj-1"
+```
+
+#### `testing` pack
+
+The richer SUnit tools keep large defect information out of the initial tool response:
+
+- `test_discover` — discovers tests by method/class/package/tag scope;
+- `run_tests` — executes method, class, package, tag, or explicit-selection scopes and returns a compact `test-run-N` identifier and summary;
+- `test_results` — retrieves deterministically ordered, paginated per-test status rows;
+- `test_failure` — retrieves the original captured exception class/message and a bounded signaler stack for one failure/error;
+- `test_rerun` — reruns the exact scope/specification of a previous test run.
+
+`run_tests` is deterministic unless shuffling is explicitly requested. A supplied shuffle seed is retained in the test-run specification and reused by `test_rerun`. Execution performs cooperative cancellation checks between individual SUnit tests rather than forcefully terminating arbitrary Pharo processes. Test-run records are transient and session-scoped.
+
+#### `runtime` pack
+
+Transcript access is exposed through a single image-level announcement bridge and bounded ring buffer:
+
+- `transcript_status` — reports the current Transcript implementation and capture-buffer status;
+- `transcript_tail` — returns entries after a monotonically increasing sequence cursor, with a bounded limit;
+- `transcript_clear` — clears both the Pharo Transcript and the assistant capture buffer.
+
+Interactive Transcript implementations announce entries and can therefore be tailed without polling the UI. In a headless image `Transcript` may be `NonInteractiveTranscript`, which writes to stdio and does not provide the same announcement stream; `transcript_status` reports the actual capture capability instead of claiming completeness.
+
+
+Iteration 051 adds two more lazy packs for live debugging and process control.
+
+#### `debug` pack
+
+The debugger pack is based on Pharo 14's real `SindarinDebugger`, `DebugSession`, and DebugPoint APIs rather than debugger-window automation:
+
+- `debug_start` — creates a new scriptable debugger for a Pharo expression and stops before the first executable expression;
+- `debug_attach_process` — attaches Sindarin to a process handle after applying the protected-process guards;
+- `debug_status` — current debugger state/source location;
+- `debug_stack` / `debug_frame` — paginated stack plus receiver, temporaries and exact method source;
+- `debug_step` — `into`, `over`, `through`, `bytecode`, `methodEntry`, and `return` modes;
+- `debug_continue` — cooperative continue until completion or an about-to-be-signalled exception, with cancellation/timeout checks between steps;
+- `debug_evaluate` — evaluates in an explicitly selected frame and returns a normal transient `obj-N` result handle;
+- `debug_restart` — restarts sessions created by `debug_start`;
+- `debug_resume` / `debug_terminate` — explicitly release a debugger by resuming or terminating its process;
+- `debug_points`, `debug_set_breakpoint`, `debug_set_watchpoint`, `debug_remove_point` — native `BreakDebugPoint`/`WatchDebugPoint` control.
+
+Debugger handles (`debug-N`) are **strong and session-scoped**. They do not expire while an agent is reasoning because silently expiring a suspended execution would be unsafe. A durable session does not serialize these runtime handles. Session cleanup terminates executions owned by `debug_start`, removes assistant-installed DebugPoints, and releases runtime references. An attached external process is not silently terminated on cleanup.
+
+Breakpoints use the same preorder AST node indexes returned by `get_method_ast`. Watchpoints can be class-wide or scoped to an existing `obj-N` object handle and support `read`, `write`, or `all` access. Only DebugPoints created by the current assistant session receive removable `point-N` handles; pre-existing user DebugPoints are visible but are not made removable through this API.
+
+Example:
+
+```text
+tool_enable pack:"debug"
+debug_start code:"| x | x := 1. x + 2"
+debug_step debugHandle:"debug-1" kind:"into"
+debug_frame debugHandle:"debug-1" frameIndex:1
+debug_evaluate debugHandle:"debug-1" frameIndex:1 code:"x"
+debug_continue debugHandle:"debug-1"
+debug_resume debugHandle:"debug-1"
+```
+
+The normal `coding` tool profile does not authorize debugger execution. The `full` profile adds the `debugging` capability; destructive termination still uses the separate `destructive` capability.
+
+#### `process` pack
+
+The process pack operates on Pharo `Process` objects and `ProcessorScheduler`, not operating-system subprocesses:
+
+- `process_list` — paginated live process inventory with strong `process-N` handles;
+- `process_stack` — bounded/paginated suspended-context stack snapshot;
+- `process_cpu_sample` — bounded CPU sampling through `ProcessorScheduler>>tallyCPUUsageFor:every:`;
+- `process_suspend` / `process_resume`;
+- `process_set_priority`;
+- `process_terminate` — destructive;
+- `process_debug` — bridge from a process handle into the Sindarin debugger.
+
+Process handles are strong for the assistant session but **own no process lifetime**: merely listing a process never terminates or resumes it during cleanup. Mutating process tools reject protected processes, including the currently active execution process, high-priority system processes, and recognized Zinc/WebSocket/PharoCA/Morphic/UI/timer infrastructure. `process_terminate` additionally requires the `destructive` capability.
+
+The existing `workspace_run_process` tool remains separate: it launches an operating-system command in the filesystem workspace, whereas this `process` pack controls Smalltalk processes inside the running Pharo image.
+
+### Native refactoring pack
+
+Iteration 052 adds the lazy `refactoring` pack. These tools use Pharo 14's actual `Re*`/`RB*` refactoring engine and `ReChangeManager`; they do not implement semantic refactorings through textual source replacement. The `coding` and `full` profiles include the separate `refactoring` capability.
+
+Every named refactoring tool is a **preview operation**. It runs the native preconditions, generates the native change model, returns a compact bounded preview, and stores a strong session-scoped `refactor-N` handle. Preview creation never mutates the image. Large plans can be inspected with `refactor_preview_details`.
+
+The pack contains:
+
+- `refactor_rename_class`;
+- `refactor_rename_method`;
+- `refactor_rename_instance_variable`;
+- `refactor_rename_local` for an argument or temporary in one method;
+- `refactor_rename_package`;
+- `refactor_extract_method`;
+- `refactor_extract_temporary`;
+- `refactor_inline_method`;
+- `refactor_move_method`;
+- `refactor_pull_up_method`;
+- `refactor_push_down_method`;
+- `refactor_add_parameter`;
+- `refactor_remove_parameter`;
+- `refactor_preview_details`;
+- `refactor_apply`;
+- `refactor_discard`.
+
+A typical flow is:
+
+```text
+tool_enable pack:"refactoring"
+refactor_rename_method className:"MyClass" selector:"oldName:" newSelector:"newName:"
+refactor_preview_details refactorHandle:"refactor-1" limit:20
+refactor_apply refactorHandle:"refactor-1"
+```
+
+`refactor_apply` does not trust the stored preview blindly. It rebuilds the same native refactoring from the original normalized arguments, regenerates the native changes against the **current image**, and compares a deterministic SHA-256 signature of the resulting plan with the preview signature. A native precondition failure or changed plan returns `status:"stale"` and performs no mutation. The verified native `ReAbstractTransformation>>performChanges` path then applies the already-generated `changes` through `ReChangeManager`; there is no independent second plan between signature validation and mutation.
+
+Preview handles are one-shot after successful apply and may be explicitly released with `refactor_discard`. They are runtime handles only and are never serialized into durable sessions. Native `RBRefactoringWarning` conditions are captured as warning strings rather than allowed to open/block an interactive UI. Native `RBRefactoringError` precondition failures are returned as structured preview results.
+
+Applied refactorings create one semantic `refactoringApplied` entry in the assistant Changes journal. Because the native refactoring may span many methods/classes and the journal currently records a compact semantic summary rather than a complete inverse native change graph, its rollback classification is deliberately **opaque** rather than pretending automatic rollback is safe. Checkpoints remain the appropriate higher-level recovery mechanism.
+
+
+### Tonel and Iceberg/Git packs
+
+Iteration 053 adds two lazy source/repository packs. Enable them only when needed, so the normal always-exposed tool catalog stays compact:
+
+```text
+tool_enable pack:"tonel"
+tool_enable pack:"iceberg"
+```
+
+The `tonel` pack uses Pharo's installed `TonelParser` and `TonelWriter`. It can parse or validate bounded Tonel payloads, serialize/export live classes and packages, and import a package through an explicit preview/apply lifecycle:
+
+- `tonel_parse`;
+- `tonel_validate_package`;
+- `tonel_serialize_class`;
+- `tonel_export_class` / `tonel_export_package`;
+- `tonel_import_preview` / `tonel_import_apply`.
+
+Import preview returns a transient session-scoped `tonel-import-N` handle and never changes the image. Apply rechecks the current package snapshot first; if the image changed since preview it returns a stale result instead of applying an obsolete patch. A successful handle is one-shot. The payload API accepts Tonel source, not arbitrary filesystem destinations; use the workspace file tools when actual path-level I/O is required.
+
+The `iceberg` pack works with repositories registered in the live Pharo image:
+
+- discovery/read: `iceberg_list_repositories`, `iceberg_repository_info`, `iceberg_status`, `iceberg_diff`, `iceberg_log`, `iceberg_commit_info`, `iceberg_branches`, `iceberg_remotes`, `iceberg_packages`;
+- repository mutations: `iceberg_commit`, `iceberg_fetch`, `iceberg_pull`, `iceberg_push`, `iceberg_create_branch`, `iceberg_switch`, `iceberg_add_remote`, `iceberg_remove_remote`;
+- package mutations: `iceberg_load_package`, `iceberg_unload_package`, `iceberg_discard_changes`;
+- repository setup: `iceberg_clone`, `iceberg_add_local_repository`.
+
+Normal mutations require the `coding` capability and are serialized as exclusive mutations. `iceberg_discard_changes` additionally requires the separate `destructive` capability, so it is not available through a normal coding profile. Pull is fast-forward-only and switch refuses dirty live packages rather than silently losing image-side edits.
+
+#### Git executable requirement and Pharo 14 compatibility boundary
+
+The supplied Pharo 14 image has a libgit/ThreadedFFI stack-safety problem on sufficiently deep same-thread call paths: native diff/commit/checkout/transport can segfault the VM depending on the remaining space in an 8 KB Smalltalk stack page. For that reason the 053 mutation/transport tools intentionally execute deep Git operations through the existing bounded OS-process runner and the system `git` executable, then use Tonel/Monticello to synchronize changed packages with the live image. Git commands are cancellation-aware, time-bounded and output-bounded.
+
+Therefore **`git` must be available on `PATH` for Iceberg mutation/transport tools**. Read-only Iceberg inspection continues to use the verified native model/path where safe. Do not replace this boundary with direct `LGitDiff`/Iceberg commit/transport calls merely because a shallow interactive experiment succeeds; the failure is caller-stack-depth dependent.
+
+This does not replace the existing workspace filesystem-Git tools. Those remain the direct repository/file-control family; the `iceberg` tools add Pharo-specific knowledge of registered Iceberg repositories and live packages.
+
+A representative flow is:
+
+```text
+tool_enable pack:"iceberg"
+iceberg_list_repositories limit:20
+iceberg_status repository:"MyProject" limit:50
+iceberg_commit repository:"MyProject" message:"Implement parser fix"
+iceberg_push repository:"MyProject" remote:"origin"
+```
+
 ## Skills, instructions and templates
 
 ### Instructions
@@ -911,6 +1128,34 @@ Then save the runtime profile if the change should survive restart:
 ```smalltalk
 harness saveRuntimeProfile.
 ```
+
+
+## Package organization
+
+`PharoCodingAssistant` intentionally remains a single production package for simple loading, but its classes are organized with Pharo **class tags**. In the System Browser the package is therefore split by responsibility instead of appearing as one flat list.
+
+| Tag | Responsibility |
+| --- | --- |
+| `Core` | agent/run orchestration and compatibility facade |
+| `Runtime` | configured agents and persisted runtime control plane |
+| `LLM` | provider protocol, providers, models, streaming and credentials |
+| `Context` | context construction, compaction and token estimation |
+| `Sessions` | durable conversations, entries, repositories and migration |
+| `Changes` | change journal, review, checkpoints and rollback support |
+| `Protocol` | external command/protocol surface and JSONL adapter |
+| `Adapters` | headless/UI-facing projections and subscriptions |
+| `Instructions` / `Skills` / `Extensions` | agent resource and extension mechanisms |
+| `Tools` | generic tool contracts, invocation, scheduling and result handling |
+| `Tools-Pharo` | tools that inspect or mutate the live Pharo image |
+| `Tools-Workspace` | filesystem, process and repository workspace tools |
+| `Workspace` | workspace, settings, resources, trust and harness support |
+| `Web` | Zinc HTTP/WebSocket server |
+| `Observability` | run telemetry |
+| `Environment` | execution environment abstraction |
+
+The test package is tagged in the same style (`Core`, `LLM`, `Protocol`, `Tools`, `Tools-Workspace`, `Web`, and so on), with additional `Fixtures`, `Support`, and `Contracts` tags for test-only code.
+
+When adding a production class, assign a real package tag rather than leaving it in `Uncategorized`. The test suite contains a package-organization contract that fails if production classes drift back into the root tag.
 
 ## Development and tests
 

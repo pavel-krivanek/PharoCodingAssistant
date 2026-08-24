@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAResourceLoaderTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Workspace',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Workspace'
 }
 
 { #category : 'private' }

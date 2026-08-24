@@ -8,7 +8,8 @@ Class {
 		'workspace'
 	],
 	#category : 'PharoCodingAssistant-Tests-Runtime',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Runtime'
 }
 
 { #category : 'running' }

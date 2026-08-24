@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'run', 'status', 'visibleText', 'reasoningText', 'lastContext', 'lastUsage', 'toolStates', 'eventCount', 'mutex', 'announcer' ],
 	#category : 'PharoCodingAssistant-Adapters',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Adapters'
 }
 
 { #category : 'initialization' }
@@ -22,7 +23,13 @@ PharoCARunViewModel >> initialize [
 { #category : 'accessing' }
 PharoCARunViewModel >> run [ ^ run ]
 { #category : 'accessing' }
-PharoCARunViewModel >> run: aRun [ run := aRun ]
+PharoCARunViewModel >> run: aRun [
+	run := aRun.
+	aRun isFinished ifTrue: [
+		mutex critical: [
+			status := aRun status.
+			visibleText := aRun answer ] ]
+]
 
 { #category : 'events' }
 PharoCARunViewModel >> consume: anEvent [
@@ -38,7 +45,7 @@ PharoCARunViewModel >> consumeUnlocked: anEvent [
 	type := anEvent type.
 	payload := anEvent payload.
 	type = #started ifTrue: [ status := #running ].
-	type = #textDelta ifTrue: [ visibleText := visibleText , payload ].
+	type = #textDelta ifTrue: [ (#(completed cancelled failed iterationLimitReached) includes: status) ifFalse: [ visibleText := visibleText , payload ] ].
 	type = #reasoningDelta ifTrue: [ reasoningText := reasoningText , payload ].
 	type = #contextPrepared ifTrue: [ lastContext := payload ].
 	type = #usage ifTrue: [ lastUsage := payload ].

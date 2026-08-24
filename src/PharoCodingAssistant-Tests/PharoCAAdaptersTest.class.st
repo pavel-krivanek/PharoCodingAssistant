@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAAdaptersTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Adapters',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Adapters'
 }
 
 { #category : 'private' }
@@ -74,4 +75,17 @@ PharoCAAdaptersTest >> testViewModelCanNotifyConcreteUIWithoutDependingOnMorphic
 	view consume: event.
 	self assert: view visibleText equals: 'live'.
 	self assert: observed asArray equals: #(textDelta)
+]
+
+{ #category : 'tests' }
+PharoCAAdaptersTest >> testViewModelReconcilesAlreadyFinishedRunWithoutDuplicatingLateTextDelta [
+	| run view |
+	run := PharoCARun new.
+	run finishCompletedWithAnswer: 'done'.
+	view := PharoCARunViewModel new.
+	view run: run.
+	self assert: view status equals: #completed.
+	self assert: view visibleText equals: 'done'.
+	view consume: (PharoCARunEvent type: #textDelta payload: 'done').
+	self assert: view visibleText equals: 'done'
 ]

@@ -8,7 +8,8 @@ Class {
 		'promptTokens', 'completionTokens', 'totalTokens', 'reasoningTokens', 'providerRetryCount', 'compactionSummaryCount', 'contextOverflowRecoveryCount', 'mutex'
 	],
 	#category : 'PharoCodingAssistant-Observability',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Observability'
 }
 
 { #category : 'initialization' }

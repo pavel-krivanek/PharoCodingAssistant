@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCARuntimeTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Runtime',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Runtime'
 }
 
 { #category : 'tests' }

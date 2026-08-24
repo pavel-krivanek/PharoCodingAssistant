@@ -3,7 +3,8 @@ Class {
 	#superclass : 'TestCase',
 	#instVars : [ 'fileSystem', 'workspace', 'repository', 'agent', 'provider', 'manager' ],
 	#category : 'PharoCodingAssistant-Tests-Sessions',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Sessions'
 }
 
 { #category : 'running' }

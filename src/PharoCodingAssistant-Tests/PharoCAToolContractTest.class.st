@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolContractTest',
 	#superclass : 'PharoCAToolTestCase',
 	#category : 'PharoCodingAssistant-Tests-Contracts',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Contracts'
 }
 
 { #category : 'support' }
@@ -56,7 +57,10 @@ PharoCAToolContractTest >> testToolNamesMatchDeclaredFunctionNames [
 PharoCAToolContractTest >> testEnabledToolsAreExactlyThoseReportedByPharoCA [
 	| expected actual |
 	actual := PharoCA new enabledTolls.
-	expected := self concreteTools select: [ :tool | tool isEnabled and: [ (PharoCAToolProfile coding allowsTool: tool) and: [ tool requiresWorkspace not ] ] ].
+	expected := self concreteTools select: [ :tool |
+		tool isEnabled and: [
+			(PharoCAToolRegistry defaultActivePackNames includes: tool toolPack) and: [
+				(PharoCAToolProfile coding allowsTool: tool) and: [ tool requiresWorkspace not ] ] ] ].
 	self assert: actual asSet equals: expected asSet
 ]
 
@@ -86,6 +90,13 @@ PharoCAToolContractTest >> testLegacyToolDefinitionProjectionIsProducedByOpenAIA
 PharoCAToolContractTest >> testBuiltInExecutionModesAreValid [
 	self concreteTools do: [ :tool |
 		self assert: (#(#parallelSafe #sequential #exclusiveMutation) includes: tool executionMode) ]
+]
+
+{ #category : 'tests' }
+PharoCAToolContractTest >> testEveryToolHasAValidPackName [
+	self concreteTools do: [ :tool |
+		self assert: tool toolPack isSymbol.
+		self deny: tool toolPack asString isEmpty ]
 ]
 
 { #category : 'tests' }

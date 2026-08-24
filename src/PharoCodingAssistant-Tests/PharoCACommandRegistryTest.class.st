@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCACommandRegistryTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Protocol',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Protocol'
 }
 
 { #category : 'tests' }

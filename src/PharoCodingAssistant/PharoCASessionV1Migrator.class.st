@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCASessionV1Migrator',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Sessions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Sessions'
 }
 
 { #category : 'migrating' }

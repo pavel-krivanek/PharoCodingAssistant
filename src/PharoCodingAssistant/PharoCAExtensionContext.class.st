@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'agent', 'run', 'session', 'environment', 'extension', 'state' ],
 	#category : 'PharoCodingAssistant-Extensions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Extensions'
 }
 
 { #category : 'accessing' }

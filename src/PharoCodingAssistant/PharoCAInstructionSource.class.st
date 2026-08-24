@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'name', 'content', 'kind', 'priority', 'enabled', 'sourcePath' ],
 	#category : 'PharoCodingAssistant-Instructions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Instructions'
 }
 
 { #category : 'instance creation' }

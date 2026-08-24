@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAToolListPackagesTest',
 	#superclass : 'PharoCAToolTestCase',
 	#category : 'PharoCodingAssistant-Tests-Tools',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Tools'
 }
 
 { #category : 'tests' }

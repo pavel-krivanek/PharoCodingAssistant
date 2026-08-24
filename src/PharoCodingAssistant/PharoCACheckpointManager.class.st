@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'environment', 'checkpoints', 'mutex', 'nextCheckpointNumber' ],
 	#category : 'PharoCodingAssistant-Changes',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Changes'
 }
 
 { #category : 'initialization' }

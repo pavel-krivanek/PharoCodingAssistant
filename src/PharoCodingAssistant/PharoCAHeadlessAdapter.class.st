@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'agent' ],
 	#category : 'PharoCodingAssistant-Adapters',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Adapters'
 }
 
 { #category : 'instance creation' }

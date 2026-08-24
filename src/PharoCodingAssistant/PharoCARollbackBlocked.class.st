@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Error',
 	#instVars : [ 'details' ],
 	#category : 'PharoCodingAssistant-Changes',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Changes'
 }
 
 { #category : 'signaling' }

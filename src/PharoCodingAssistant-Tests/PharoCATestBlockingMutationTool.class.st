@@ -4,7 +4,8 @@ Class {
 	#superclass : 'PharoCATool',
 	#classVars : [ 'ReleaseSemaphore', 'StartedSemaphore' ],
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'test support' }

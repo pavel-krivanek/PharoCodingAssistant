@@ -8,7 +8,8 @@ Class {
 		'omittedMessageCount', 'omittedMessages', 'compacted', 'compactionSummaryUsed'
 	],
 	#category : 'PharoCodingAssistant-Context',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Context'
 }
 
 { #category : 'converting' }

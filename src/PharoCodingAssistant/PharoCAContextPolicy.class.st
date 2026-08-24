@@ -11,7 +11,8 @@ Class {
 		'overflowSafetyMarginIncrementTokens'
 	],
 	#category : 'PharoCodingAssistant-Context',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Context'
 }
 
 { #category : 'converting' }

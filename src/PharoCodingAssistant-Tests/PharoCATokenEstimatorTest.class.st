@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCATokenEstimatorTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Context',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Context'
 }
 
 { #category : 'tests' }

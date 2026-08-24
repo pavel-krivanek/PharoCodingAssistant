@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAToolResult',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Tools',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'instance creation' }

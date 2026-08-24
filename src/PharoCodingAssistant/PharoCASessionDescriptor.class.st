@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'sessionId', 'workspaceId', 'workspaceName', 'name', 'createdAt', 'updatedAt', 'archived', 'entryCount', 'currentLeafId', 'file' ],
 	#category : 'PharoCodingAssistant-Sessions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Sessions'
 }
 
 { #category : 'instance creation' }

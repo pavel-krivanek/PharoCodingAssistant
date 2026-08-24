@@ -8,7 +8,8 @@ Class {
 		'rejectToolName', 'replacementResult', 'stateCounts', 'responseReplacement', 'replacementMessages', 'instructionSource', 'statePersistencePolicy'
 	],
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'lifecycle' }

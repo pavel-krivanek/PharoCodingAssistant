@@ -21,7 +21,8 @@ Class {
 		'initialReplayCount'
 	],
 	#category : 'PharoCodingAssistant-Adapters',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Adapters'
 }
 
 { #category : 'defaults' }

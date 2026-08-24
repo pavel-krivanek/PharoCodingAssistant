@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCAWorkspaceCommandRunner',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Workspace',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Workspace'
 }
 
 { #category : 'defaults' }

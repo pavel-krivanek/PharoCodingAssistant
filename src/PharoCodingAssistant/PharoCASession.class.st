@@ -10,7 +10,8 @@ Class {
 		'currentLeafId'
 	],
 	#category : 'PharoCodingAssistant-Sessions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Sessions'
 }
 
 { #category : 'private' }

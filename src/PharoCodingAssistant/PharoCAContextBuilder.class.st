@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'tokenEstimator', 'policy' ],
 	#category : 'PharoCodingAssistant-Context',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Context'
 }
 
 { #category : 'building' }

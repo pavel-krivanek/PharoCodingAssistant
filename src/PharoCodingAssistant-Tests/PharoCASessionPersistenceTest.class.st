@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCASessionPersistenceTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Sessions',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Sessions'
 }
 
 { #category : 'private' }
@@ -85,10 +86,12 @@ PharoCASessionPersistenceTest >> testSkillAndOptInExtensionStateRestoreButTransi
 	agent provider: provider.
 	session := agent newSession.
 	agent skillRegistry activateNamed: 'persisted-skill' session: session.
+	agent toolRegistry activatePackNamed: 'browse' forSession: session.
 	agent run: 'first' inSession: session.
 	snapshot := agent sessionSnapshotString: session.
 	dictionary := STONJSON fromString: snapshot.
 	self assert: (((dictionary at: 'agentState') at: 'activeSkills') includes: 'persisted-skill').
+	self assert: (((dictionary at: 'agentState') at: 'activeToolPacks') includes: 'browse').
 	self assert: ((((dictionary at: 'agentState') at: 'extensions') includesKey: 'persistent')).
 	self deny: ((((dictionary at: 'agentState') at: 'extensions') includesKey: 'transient')).
 
@@ -100,6 +103,7 @@ PharoCASessionPersistenceTest >> testSkillAndOptInExtensionStateRestoreButTransi
 	restoredAgent registerExtension: transient2.
 	restoredSession := restoredAgent restoreSessionFromString: snapshot.
 	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restoredSession) equals: #('persisted-skill').
+	self assert: (restoredAgent toolRegistry activePackNamesForSession: restoredSession) equals: #('browse' 'catalog' 'core').
 	provider2 := PharoCATestLLMProvider new.
 	provider2 queueResponse: (self completionWith: 'two').
 	restoredAgent provider: provider2.
@@ -201,4 +205,18 @@ PharoCASessionPersistenceTest >> testMultipartUserAttachmentRoundTripsWithMetada
 	self assert: restoredPart value equals: attachment value.
 	self assert: (restoredPart metadata at: 'attachment').
 	self assert: (restoredPart metadata at: 'name') equals: 'notes.txt'
+]
+
+{ #category : 'tests-048' }
+PharoCASessionPersistenceTest >> testOlderSnapshotWithoutToolPackStateRestoresDefaultPacks [
+	| agent session snapshot dictionary restoredAgent restoredSession state |
+	agent := PharoCA new.
+	session := agent newSession.
+	snapshot := agent sessionSnapshotString: session.
+	dictionary := STONJSON fromString: snapshot.
+	state := dictionary at: 'agentState'.
+	state removeKey: 'activeToolPacks' ifAbsent: [ ].
+	restoredAgent := PharoCA new.
+	restoredSession := restoredAgent restoreSessionFromString: (STONJSON toString: dictionary).
+	self assert: (restoredAgent toolRegistry activePackNamesForSession: restoredSession) equals: #('catalog' 'core')
 ]

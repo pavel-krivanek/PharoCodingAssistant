@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'skillsByName', 'skillNames', 'activeNamesBySessionId', 'mutex', 'discoveryCharacterBudget' ],
 	#category : 'PharoCodingAssistant-Skills',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Skills'
 }
 
 { #category : 'activation' }

@@ -1,0 +1,8 @@
+Class { #name : 'PharoCAToolTranscriptTail', #superclass : 'PharoCATool', #category : 'PharoCodingAssistant-Tools-Pharo', #package : 'PharoCodingAssistant', #tag : 'Tools-Pharo' }
+{ #category : 'definition' } PharoCAToolTranscriptTail class >> toolName [ ^ #transcript_tail ]
+{ #category : 'definition' } PharoCAToolTranscriptTail class >> toolPack [ ^ #runtime ]
+{ #category : 'definition' } PharoCAToolTranscriptTail class >> capability [ ^ #inspection ]
+{ #category : 'execution' } PharoCAToolTranscriptTail class >> executionMode [ ^ #parallelSafe ]
+{ #category : 'definition' } PharoCAToolTranscriptTail class >> llmDefinition [ ^ PharoCALLMToolDefinition name:'transcript_tail' description:'Returns bounded Transcript entries newer than a sequence cursor.' parameters:{'type'->'object'.'properties'->{'afterSequence'->{ 'type'->'integer'. 'minimum'->0 } asDictionary. 'limit'->{ 'type'->'integer'. 'minimum'->1. 'maximum'->200 } asDictionary} asDictionary.'required'->#()} asDictionary ]
+{ #category : 'execution' } PharoCAToolTranscriptTail class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+{ #category : 'execution' } PharoCAToolTranscriptTail class >> execute: args context: context [ | buffer after limit entries | buffer:=context requireTranscriptBuffer. after:=args at:'afterSequence' ifAbsent:[0]. limit:=args at:'limit' ifAbsent:[50]. entries:=buffer entriesAfter:after limit:limit. ^ {'entries'->entries. 'latestSequence'->buffer latestSequence. 'hasMore'->(entries size = limit and:[buffer latestSequence > ((entries last) at:'sequence')])} asDictionary ]

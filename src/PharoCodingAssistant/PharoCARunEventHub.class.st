@@ -13,7 +13,8 @@ Class {
 		'subscriptions'
 	],
 	#category : 'PharoCodingAssistant-Core',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }
 
 { #category : 'defaults' }

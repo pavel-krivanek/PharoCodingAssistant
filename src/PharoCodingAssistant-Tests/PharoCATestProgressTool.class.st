@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCATestProgressTool',
 	#superclass : 'PharoCATool',
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'execution' }

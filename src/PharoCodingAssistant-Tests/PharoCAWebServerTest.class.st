@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAWebServerTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Web',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Web'
 }
 
 { #category : 'tests' }

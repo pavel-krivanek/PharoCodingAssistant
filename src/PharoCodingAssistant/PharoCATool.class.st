@@ -4,8 +4,9 @@ Abstract superclass for all assistant tool commands, defining common behavior an
 Class {
 	#name : 'PharoCATool',
 	#superclass : 'Object',
-	#category : 'PharoCodingAssistant',
-	#package : 'PharoCodingAssistant'
+	#category : 'PharoCodingAssistant-Tools',
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'as yet unclassified' }
@@ -37,6 +38,12 @@ PharoCATool class >> capability [
 PharoCATool class >> executionMode [
 	"Conservative default for third-party tools. Built-in tools declare their mode explicitly."
 	^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCATool class >> toolPack [
+	"Core is the compatibility/default pack. New large tool families should override this so their schemas can be activated lazily per session."
+	^ #core
 ]
 
 { #category : 'as yet unclassified' }

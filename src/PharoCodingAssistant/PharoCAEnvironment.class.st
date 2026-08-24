@@ -5,7 +5,8 @@ Class {
 	#instVars : [ 'identifier', 'scheduler', 'changeJournal', 'checkpointManager', 'activeRuns', 'activeRunsMutex' ],
 	#classVars : [ 'CurrentImage' ],
 	#category : 'PharoCodingAssistant-Environment',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Environment'
 }
 
 { #category : 'instance creation' }

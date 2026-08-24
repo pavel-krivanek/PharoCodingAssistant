@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAModelTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Core',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Core'
 }
 
 { #category : 'tests' }

@@ -3,7 +3,8 @@ Class {
 	#superclass : 'PharoCALLMProvider',
 	#instVars : [ 'attempts', 'failuresBeforeSuccess', 'emitBeforeFailure', 'requests' ],
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'initialization' }

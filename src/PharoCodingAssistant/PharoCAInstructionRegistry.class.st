@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'sources', 'mutex' ],
 	#category : 'PharoCodingAssistant-Instructions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Instructions'
 }
 
 { #category : 'accessing' }

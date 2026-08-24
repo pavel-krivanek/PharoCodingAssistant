@@ -8,7 +8,8 @@ Class {
 		'reason'
 	],
 	#category : 'PharoCodingAssistant-Context',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Context'
 }
 
 { #category : 'signalling' }

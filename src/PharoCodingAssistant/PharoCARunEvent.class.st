@@ -10,7 +10,8 @@ Class {
 		'sessionId'
 	],
 	#category : 'PharoCodingAssistant-Core',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }
 
 { #category : 'instance creation' }

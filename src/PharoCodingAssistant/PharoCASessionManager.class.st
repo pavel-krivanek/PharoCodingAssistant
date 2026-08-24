@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'workspace', 'repository', 'agent', 'currentSession', 'currentName', 'ephemeralSessionIds', 'autosaveErrors', 'autosaveMutex', 'pendingAutosaves', 'autosaveSemaphore', 'ephemeralSessionsById' ],
 	#category : 'PharoCodingAssistant-Sessions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Sessions'
 }
 
 { #category : 'initialization' }

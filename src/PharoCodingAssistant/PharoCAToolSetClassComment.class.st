@@ -2,8 +2,9 @@
 Class {
 	#name : 'PharoCAToolSetClassComment',
 	#superclass : 'PharoCATool',
-	#category : 'PharoCodingAssistant',
-	#package : 'PharoCodingAssistant'
+	#category : 'PharoCodingAssistant-Tools-Pharo',
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools-Pharo'
 }
 
 { #category : 'execution' }

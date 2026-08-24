@@ -3,7 +3,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'parentSlot' ],
 	#category : 'PharoCodingAssistant-Tests-Fixtures',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Fixtures'
 }
 
 { #category : 'fixture-inheritance' }

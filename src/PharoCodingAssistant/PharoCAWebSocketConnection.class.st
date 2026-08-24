@@ -11,7 +11,8 @@ Class {
 		'subscriptionIds'
 	],
 	#category : 'PharoCodingAssistant-Web',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Web'
 }
 
 { #category : 'defaults' }

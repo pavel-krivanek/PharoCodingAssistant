@@ -2,5 +2,6 @@ Class {
 	#name : 'PharoCATestFixtureSibling',
 	#superclass : 'PharoCATestFixtureParent',
 	#category : 'PharoCodingAssistant-Tests-Fixtures',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Fixtures'
 }

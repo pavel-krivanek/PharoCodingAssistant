@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'session', 'leafId' ],
 	#category : 'PharoCodingAssistant-Core',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }
 
 { #category : 'instance creation' }

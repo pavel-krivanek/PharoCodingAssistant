@@ -2,9 +2,10 @@
 Class {
 	#name : 'PharoCAToolExecutionContext',
 	#superclass : 'Object',
-	#instVars : [ 'cancellationToken', 'deadlineMilliseconds', 'progressBlock', 'startedBlock', 'environment', 'run', 'invocation', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore' ],
+	#instVars : [ 'cancellationToken', 'deadlineMilliseconds', 'progressBlock', 'startedBlock', 'environment', 'run', 'invocation', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore', 'objectHandleRegistry', 'testRunStore', 'transcriptBuffer', 'runtimeHandleRegistry' ],
 	#category : 'PharoCodingAssistant-Tools',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools'
 }
 
 { #category : 'instance creation' }
@@ -161,3 +162,48 @@ PharoCAToolExecutionContext >> workspaceOutputStore [ ^ workspaceOutputStore ]
 
 { #category : 'workspace' }
 PharoCAToolExecutionContext >> workspaceOutputStore: aStore [ workspaceOutputStore := aStore ]
+
+
+{ #category : 'objects' }
+PharoCAToolExecutionContext >> objectHandleRegistry [ ^ objectHandleRegistry ]
+
+{ #category : 'objects' }
+PharoCAToolExecutionContext >> objectHandleRegistry: aRegistry [ objectHandleRegistry := aRegistry ]
+
+{ #category : 'objects' }
+PharoCAToolExecutionContext >> requireObjectHandleRegistry [
+	objectHandleRegistry ifNil: [ objectHandleRegistry := PharoCAObjectHandleRegistry new ].
+	^ objectHandleRegistry
+]
+
+
+{ #category : 'testing-tools' }
+PharoCAToolExecutionContext >> testRunStore [ ^ testRunStore ]
+{ #category : 'testing-tools' }
+PharoCAToolExecutionContext >> testRunStore: aStore [ testRunStore := aStore ]
+{ #category : 'testing-tools' }
+PharoCAToolExecutionContext >> requireTestRunStore [
+	testRunStore ifNil: [ testRunStore := PharoCATestRunStore new ].
+	^ testRunStore
+]
+
+{ #category : 'transcript' }
+PharoCAToolExecutionContext >> transcriptBuffer [ ^ transcriptBuffer ]
+{ #category : 'transcript' }
+PharoCAToolExecutionContext >> transcriptBuffer: aBuffer [ transcriptBuffer := aBuffer ]
+{ #category : 'transcript' }
+PharoCAToolExecutionContext >> requireTranscriptBuffer [
+	transcriptBuffer ifNil: [ transcriptBuffer := PharoCATranscriptBuffer new ].
+	^ transcriptBuffer
+]
+
+
+{ #category : 'runtime-handles' }
+PharoCAToolExecutionContext >> runtimeHandleRegistry [ ^ runtimeHandleRegistry ]
+{ #category : 'runtime-handles' }
+PharoCAToolExecutionContext >> runtimeHandleRegistry: aRegistry [ runtimeHandleRegistry := aRegistry ]
+{ #category : 'runtime-handles' }
+PharoCAToolExecutionContext >> requireRuntimeHandleRegistry [
+	runtimeHandleRegistry ifNil: [ runtimeHandleRegistry := PharoCARuntimeHandleRegistry new ].
+	^ runtimeHandleRegistry
+]

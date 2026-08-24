@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAAnthropicProviderTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-LLM',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'LLM'
 }
 
 { #category : 'support' }

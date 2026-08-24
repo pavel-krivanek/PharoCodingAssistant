@@ -4,7 +4,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [ 'model', 'messages', 'toolDefinitions', 'temperature', 'reasoningEffort', 'maxOutputTokens', 'toolChoice', 'providerOptions' ],
 	#category : 'PharoCodingAssistant-LLM',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'LLM'
 }
 
 { #category : 'initialization' }

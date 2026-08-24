@@ -2,7 +2,8 @@ Class {
 	#name : 'PharoCAInstructionSourceTest',
 	#superclass : 'TestCase',
 	#category : 'PharoCodingAssistant-Tests-Instructions',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Instructions'
 }
 
 { #category : 'tests' }

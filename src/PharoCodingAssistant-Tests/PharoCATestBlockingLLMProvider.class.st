@@ -7,7 +7,8 @@ Class {
 		'releaseSemaphore'
 	],
 	#category : 'PharoCodingAssistant-Tests-Support',
-	#package : 'PharoCodingAssistant-Tests'
+	#package : 'PharoCodingAssistant-Tests',
+	#tag : 'Support'
 }
 
 { #category : 'accessing' }

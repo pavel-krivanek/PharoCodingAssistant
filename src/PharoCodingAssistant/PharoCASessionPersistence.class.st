@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCASessionPersistence',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Sessions',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Sessions'
 }
 
 { #category : 'accessing' }
@@ -23,6 +24,7 @@ PharoCASessionPersistence >> dictionaryForSession: aSession agent: anAgentOrNil 
 	anAgentOrNil ifNotNil: [
 		state
 			at: 'activeSkills' put: (anAgentOrNil skillRegistry activeSkillNamesForSession: aSession);
+			at: 'activeToolPacks' put: (anAgentOrNil toolRegistry activePackNamesForSession: aSession);
 			at: 'extensions' put: (anAgentOrNil extensionRegistry persistentStateForSession: aSession) ].
 	^ {
 		'format' -> 'PharoCodingAssistantSession'.
@@ -45,7 +47,7 @@ PharoCASessionPersistence >> stringForSession: aSession agent: anAgentOrNil [
 
 { #category : 'deserializing' }
 PharoCASessionPersistence >> sessionFromDictionary: aDictionary agent: anAgentOrNil [
-	| version session state activeSkills extensionState |
+	| version session state activeSkills activeToolPacks extensionState |
 	(aDictionary at: 'format' ifAbsent: [ nil ]) = 'PharoCodingAssistantSession'
 		ifFalse: [ Error signal: 'Not a PharoCodingAssistant session snapshot' ].
 	version := aDictionary at: 'version' ifAbsent: [ Error signal: 'Session snapshot has no version' ].
@@ -56,6 +58,8 @@ PharoCASessionPersistence >> sessionFromDictionary: aDictionary agent: anAgentOr
 		state := aDictionary at: 'agentState' ifAbsent: [ Dictionary new ].
 		activeSkills := state at: 'activeSkills' ifAbsent: [ #() ].
 		anAgentOrNil skillRegistry restoreActiveSkillNames: activeSkills forSession: session.
+		activeToolPacks := state at: 'activeToolPacks' ifAbsent: [ anAgentOrNil toolRegistry class defaultActivePackNames ].
+		anAgentOrNil toolRegistry restoreActivePackNames: activeToolPacks forSession: session.
 		extensionState := state at: 'extensions' ifAbsent: [ Dictionary new ].
 		anAgentOrNil extensionRegistry restorePersistentState: extensionState forSession: session ].
 	^ session

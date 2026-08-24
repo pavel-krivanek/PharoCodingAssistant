@@ -3,7 +3,8 @@ Class {
 	#name : 'PharoCARuntimeProfilePersistence',
 	#superclass : 'Object',
 	#category : 'PharoCodingAssistant-Runtime',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Runtime'
 }
 
 { #category : 'accessing' }

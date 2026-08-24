@@ -6,7 +6,8 @@ Class {
 		'callbacks'
 	],
 	#category : 'PharoCodingAssistant-Core',
-	#package : 'PharoCodingAssistant'
+	#package : 'PharoCodingAssistant',
+	#tag : 'Core'
 }
 
 { #category : 'control' }
