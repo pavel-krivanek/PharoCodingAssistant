@@ -125,6 +125,8 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolIcebergDiscardChanges
 		PharoCAToolIcebergClone
 		PharoCAToolIcebergAddLocalRepository
+		PharoCAToolUIListWindows
+		PharoCAToolUIScreenshot
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
 		PharoCAToolDeactivateSkill
@@ -785,12 +787,21 @@ PharoCAToolRegistry >> packNames [
 
 { #category : 'catalog' }
 PharoCAToolRegistry >> metadataForTool: tool session: aSession [
-	| definition activePacks available |
+	| definition activePacks available reason |
 	definition := tool llmDefinition.
 	activePacks := self activePackNamesForSession: aSession.
 	available := tool isEnabled
 		and: [ (profile allowsTool: tool)
 		and: [ tool requiresWorkspace not or: [ workspace notNil ] ] ].
+	reason := tool isEnabled
+		ifFalse: [ 'tool_disabled' ]
+		ifTrue: [
+			(profile allowsTool: tool)
+				ifFalse: [ 'profile_restricted' ]
+				ifTrue: [
+					(tool requiresWorkspace and: [ workspace isNil ])
+						ifTrue: [ 'workspace_required' ]
+						ifFalse: [ 'available' ] ] ].
 	^ {
 		'name' -> tool toolName asString.
 		'description' -> definition description.
@@ -799,6 +810,8 @@ PharoCAToolRegistry >> metadataForTool: tool session: aSession [
 		'executionMode' -> tool executionMode asString.
 		'active' -> (activePacks includes: tool toolPack asSymbol).
 		'available' -> available.
+		'availabilityReason' -> reason.
+		'profile' -> profile name.
 		'requiresWorkspace' -> tool requiresWorkspace
 	} asDictionary
 ]

@@ -116,21 +116,20 @@ PharoCAAgentToolRegistryTest >> testUnknownModelToolCallBecomesRecoverableToolRe
 ]
 
 { #category : 'tests' }
-PharoCAAgentToolRegistryTest >> testModelInventedEvaluationCallIsRejectedByDefaultCodingProfile [
+PharoCAAgentToolRegistryTest >> testModelEvaluationCallIsAdvertisedAndExecutableByDefaultCodingProfile [
 	| agent provider run secondPayload toolMessage result advertisedNames |
 	provider := PharoCATestLLMProvider new.
 	provider
-		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"Smalltalk globals at: #PCAProfileEscape put: true"}');
-		queueResponse: (self completionWith: 'recovered').
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"1 + 2"}');
+		queueResponse: (self completionWith: 'done').
 	agent := PharoCA new provider: provider; yourself.
-	run := agent run: 'try forbidden evaluation'.
+	run := agent run: 'evaluate an expression'.
 	self assert: run status equals: #completed.
-	self deny: (Smalltalk globals includesKey: #PCAProfileEscape).
 	advertisedNames := ((provider payloads first at: 'tools') collect: [ :definition | (definition at: 'function') at: 'name' ]).
-	self deny: (advertisedNames includes: 'evaluate_and_print').
+	self assert: (advertisedNames includes: 'evaluate_and_print').
 	secondPayload := provider payloads second.
 	toolMessage := (secondPayload at: 'messages') detect: [ :message | (message at: 'role') = 'tool' ].
 	result := STONJSON fromString: (toolMessage at: 'content').
-	self deny: (result at: 'ok').
-	self assert: ((result at: 'error') at: 'type') equals: 'tool_not_allowed'
+	self assert: (result at: 'ok').
+	self assert: ((result at: 'result') at: 'result') equals: '3'
 ]

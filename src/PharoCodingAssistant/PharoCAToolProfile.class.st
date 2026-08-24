@@ -31,7 +31,7 @@ PharoCAToolProfile class >> readOnly [
 PharoCAToolProfile class >> coding [
 	^ self new
 		name: 'coding';
-		capabilities: #(inspection session coding testing refactoring);
+		capabilities: #(inspection session coding testing evaluation refactoring);
 		yourself
 ]
 

@@ -7,15 +7,15 @@ Class {
 }
 
 { #category : 'tests' }
-PharoCAToolProfileTest >> testDefaultRegistryUsesCodingProfileAndDoesNotAdvertiseEvaluation [
+PharoCAToolProfileTest >> testDefaultRegistryUsesCodingProfileAndAdvertisesEvaluation [
 	| registry names |
 	registry := PharoCAToolRegistry default.
 	names := registry enabledTools collect: [ :each | each toolName ].
 	self assert: registry profile name equals: 'coding'.
 	self assert: (names includes: #compile_method).
 	self assert: (names includes: #run_tests).
-	self deny: (names includes: #evaluate).
-	self deny: (names includes: #evaluate_and_print)
+	self assert: (names includes: #evaluate).
+	self assert: (names includes: #evaluate_and_print)
 ]
 
 { #category : 'tests' }
@@ -43,13 +43,13 @@ PharoCAToolProfileTest >> testFullProfileMakesEvaluationAvailableButDoesNotOverr
 ]
 
 { #category : 'tests' }
-PharoCAToolProfileTest >> testAllowOverrideCanOptSingleEvaluationToolIntoCodingProfile [
+PharoCAToolProfileTest >> testExcludeOverrideCanRemoveSingleEvaluationToolFromCodingProfile [
 	| registry names |
 	registry := PharoCAToolRegistry default.
-	registry allowToolNamed: 'evaluate_and_print'.
+	registry excludeToolNamed: 'evaluate_and_print'.
 	names := registry enabledTools collect: [ :each | each toolName ].
-	self assert: (names includes: #evaluate_and_print).
-	self deny: (names includes: #evaluate)
+	self deny: (names includes: #evaluate_and_print).
+	self assert: (names includes: #evaluate)
 ]
 
 { #category : 'tests' }
@@ -65,6 +65,7 @@ PharoCAToolProfileTest >> testExcludeOverrideWinsOverCapabilityAndAllow [
 PharoCAToolProfileTest >> testExcludedToolCannotBeInvokedEvenWhenModelInventsItsName [
 	| registry result |
 	registry := PharoCAToolRegistry default.
+	registry excludeToolNamed: 'evaluate_and_print'.
 	result := registry executeNamed: 'evaluate_and_print' arguments: { 'code' -> '1 + 2' } asDictionary.
 	self deny: (result at: 'ok').
 	self assert: ((result at: 'error') at: 'type') equals: 'tool_not_allowed'.
@@ -86,9 +87,21 @@ PharoCAToolProfileTest >> testProfileCopyIsIndependent [
 	| original copy |
 	original := PharoCAToolProfile coding.
 	copy := original copy.
-	copy allowToolNamed: #evaluate.
-	self deny: (original allowsTool: PharoCAToolDoIt).
-	self assert: (copy allowsTool: PharoCAToolDoIt)
+	copy excludeToolNamed: #evaluate.
+	self assert: (original allowsTool: PharoCAToolDoIt).
+	self deny: (copy allowsTool: PharoCAToolDoIt)
+]
+
+{ #category : 'tests' }
+PharoCAToolProfileTest >> testCodingProfileCanExecuteEvaluationAndReportsEvaluationErrors [
+	| registry success failure |
+	registry := PharoCAToolRegistry default.
+	success := registry executeNamed: 'evaluate_and_print' arguments: { 'code' -> '1 + 2' } asDictionary.
+	self assert: (success at: 'ok').
+	self assert: ((success at: 'result') at: 'result') equals: '3'.
+	failure := registry executeNamed: 'evaluate' arguments: { 'code' -> '1 / 0' } asDictionary.
+	self deny: (failure at: 'ok').
+	self assert: ((failure at: 'error') at: 'type') equals: 'tool_execution_error'
 ]
 
 { #category : 'tests' }

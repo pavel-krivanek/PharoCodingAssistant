@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCAEnvironment',
 	#superclass : 'Object',
-	#instVars : [ 'identifier', 'scheduler', 'changeJournal', 'checkpointManager', 'activeRuns', 'activeRunsMutex' ],
+	#instVars : [ 'identifier', 'scheduler', 'changeJournal', 'checkpointManager', 'activeRuns', 'activeRunsMutex', 'artifactStore' ],
 	#classVars : [ 'CurrentImage' ],
 	#category : 'PharoCodingAssistant-Environment',
 	#package : 'PharoCodingAssistant',
@@ -26,6 +26,13 @@ PharoCAEnvironment class >> named: aString [
 PharoCAEnvironment class >> resetCurrentImage [
 	CurrentImage := nil
 ]
+
+
+{ #category : 'artifacts' }
+PharoCAEnvironment >> artifactStore [ ^ artifactStore ]
+
+{ #category : 'artifacts' }
+PharoCAEnvironment >> artifactStore: aStore [ artifactStore := aStore ]
 
 { #category : 'accessing' }
 PharoCAEnvironment >> changeJournal [ ^ changeJournal ]
@@ -62,7 +69,8 @@ PharoCAEnvironment >> initialize [
 	changeJournal := PharoCAChangeJournal forEnvironmentId: identifier.
 	checkpointManager := PharoCACheckpointManager new environment: self; yourself.
 	activeRuns := IdentitySet new.
-	activeRunsMutex := Semaphore forMutualExclusion
+	activeRunsMutex := Semaphore forMutualExclusion.
+	artifactStore := PharoCAArtifactStore new
 ]
 
 { #category : 'tools' }

@@ -15,11 +15,11 @@ PharoCAToolObjectExecutionTest >> testEvaluateReturnsHandleTimingAndBoundedPrese
 ]
 
 { #category : 'tests' }
-PharoCAToolObjectExecutionTest >> testCodingProfileDoesNotAllowArbitraryEvaluation [
+PharoCAToolObjectExecutionTest >> testCodingProfileAllowsExpressionEvaluation [
 	| result |
 	result := PharoCAToolRegistry default executeNamed: 'evaluate_expression' arguments: { 'code' -> '1 + 2' } asDictionary.
-	self deny: (result at: 'ok').
-	self assert: ((result at: 'error') at: 'type') equals: 'tool_not_allowed'
+	self assert: (result at: 'ok').
+	self assert: ((result at: 'result') at: 'printString') equals: '3'
 ]
 
 { #category : 'tests' }

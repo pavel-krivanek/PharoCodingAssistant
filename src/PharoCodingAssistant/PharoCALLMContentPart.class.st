@@ -19,6 +19,12 @@ PharoCALLMContentPart class >> imageURL: aString [
 ]
 
 { #category : 'instance creation' }
+PharoCALLMContentPart class >> imageArtifact: aDescriptor [
+	"Provider-neutral reference to an environment artifact. Provider adapters deliberately do not resolve this yet; a future vision bridge can project it to URL/base64 without changing durable message shape."
+	^ self type: #imageArtifact value: aDescriptor copy
+]
+
+{ #category : 'instance creation' }
 PharoCALLMContentPart class >> type: aSymbol value: anObject [
 	^ self new type: aSymbol; value: anObject; yourself
 ]
@@ -44,6 +50,9 @@ PharoCALLMContentPart >> metadata: aDictionary [ metadata := aDictionary copy ]
 
 { #category : 'testing' }
 PharoCALLMContentPart >> isText [ ^ type = #text ]
+
+{ #category : 'testing' }
+PharoCALLMContentPart >> isImage [ ^ type = #imageURL or: [ type = #imageArtifact ] ]
 
 { #category : 'converting' }
 PharoCALLMContentPart >> asDictionary [

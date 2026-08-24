@@ -159,3 +159,27 @@ PharoCALLMProtocolTest >> testTokenEstimatorAcceptsCanonicalMessagesAndToolDefin
 	self assert: messageTokens > 0.
 	self assert: definitionTokens > 0
 ]
+
+{ #category : 'tests-054' }
+PharoCALLMProtocolTest >> testImageArtifactContentPartIsProviderNeutralAndCountsAsImage [
+	| descriptor part restored estimator |
+	descriptor := { 'artifactId' -> 'artifact-123'. 'mimeType' -> 'image/png'. 'sizeBytes' -> 42 } asDictionary.
+	part := PharoCALLMContentPart imageArtifact: descriptor.
+	self assert: part type equals: #imageArtifact.
+	self assert: part isImage.
+	self deny: part isText.
+	restored := PharoCALLMContentPart fromDictionary: part asDictionary.
+	self assert: restored type equals: #imageArtifact.
+	self assert: (restored value at: 'artifactId') equals: 'artifact-123'.
+	estimator := PharoCATokenEstimator new.
+	self assert: (estimator estimateContentPart: part) equals: estimator imageContentTokens
+]
+
+{ #category : 'tests-054' }
+PharoCALLMProtocolTest >> testProviderAdaptersRejectUnresolvedArtifactReferencesExplicitly [
+	| part message |
+	part := PharoCALLMContentPart imageArtifact: { 'artifactId' -> 'artifact-123'. 'mimeType' -> 'image/png' } asDictionary.
+	message := PharoCALLMMessage new role: #user; contentParts: { part }; yourself.
+	self should: [ PharoCAOpenAIProvider new wireMessageFor: message ] raise: Error.
+	self should: [ PharoCAAnthropicProvider new wireRegularMessageFor: message ] raise: Error
+]

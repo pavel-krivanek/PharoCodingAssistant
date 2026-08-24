@@ -64,7 +64,7 @@ PharoCAToolExecutionPackContractTest >> testStringAndArrayBoundsAreEnforcedByGen
 ]
 
 { #category : 'tests' }
-PharoCAToolExecutionPackContractTest >> testPackActivationStillRespectsProfileCapabilities [
+PharoCAToolExecutionPackContractTest >> testPackActivationRespectsCodingEvaluationCapability [
 	| registry session names |
 	registry := PharoCAToolRegistry default.
 	session := PharoCASession new.
@@ -72,10 +72,10 @@ PharoCAToolExecutionPackContractTest >> testPackActivationStillRespectsProfileCa
 	names := (registry definitionsForSession: session) collect: [ :each | (each at: 'function') at: 'name' ].
 	self assert: (names includes: 'check_code').
 	self assert: (names includes: 'object_summary').
-	self deny: (names includes: 'evaluate_expression').
-	self deny: (names includes: 'object_send').
-	registry useProfileNamed: 'full'.
-	names := (registry definitionsForSession: session) collect: [ :each | (each at: 'function') at: 'name' ].
 	self assert: (names includes: 'evaluate_expression').
-	self assert: (names includes: 'object_send')
+	self assert: (names includes: 'object_send').
+	registry useProfileNamed: 'read-only'.
+	names := (registry definitionsForSession: session) collect: [ :each | (each at: 'function') at: 'name' ].
+	self deny: (names includes: 'evaluate_expression').
+	self deny: (names includes: 'object_send')
 ]

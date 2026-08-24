@@ -94,6 +94,9 @@ PharoCAWebServer >> handleRequest: request [
 	request uri firstPathSegment = 'assets' ifTrue: [
 		request uri pathSegments size = 2 ifFalse: [ ^ ZnResponse notFound: request uri ].
 		^ self serveAssetNamed: request uri pathSegments second ].
+	request uri firstPathSegment = 'artifacts' ifTrue: [
+		request uri pathSegments size = 2 ifFalse: [ ^ ZnResponse notFound: request uri ].
+		^ self serveArtifactId: request uri pathSegments second ].
 	^ ZnResponse notFound: request uri
 ]
 
@@ -145,4 +148,19 @@ PharoCAWebServer >> serveAssetNamed: aName [
 			ifTrue: [ ZnMimeType textCss ]
 			ifFalse: [ ZnMimeType textPlain ] ].
 	^ ZnResponse ok: (ZnEntity with: contents type: mime)
+]
+
+
+{ #category : 'http-054' }
+PharoCAWebServer >> serveArtifactId: identifier [
+	| artifact response |
+	[ artifact := harness agent environment artifactStore artifactAt: identifier ]
+		on: Error
+		do: [ :ignored | ^ ZnResponse notFound: '/artifacts/', identifier ].
+	response := ZnResponse ok: (ZnEntity with: artifact bytes type: (ZnMimeType fromString: artifact mimeType)).
+	response headers
+		at: 'Cache-Control' put: 'private, no-store';
+		at: 'X-Content-Type-Options' put: 'nosniff';
+		at: 'Content-Security-Policy' put: 'default-src ''none''; sandbox'.
+	^ response
 ]

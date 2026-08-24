@@ -231,7 +231,8 @@ PharoCACodingHarnessTest >> testGlobalToolProfileSettingIsApplied [
 	harness reloadResources.
 	names := harness agent enabledTools collect: [ :each | each toolName ].
 	self assert: harness agent toolProfile name equals: 'full'.
-	self assert: (names includes: #evaluate_and_print)
+	self assert: (names includes: #evaluate_and_print).
+	self assert: (harness agent toolProfile allowsTool: PharoCAToolDebugStart)
 ]
 
 { #category : 'tests' }
@@ -244,7 +245,8 @@ PharoCACodingHarnessTest >> testUntrustedProjectCannotEnableFullToolProfile [
 	harness reloadResources.
 	names := harness agent enabledTools collect: [ :each | each toolName ].
 	self assert: harness agent toolProfile name equals: 'coding'.
-	self deny: (names includes: #evaluate_and_print)
+	self assert: (names includes: #evaluate_and_print).
+	self deny: (harness agent toolProfile allowsTool: PharoCAToolDebugStart)
 ]
 
 { #category : 'tests' }
@@ -258,11 +260,12 @@ PharoCACodingHarnessTest >> testTrustedProjectCanSelectFullToolProfileAndRevocat
 	workspace trust.
 	harness reloadResources.
 	self assert: harness agent toolProfile name equals: 'full'.
-	self assert: ((harness agent enabledTools collect: [ :each | each toolName ]) includes: #evaluate).
+	self assert: (harness agent toolProfile allowsTool: PharoCAToolDebugStart).
 	workspace untrust.
 	harness reloadResources.
 	self assert: harness agent toolProfile name equals: 'coding'.
-	self deny: ((harness agent enabledTools collect: [ :each | each toolName ]) includes: #evaluate)
+	self deny: (harness agent toolProfile allowsTool: PharoCAToolDebugStart).
+	self assert: ((harness agent enabledTools collect: [ :each | each toolName ]) includes: #evaluate)
 ]
 
 { #category : 'tests' }
@@ -271,36 +274,36 @@ PharoCACodingHarnessTest >> testToolAllowAndExcludeSettingsRefineSelectedProfile
 	fixture := self harnessFixture.
 	harness := fixture first.
 	global := fixture second.
-	self write: '{"tools.profile":"coding","tools.allow":["evaluate_and_print"],"tools.exclude":["define_class"]}' to: global / 'settings.json'.
+	self write: '{"tools.profile":"coding","tools.allow":["debug_start"],"tools.exclude":["define_class"]}' to: global / 'settings.json'.
 	harness reloadResources.
 	names := harness agent enabledTools collect: [ :each | each toolName ].
-	self assert: (names includes: #evaluate_and_print).
-	self deny: (names includes: #evaluate).
+	self assert: (harness agent toolProfile allowsTool: PharoCAToolDebugStart).
+	self assert: (names includes: #evaluate).
 	self deny: (names includes: #define_class)
 ]
 
 { #category : 'tests' }
-PharoCACodingHarnessTest >> testIllTypedToolSettingsAreDiagnosedAndDoNotEnableEvaluation [
+PharoCACodingHarnessTest >> testIllTypedToolSettingsAreDiagnosedAndDoNotEnableFullCapabilities [
 	| fixture harness global |
 	fixture := self harnessFixture.
 	harness := fixture first.
 	global := fixture second.
-	self write: '{"tools.profile":"everything","tools.allow":"evaluate"}' to: global / 'settings.json'.
+	self write: '{"tools.profile":"everything","tools.allow":"debug_start"}' to: global / 'settings.json'.
 	harness reloadResources.
 	self assert: harness agent toolProfile name equals: 'coding'.
-	self deny: ((harness agent enabledTools collect: [ :each | each toolName ]) includes: #evaluate).
+	self deny: (harness agent toolProfile allowsTool: PharoCAToolDebugStart).
+	self assert: ((harness agent enabledTools collect: [ :each | each toolName ]) includes: #evaluate).
 	self assert: (harness resources diagnostics count: [ :each | each code = #invalidEffectiveSetting ]) equals: 2
 ]
 
 { #category : 'tests' }
 PharoCACodingHarnessTest >> testToolAllowSettingIsAtomicWhenOneToolNameIsUnknown [
-	| fixture harness global names |
+	| fixture harness global |
 	fixture := self harnessFixture.
 	harness := fixture first.
 	global := fixture second.
-	self write: '{"tools.allow":["evaluate_and_print","definitely_not_a_tool"]}' to: global / 'settings.json'.
+	self write: '{"tools.allow":["debug_start","definitely_not_a_tool"]}' to: global / 'settings.json'.
 	harness reloadResources.
-	names := harness agent enabledTools collect: [ :each | each toolName ].
-	self deny: (names includes: #evaluate_and_print).
+	self deny: (harness agent toolProfile allowsTool: PharoCAToolDebugStart).
 	self assert: (harness resources diagnostics anySatisfy: [ :each | each code = #invalidEffectiveSetting ])
 ]

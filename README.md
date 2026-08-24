@@ -661,9 +661,11 @@ harness reloadResources.
 
 The settings schema recognizes these tool profiles:
 
-- `read-only`
-- `coding`
-- `full`
+- `read-only` — inspection and session-management tools only;
+- `coding` — the normal coding-agent profile: inspection, structured coding, testing, refactoring, and Pharo evaluation;
+- `full` — `coding` plus debugging, destructive, and process-control capabilities.
+
+Since iteration 055, Pharo evaluation is deliberately part of the normal `coding` profile. A coding agent must be able to execute expressions/DoIts while investigating and validating live-image behavior. Use `read-only` when evaluation must be prohibited, and `tools.exclude` when only selected evaluation tools should be removed.
 
 A project can select one through `settings.json`:
 
@@ -718,7 +720,7 @@ The `execution` pack provides safer code checking plus explicit live-object inte
 
 Object handles are isolated by durable assistant session and have a sliding TTL. They are deliberately **not persisted**: reopening an old conversation cannot resurrect arbitrary object identities from an earlier image lifetime.
 
-Enabling the `execution` pack does not itself authorize arbitrary execution. `check_code`, `object_summary`, `object_slots`, and `object_release` use inspection capability, whereas `evaluate_expression` and `object_send` require the `evaluation` capability and execute exclusively. The active tool profile/allow/exclude policy remains authoritative.
+`check_code`, `object_summary`, `object_slots`, and `object_release` use inspection capability, whereas `evaluate_expression` and `object_send` require the `evaluation` capability and execute exclusively. The normal `coding` profile includes `evaluation` as of iteration 055, so enabling this pack makes those execution tools callable for a coding agent. `read-only` still blocks them, and explicit `tools.exclude` policy remains authoritative.
 
 A typical exploratory sequence is:
 
@@ -891,6 +893,22 @@ iceberg_status repository:"MyProject" limit:50
 iceberg_commit repository:"MyProject" message:"Implement parser fix"
 iceberg_push repository:"MyProject" remote:"origin"
 ```
+
+### Artifact and UI screenshot pack
+
+Iteration 054 adds an ephemeral binary artifact store and a lazy `ui` pack:
+
+```text
+tool_enable pack:"ui"
+ui_list_windows limit:20
+ui_screenshot target:"window" handle:"obj-1"
+```
+
+`ui_screenshot` can capture `world`, a listed `window`, an arbitrary Morph object handle, or a bounded rectangle in World coordinates. It renders through Morphic and encodes PNG directly in memory. The textual tool result contains only a compact artifact descriptor; image bytes are kept in the environment-scoped `PharoCAArtifactStore` and served to the local browser at `/artifacts/<artifactId>`. Default storage is bounded by entry count, per-artifact bytes, total bytes and a fixed lifetime, so repeated screenshots cannot grow the image indefinitely.
+
+The static web UI recognizes image artifact descriptors and shows them inline in the corresponding tool row. No screenshot base64 crosses the normal WebSocket/tool-result path and no frontend build dependency is introduced.
+
+Canonical LLM content now also has a provider-neutral `imageArtifact` part reserved for future vision-capable tool-to-model feedback. Current provider adapters deliberately require explicit resolution before transport rather than leaking an environment-local artifact implicitly.
 
 ## Skills, instructions and templates
 
@@ -1137,6 +1155,7 @@ harness saveRuntimeProfile.
 | Tag | Responsibility |
 | --- | --- |
 | `Core` | agent/run orchestration and compatibility facade |
+| `Artifacts` | bounded ephemeral binary artifacts and metadata |
 | `Runtime` | configured agents and persisted runtime control plane |
 | `LLM` | provider protocol, providers, models, streaming and credentials |
 | `Context` | context construction, compaction and token estimation |
@@ -1147,8 +1166,10 @@ harness saveRuntimeProfile.
 | `Instructions` / `Skills` / `Extensions` | agent resource and extension mechanisms |
 | `Tools` | generic tool contracts, invocation, scheduling and result handling |
 | `Tools-Pharo` | tools that inspect or mutate the live Pharo image |
+| `Tools-UI` | Morphic window and screenshot tools |
 | `Tools-Workspace` | filesystem, process and repository workspace tools |
 | `Workspace` | workspace, settings, resources, trust and harness support |
+| `UI` | Morphic capture/UI-process boundary |
 | `Web` | Zinc HTTP/WebSocket server |
 | `Observability` | run telemetry |
 | `Environment` | execution environment abstraction |

@@ -47,7 +47,7 @@ PharoCATokenEstimator >> messageOverheadTokens [
 { #category : 'estimating-031' }
 PharoCATokenEstimator >> estimateContentPart: aPart [
 	aPart type = #text ifTrue: [ ^ self estimateString: aPart value ].
-	aPart type = #imageURL ifTrue: [ ^ self imageContentTokens ].
+	(#(#imageURL #imageArtifact) includes: aPart type) ifTrue: [ ^ self imageContentTokens ].
 	^ self estimateObject: aPart asDictionary
 ]
 

@@ -32,7 +32,7 @@ PharoCAToolRegistryTest >> testDefaultRegistryContainsExplicitToolSet [
 		iceberg_branches iceberg_remotes iceberg_packages
 		iceberg_commit iceberg_fetch iceberg_pull iceberg_push iceberg_create_branch iceberg_switch
 		iceberg_add_remote iceberg_remove_remote iceberg_load_package iceberg_unload_package iceberg_discard_changes
-		iceberg_clone iceberg_add_local_repository
+		iceberg_clone iceberg_add_local_repository ui_list_windows ui_screenshot
 		activate_skill compile_method deactivate_skill define_class evaluate get_class_comment get_class_definition
 		get_class_hierarchy get_method_inheritance get_package_comment list_classes_in_package
 		list_implementors list_methods list_packages list_senders list_skills evaluate_and_print
@@ -48,9 +48,9 @@ PharoCAToolRegistryTest >> testDefinitionsContainOnlyEnabledTools [
 	names := registry definitions collect: [ :definition |
 		(definition at: 'function') at: 'name' ].
 	self deny: (names includes: 'remove_class').
-	self deny: (names includes: 'evaluate').
-	self deny: (names includes: 'evaluate_and_print').
-	self assert: names size equals: 20
+	self assert: (names includes: 'evaluate').
+	self assert: (names includes: 'evaluate_and_print').
+	self assert: names size equals: 22
 ]
 
 { #category : 'tests' }

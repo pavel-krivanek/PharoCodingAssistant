@@ -84,6 +84,22 @@ PharoCAToolCatalogTest >> testToolSearchFindsInactiveBrowseToolWithMetadata [
 ]
 
 { #category : 'tests' }
+PharoCAToolCatalogTest >> testToolSearchExplainsProfileRestriction [
+	| agent session registry result item |
+	agent := PharoCA new.
+	session := agent newSession.
+	registry := agent toolRegistry.
+	registry useProfileNamed: 'read-only'.
+	result := registry searchCatalog: 'evaluate' pack: 'core' arguments: Dictionary new session: session.
+	item := (result at: 'tools') detect: [ :each | (each at: 'name') = 'evaluate' ].
+	self assert: (item at: 'active').
+	self deny: (item at: 'available').
+	self assert: (item at: 'availabilityReason') equals: 'profile_restricted'.
+	self assert: (item at: 'profile') equals: 'read-only'.
+	self assert: (item at: 'capability') equals: 'evaluation'
+]
+
+{ #category : 'tests' }
 PharoCAToolCatalogTest >> testToolSearchIsPaginatedAndCursorIsBoundToQuery [
 	| agent session registry first cursor second |
 	agent := PharoCA new.

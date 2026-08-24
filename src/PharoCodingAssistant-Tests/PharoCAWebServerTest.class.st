@@ -92,3 +92,48 @@ PharoCAWebServerTest >> testServeApplicationScriptReadsConfiguredStaticFile [
 	self assert: response entity contentType equals: ZnMimeType applicationJavascript
 ]
 
+
+{ #category : 'tests-054' }
+PharoCAWebServerTest >> testServeArtifactUsesEnvironmentStoreAndSafeHeaders [
+	| harness server artifact response |
+	harness := PharoCACodingHarness new.
+	artifact := harness agent environment artifactStore
+		storeBytes: #[137 80 78 71]
+		mimeType: 'image/png'
+		owner: Dictionary new
+		metadata: Dictionary new.
+	server := PharoCAWebServer on: harness webRoot: FileSystem memory root.
+	response := server serveArtifactId: artifact identifier.
+	self assert: response status equals: 200.
+	self assert: response entity contents equals: #[137 80 78 71].
+	self assert: response entity contentType equals: ZnMimeType imagePng.
+	self assert: (response headers at: 'Cache-Control') equals: 'private, no-store'.
+	self assert: (response headers at: 'X-Content-Type-Options') equals: 'nosniff'
+]
+
+{ #category : 'tests-054' }
+PharoCAWebServerTest >> testServeUnknownArtifactReturnsNotFound [
+	| server response |
+	server := PharoCAWebServer on: PharoCACodingHarness new webRoot: FileSystem memory root.
+	response := server serveArtifactId: 'artifact-missing'.
+	self assert: response status equals: 404
+]
+
+{ #category : 'tests-054' }
+PharoCAWebServerTest >> testArtifactRouteServesExactTwoSegmentPath [
+	| harness root server artifact request response bad |
+	harness := PharoCACodingHarness new.
+	artifact := harness agent environment artifactStore
+		storeBytes: #[1 2 3]
+		mimeType: 'application/octet-stream'
+		owner: Dictionary new
+		metadata: Dictionary new.
+	root := FileSystem memory root.
+	server := PharoCAWebServer on: harness webRoot: root.
+	request := ZnRequest get: 'http://127.0.0.1/artifacts/', artifact identifier.
+	response := server handleRequest: request.
+	self assert: response status equals: 200.
+	self assert: response entity contents equals: #[1 2 3].
+	bad := server handleRequest: (ZnRequest get: 'http://127.0.0.1/artifacts/', artifact identifier, '/extra').
+	self assert: bad status equals: 404
+]
