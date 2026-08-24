@@ -12,13 +12,41 @@ PharoCodingAssistant is a coding-agent runtime that runs inside a live Pharo ima
 
 The browser is deliberately static HTML/CSS/JavaScript. There is no Node.js, npm, bundler, transpiler or frontend framework build step.
 
+## Installation
+
+PharoCodingAssistant is developed and validated with Pharo 14. The normal installation uses the Metacello baseline from the public repository:
+
+```smalltalk
+Metacello new
+    baseline: 'PharoCodingAssistant';
+    repository: 'github://pavel-krivanek/PharoCodingAssistant:master/src';
+    load.
+```
+
+Repository: <https://github.com/pavel-krivanek/PharoCodingAssistant>
+
+The default baseline group loads only the production `PharoCodingAssistant` package. For development, including the SUnit package:
+
+```smalltalk
+Metacello new
+    baseline: 'PharoCodingAssistant';
+    repository: 'github://pavel-krivanek/PharoCodingAssistant:master/src';
+    load: 'Development'.
+```
+
+`Tests` is also available when only the test package in addition to the core is wanted.
+
+The Metacello baseline loads Smalltalk code. The browser UI is deliberately kept as ordinary static files in the repository's `web/` directory, so a full web setup should also have a checkout of the repository available locally. The web server is then pointed at that directory. A headless/API-only setup does not need the `web/` files.
+
+For example, after cloning the repository to a convenient local directory, load the baseline above and use that checkout's `web/` directory in `PharoCAWebServer`.
+
 ## Quick setup: discover the model from a local provider
 
 This is the shortest practical setup for a local server such as llama.cpp, LM Studio, vLLM, or another server exposing the OpenAI-compatible `chat/completions` and `models` endpoints.
 
 The example assumes:
 
-- the PharoCodingAssistant package is already loaded into the image;
+- PharoCodingAssistant has been loaded with the baseline above;
 - your coding project is in `C:\work\MyProject`;
 - this repository is in `C:\work\PharoCodingAssistant`;
 - the local model server listens on port `8080`;
@@ -163,9 +191,9 @@ run wait.
 run answer.
 ```
 
-## Loading the Tonel package
+## Direct Tonel loading (development fallback)
 
-For a source checkout/bundle, the production package can be loaded directly with Pharo's installed Tonel reader:
+Metacello via the baseline is the preferred installation path. If you are developing an unpacked bundle or intentionally want to bypass Metacello, the production package can still be loaded directly with Pharo's installed Tonel reader:
 
 ```smalltalk
 | src |
