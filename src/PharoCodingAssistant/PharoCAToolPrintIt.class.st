@@ -1,6 +1,4 @@
-"
-Tool to evaluate Pharo code and return its printString result.
-"
+"Tool to evaluate Pharo code and return its printString result. Arbitrary evaluation is journaled as opaque because its image effects cannot be inferred safely."
 Class {
 	#name : 'PharoCAToolPrintIt',
 	#superclass : 'PharoCATool',
@@ -8,31 +6,42 @@ Class {
 	#package : 'PharoCodingAssistant'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'execution' }
 PharoCAToolPrintIt class >> execute: args [
+	^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
-   ^ { 'result' -> (Smalltalk compiler evaluate: (args at: 'code')) printString } asDictionary 
-
+{ #category : 'execution' }
+PharoCAToolPrintIt class >> execute: args context: context [
+	| code printed |
+	code := args at: 'code'.
+	printed := (Smalltalk compiler evaluate: code) printString.
+	context
+		recordChangeKind: #opaqueEvaluation
+		target: 'Smalltalk image'
+		before: nil
+		after: nil
+		metadata: {
+			'code' -> code.
+			'resultPrintString' -> printed.
+			'effectsInspectable' -> false
+		} asDictionary.
+	^ { 'result' -> printed } asDictionary
 ]
 
 { #category : 'definition' }
-PharoCAToolPrintIt class >> toolDefinition [ 
-	^ {
-        'type' -> 'function'.
-        'function' -> {
-            'name' -> 'evaluate_and_print'.
-            'description' -> 'Evaluates Pharo code and returns the printString of the result.'.
-            'parameters' -> {
-                'type' -> 'object'.
-                'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary.
-                'required' -> #('code')
-            } asDictionary
-        } asDictionary
-    } asDictionary.
+PharoCAToolPrintIt class >> capability [ ^ #evaluation ]
+
+{ #category : 'execution' }
+PharoCAToolPrintIt class >> executionMode [ ^ #exclusiveMutation ]
+
+{ #category : 'definition' }
+PharoCAToolPrintIt class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'evaluate_and_print'
+		description: 'Evaluates Pharo code and returns the printString of the result.'
+		parameters: { 'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'code' }. 'type' -> 'object' } asDictionary
 ]
 
 { #category : 'definition' }
-PharoCAToolPrintIt class >> toolName [ 
-
-	^ #evaluate_and_print
-]
+PharoCAToolPrintIt class >> toolName [ ^ #evaluate_and_print ]

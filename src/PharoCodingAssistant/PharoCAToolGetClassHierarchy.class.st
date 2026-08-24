@@ -1,6 +1,4 @@
-"
-Returns the superclass chain and subclasses for a given class.
-"
+"Returns one bounded, deterministic relation from a class hierarchy."
 Class {
 	#name : 'PharoCAToolGetClassHierarchy',
 	#superclass : 'PharoCATool',
@@ -10,38 +8,44 @@ Class {
 
 { #category : 'definition' }
 PharoCAToolGetClassHierarchy class >> execute: args [
-	| aClass classSymbol |
+	| aClass classSymbol relation items page |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary
-	].
+		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
+	relation := args at: 'relation' ifAbsent: [ 'superclasses' ].
+	items := relation = 'superclasses'
+		ifTrue: [ aClass allSuperclasses collect: [ :c | c name ] ]
+		ifFalse: [ relation = 'directSubclasses'
+			ifTrue: [ (aClass subclasses collect: [ :c | c name ]) asSortedCollection ]
+			ifFalse: [ (aClass allSubclasses collect: [ :c | c name ]) asSortedCollection ] ].
+	page := PharoCAToolPagination
+		pageItems: items
+		arguments: args
+		scope: 'get_class_hierarchy|', aClass name, '|', relation.
 	^ {
 		'className' -> aClass name.
-		'superclasses' -> ((aClass withAllSuperclasses collect: [ :c | c name ]) asArray).
-		'directSubclasses' -> ((aClass subclasses collect: [ :c | c name ]) asArray).
-		'allSubclasses' -> ((aClass allSubclasses collect: [ :c | c name ]) asArray)
+		'relation' -> relation.
+		'classes' -> (page at: 'items').
+		'page' -> (page at: 'page')
 	} asDictionary
 ]
 
+
 { #category : 'definition' }
-PharoCAToolGetClassHierarchy class >> toolDefinition [
-	^ {
-		'type' -> 'function'.
-		'function' -> {
-			'name' -> 'get_class_hierarchy'.
-			'description' -> 'Returns superclass chain and subclasses for a class.'.
-			'parameters' -> {
-				'type' -> 'object'.
-				'properties' -> {
-					'className' -> { 'type' -> 'string' } asDictionary
-				} asDictionary.
-				'required' -> #('className')
-			} asDictionary
-		} asDictionary
-	} asDictionary.
+PharoCAToolGetClassHierarchy class >> capability [ ^ #inspection ]
+
+{ #category : 'execution' }
+PharoCAToolGetClassHierarchy class >> executionMode [
+	^ #parallelSafe
 ]
 
 { #category : 'definition' }
-PharoCAToolGetClassHierarchy class >> toolName [
-	^ #get_class_hierarchy
+PharoCAToolGetClassHierarchy class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'get_class_hierarchy'
+		description: 'Returns one paginated class-hierarchy relation. relation defaults to superclasses; use directSubclasses or allSubclasses when needed.'
+		parameters: { 'properties' -> { 'limit' -> { 'minimum' -> 1. 'maximum' -> 200. 'type' -> 'integer' } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'cursor' -> { 'type' -> 'string' } asDictionary. 'relation' -> { 'enum' -> { 'superclasses'. 'directSubclasses'. 'allSubclasses' }. 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'className' }. 'type' -> 'object' } asDictionary
 ]
+
+{ #category : 'definition' }
+PharoCAToolGetClassHierarchy class >> toolName [ ^ #get_class_hierarchy ]

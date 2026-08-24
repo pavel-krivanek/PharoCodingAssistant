@@ -1,6 +1,4 @@
-"
-Tool to evaluate arbitrary Pharo code (DoIt) within the CAT environment.
-"
+"Tool to evaluate arbitrary Pharo code. Because arbitrary evaluation cannot be semantically diffed safely, it is journaled explicitly as an opaque image operation."
 Class {
 	#name : 'PharoCAToolDoIt',
 	#superclass : 'PharoCATool',
@@ -10,27 +8,39 @@ Class {
 
 { #category : 'TOREMOVE' }
 PharoCAToolDoIt class >> execute: args [
-	Smalltalk compiler evaluate: (args at: 'code').
+	^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
+{ #category : 'execution' }
+PharoCAToolDoIt class >> execute: args context: context [
+	| code |
+	code := args at: 'code'.
+	Smalltalk compiler evaluate: code.
+	context
+		recordChangeKind: #opaqueEvaluation
+		target: 'Smalltalk image'
+		before: nil
+		after: nil
+		metadata: {
+			'code' -> code.
+			'effectsInspectable' -> false
+		} asDictionary.
 	^ { 'status' -> 'ok' } asDictionary
 ]
 
+{ #category : 'definition' }
+PharoCAToolDoIt class >> capability [ ^ #evaluation ]
+
+{ #category : 'execution' }
+PharoCAToolDoIt class >> executionMode [ ^ #exclusiveMutation ]
+
 { #category : 'TOREMOVE' }
-PharoCAToolDoIt class >> toolDefinition [
-	^ {
-		'type' -> 'function'.
-		'function' -> {
-			'name' -> 'evaluate'.
-			'description' -> 'Evaluates Pharo code (DoIt). Returns status only.'.
-			'parameters' -> {
-				'type' -> 'object'.
-				'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary.
-				'required' -> #('code')
-			} asDictionary
-		} asDictionary
-	} asDictionary.
+PharoCAToolDoIt class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'evaluate'
+		description: 'Evaluates Pharo code (DoIt). Returns status only.'
+		parameters: { 'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'code' }. 'type' -> 'object' } asDictionary
 ]
 
 { #category : 'TOREMOVE' }
-PharoCAToolDoIt class >> toolName [
-	^ #evaluate
-]
+PharoCAToolDoIt class >> toolName [ ^ #evaluate ]

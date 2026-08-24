@@ -1,6 +1,4 @@
-"
-Lists methods of a class, optionally filtered by protocol.
-"
+"Lists local methods of a class, optionally filtered by protocol, using deterministic cursor pagination."
 Class {
 	#name : 'PharoCAToolListMethods',
 	#superclass : 'PharoCATool',
@@ -10,62 +8,51 @@ Class {
 
 { #category : 'definition' }
 PharoCAToolListMethods class >> execute: args [
-	| aClass classSymbol side targetClass protocol selectors methods |
+	| aClass classSymbol side targetClass protocol selectors methods page scope |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary
-	].
-
+		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
 	side := args at: 'side' ifAbsent: [ 'instance' ].
-	targetClass := (side = 'class')
-		ifTrue: [ aClass class ]
-		ifFalse: [ aClass ].
-
+	targetClass := (side = 'class') ifTrue: [ aClass class ] ifFalse: [ aClass ].
 	protocol := args at: 'protocol' ifAbsent: [ nil ].
-
 	selectors := targetClass selectors.
 	protocol ifNotNil: [
 		| proto |
-		proto :=  targetClass protocolNamed: protocol ifAbsent: [ nil ].
-		proto ifNotNil: [ 
-			selectors := proto methodSelectors.
-		]
-	].
-
+		proto := targetClass protocolNamed: protocol ifAbsent: [ nil ].
+		selectors := proto ifNil: [ #() ] ifNotNil: [ proto methodSelectors ] ].
 	methods := (selectors asSortedCollection collect: [ :sel |
 		| cat |
-		cat := (targetClass methodNamed: sel asSymbol) protocolName. 
+		cat := (targetClass methodNamed: sel asSymbol) protocolName.
 		{
 			'selector' -> sel asString.
 			'protocol' -> (cat ifNil: [ '' ])
 		} asDictionary
 	]) asArray.
-
+	scope := 'list_methods|', aClass name, '|', side, '|', (protocol ifNil: [ '' ]).
+	page := PharoCAToolPagination pageItems: methods arguments: args scope: scope.
 	^ {
 		'className' -> aClass name.
 		'side' -> side.
-		'methods' -> methods
+		'methods' -> (page at: 'items').
+		'page' -> (page at: 'page')
 	} asDictionary
 ]
 
+
 { #category : 'definition' }
-PharoCAToolListMethods class >> toolDefinition [
-	^ {
-		'type' -> 'function'.
-		'function' -> {
-			'name' -> 'list_methods'.
-			'description' -> 'Lists methods of a class. side: instance|class (default instance). Optional protocol to filter.'.
-			'parameters' -> {
-				'type' -> 'object'.
-				'properties' -> {
-					'className' -> { 'type' -> 'string' } asDictionary.
-					'side' -> { 'type' -> 'string' } asDictionary.
-					'protocol' -> { 'type' -> 'string' } asDictionary
-				} asDictionary.
-				'required' -> #('className')
-			} asDictionary
-		} asDictionary
-	} asDictionary.
+PharoCAToolListMethods class >> capability [ ^ #inspection ]
+
+{ #category : 'execution' }
+PharoCAToolListMethods class >> executionMode [
+	^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolListMethods class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'list_methods'
+		description: 'Lists local methods of a class. side: instance|class (default instance); protocol optionally filters. Results are cursor-paginated.'
+		parameters: { 'properties' -> { 'className' -> { 'type' -> 'string' } asDictionary. 'limit' -> { 'minimum' -> 1. 'maximum' -> 200. 'type' -> 'integer' } asDictionary. 'side' -> { 'enum' -> { 'instance'. 'class' }. 'type' -> 'string' } asDictionary. 'protocol' -> { 'type' -> 'string' } asDictionary. 'cursor' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'className' }. 'type' -> 'object' } asDictionary
 ]
 
 { #category : 'definition' }
