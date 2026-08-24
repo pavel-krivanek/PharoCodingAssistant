@@ -237,6 +237,39 @@ PharoCAExternalProtocolTest >> testProtocolCancelControlsActiveRunAndProducesRep
 	self assert: ((replay at: 'items') anySatisfy: [ :event | ((event at: 'data') at: 'type') = 'cancelled' ])
 ]
 
+
+{ #category : 'tests' }
+PharoCAExternalProtocolTest >> testProtocolSteerRedirectsAnActiveRunWithoutStartingAnotherRun [
+	| steering steeringHarness steeringProtocol sessionId started runId run steered secondMessages deadline |
+	steering := PharoCATestSteeringLLMProvider new.
+	steeringHarness := PharoCACodingHarness new
+		workspace: workspace;
+		resourceLoader: loader;
+		sessionRepository: repository;
+		yourself.
+	steeringHarness reloadResources.
+	steeringHarness agent provider: steering.
+	steeringProtocol := PharoCAExternalProtocol on: steeringHarness.
+	sessionId := ((steeringProtocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Steering' } asDictionary))) at: 'result') at: 'id'.
+	started := steeringProtocol handleRequest: (self request: 'runs.start' params: ({ 'prompt' -> 'original'. 'sessionId' -> sessionId } asDictionary)).
+	runId := (started at: 'result') at: 'id'.
+	run := steeringProtocol runNamed: runId.
+	deadline := Time millisecondClockValue + 1000.
+	[ (steering requestCount < 1 or: [ run partialAnswer ~= 'partial' ]) and: [ Time millisecondClockValue < deadline ] ] whileTrue: [ (Delay forMilliseconds: 1) wait ].
+	self assert: run partialAnswer equals: 'partial'.
+	steered := steeringProtocol handleRequest: (self request: 'runs.steer' params: ({ 'runId' -> runId. 'message' -> 'change direction' } asDictionary)).
+	self assert: (steered at: 'ok').
+	self assert: ((steered at: 'result') at: 'id') equals: runId.
+	self assert: (run waitTimeoutMilliseconds: 1000).
+	self assert: run status equals: #completed.
+	self assert: run answer equals: 'redirected'.
+	self assert: steering requestCount equals: 2.
+	secondMessages := (steering payloads second) at: 'messages'.
+	self assert: (secondMessages last at: 'role') equals: 'user'.
+	self assert: (secondMessages last at: 'content') equals: 'change direction'.
+	self assert: (run events anySatisfy: [ :event | event type = #steeringApplied ])
+]
+
 { #category : 'tests-025' }
 PharoCAExternalProtocolTest >> testProtocolCreatesAgentSelectsModelAndCanMakeItDefault [
 	| model created changed defaulted |

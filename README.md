@@ -744,6 +744,8 @@ The UI includes, among other things:
 - multiple agents/models;
 - slash-command completion;
 - streamed assistant text, reasoning and tool calls in chronological order;
+- live steering from the normal composer while a run is active (`Send` becomes `Steer`);
+- queued follow-up messages for the distinct "finish this turn, then continue" behavior;
 - compact expandable tool/reasoning traces;
 - context occupancy and token telemetry;
 - tokens/second and TTFT when data are available;
