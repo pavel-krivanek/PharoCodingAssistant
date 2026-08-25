@@ -1280,7 +1280,7 @@ PharoCAExternalProtocolTest >> testSessionGetPreservesReasoningToolCallsAndToolR
 
 { #category : 'tests-040' }
 PharoCAExternalProtocolTest >> testFreshSessionKeepsCompleteSlashCommandCatalogIncludingSkillsModelAndReasoning [
-	| before created after completion labels skill response |
+	| before created after completion labels skill response debugSkill skillNames |
 	skill := PharoCASkill
 		named: 'debug-session'
 		description: 'Debug the current session'
@@ -1305,9 +1305,11 @@ PharoCAExternalProtocolTest >> testFreshSessionKeepsCompleteSlashCommandCatalogI
 		'agentId' -> 'default'
 	} asDictionary)).
 	self assert: (response at: 'ok').
-	self assert: (response at: 'result') size equals: 1.
-	self assert: (((response at: 'result') first at: 'name')) equals: 'debug-session'.
-	self deny: (((response at: 'result') first at: 'active'))
+	skillNames := ((response at: 'result') collect: [ :each | each at: 'name' ]) asSet.
+	#('Bloc' 'Collections' 'Roassal' 'Spec2' 'debug-session')
+		do: [ :name | self assert: (skillNames includes: name) ].
+	debugSkill := (response at: 'result') detect: [ :each | (each at: 'name') = 'debug-session' ].
+	self deny: (debugSkill at: 'active')
 ]
 
 { #category : 'tests-040' }

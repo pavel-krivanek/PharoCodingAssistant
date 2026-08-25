@@ -71,3 +71,19 @@ PharoCAToolSkillTest >> testUnknownSkillActivationReturnsCanonicalExecutionError
 	self deny: (result at: 'ok').
 	self assert: ((result at: 'error') at: 'type') equals: 'tool_execution_error'
 ]
+
+
+{ #category : 'tests' }
+PharoCAToolSkillTest >> testListSkillsSearchesBuiltinKeywords [
+	| fixture context result raw names |
+	fixture := self agentRunAndContext.
+	context := fixture third.
+	result := fixture first toolRegistry
+		executeNamed: 'list_skills'
+		arguments: { 'substring' -> 'RSForceBasedLayout'. 'limit' -> 20 } asDictionary
+		context: context.
+	self assert: (result at: 'ok').
+	raw := result at: 'result'.
+	names := (raw at: 'skills') collect: [ :each | each at: 'name' ].
+	self assert: names equals: #('Roassal')
+]

@@ -40,7 +40,7 @@ Use Pharo-specific classes, selectors and conventions that actually exist in the
 Prefer the smallest coherent change; do not perform unrelated cleanup.
 After modifying code, verify it with relevant tests or inspection and investigate failures before continuing.
 Tool results are bounded/paginated; request more only when current evidence is insufficient.
-Activate optional skills only when relevant.
+Activate relevant skills; built-ins cover Collections, Spec2, Roassal and Bloc.
 Do not claim a change works unless evidence verifies it; report unresolved failures precisely.'.
 	toolTimeoutMilliseconds := 60000
 ]

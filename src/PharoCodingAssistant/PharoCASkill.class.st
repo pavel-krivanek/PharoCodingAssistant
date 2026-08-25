@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCASkill',
 	#superclass : 'Object',
-	#instVars : [ 'name', 'description', 'instructions', 'priority', 'scope', 'sourcePath' ],
+	#instVars : [ 'name', 'description', 'instructions', 'priority', 'scope', 'sourcePath', 'keywords' ],
 	#category : 'PharoCodingAssistant-Skills',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
@@ -32,7 +32,8 @@ PharoCASkill >> asMetadataDictionary [
 		'name' -> name.
 		'description' -> description.
 		'scope' -> (scope ifNil: [ nil ] ifNotNil: [ scope asString ]).
-		'sourcePath' -> sourcePath
+		'sourcePath' -> sourcePath.
+		'keywords' -> keywords asArray
 	} asDictionary
 ]
 
@@ -45,7 +46,8 @@ PharoCASkill >> description: aString [ description := aString ]
 { #category : 'initialization' }
 PharoCASkill >> initialize [
 	super initialize.
-	priority := 500
+	priority := 500.
+	keywords := #()
 ]
 
 { #category : 'accessing' }
@@ -59,6 +61,26 @@ PharoCASkill >> name [ ^ name ]
 
 { #category : 'accessing' }
 PharoCASkill >> name: aName [ name := aName asString ]
+
+
+
+{ #category : 'accessing' }
+PharoCASkill >> keywords [ ^ keywords ]
+
+{ #category : 'accessing' }
+PharoCASkill >> keywords: aCollection [
+	keywords := (aCollection ifNil: [ #() ]) collect: [ :each | each asString ]
+]
+
+{ #category : 'testing' }
+PharoCASkill >> matchesDiscoveryQuery: aString [
+	| query |
+	query := aString asString trimBoth asLowercase.
+	query isEmpty ifTrue: [ ^ true ].
+	^ (name asLowercase includesSubstring: query)
+		or: [ (description asLowercase includesSubstring: query)
+		or: [ keywords anySatisfy: [ :each | each asLowercase includesSubstring: query ] ] ]
+]
 
 { #category : 'accessing' }
 PharoCASkill >> priority [ ^ priority ]

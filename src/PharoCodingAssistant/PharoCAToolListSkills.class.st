@@ -20,10 +20,7 @@ PharoCAToolListSkills class >> execute: args context: aContext [
 	substring := args at: 'substring' ifAbsent: [ '' ].
 	activeNames := (registry activeSkillNamesForSession: run session) asSet.
 	metadata := registry skills
-		select: [ :skill |
-			substring isEmpty or: [
-				(skill name asLowercase includesSubstring: substring asLowercase)
-				or: [ skill description asLowercase includesSubstring: substring asLowercase ] ] ]
+		select: [ :skill | skill matchesDiscoveryQuery: substring ]
 		thenCollect: [ :skill |
 			| item |
 			item := skill asMetadataDictionary copy.
@@ -47,7 +44,7 @@ PharoCAToolListSkills class >> executionMode [ ^ #parallelSafe ]
 PharoCAToolListSkills class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'list_skills'
-		description: 'Lists available assistant skills as concise name/description metadata. Skill bodies are not returned. Results are cursor-paginated.'
+		description: 'Lists available assistant skills as concise name/description/keyword metadata. Skill bodies are not returned. Results are cursor-paginated.'
 		parameters: { 'properties' -> { 'limit' -> { 'minimum' -> 1. 'maximum' -> 200. 'type' -> 'integer' } asDictionary. 'substring' -> { 'type' -> 'string' } asDictionary. 'cursor' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> #(). 'type' -> 'object' } asDictionary
 ]
 

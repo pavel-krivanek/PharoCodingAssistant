@@ -956,6 +956,9 @@ Markdown files under `instructions/` are loaded as instruction sources. `system.
 
 Each `skills/*.md` file becomes a named skill. The filename without `.md` is the skill name. The first non-empty Markdown line is used as the short description when possible; the complete file is the lazily activated skill body.
 
+
+The default agent also registers four built-in domain skills adapted from ChatPharo's MIT-licensed `AI-ChatPharo-Skills`: `Collections`, `Spec2`, `Roassal`, and `Bloc`. They are inactive by default and their bodies enter model context only after `activate_skill`; `list_skills` can find them by class/selector keywords as well as by name/description. Their inactive descriptions are not repeated as an ephemeral discovery block on every provider request—the compact system prompt already names the built-ins—so small-context models do not pay a permanent metadata cost. Dynamic workspace/extension skills still receive ephemeral discovery descriptions. The Bloc skill explicitly verifies availability because Bloc is not part of the supplied base image.
+
 In the browser/command interface:
 
 ```text

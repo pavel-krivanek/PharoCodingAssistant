@@ -500,6 +500,7 @@ PharoCAAgent >> initialize [
 	extensionRegistry := PharoCAExtensionRegistry new.
 	instructionRegistry := PharoCAInstructionRegistry new.
 	skillRegistry := PharoCASkillRegistry new.
+	PharoCABuiltinSkills all do: [ :skill | skillRegistry register: skill ].
 	activeRuns := OrderedCollection new.
 	activeRunsMutex := Semaphore forMutualExclusion.
 	environment := PharoCAEnvironment currentImage.

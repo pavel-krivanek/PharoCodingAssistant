@@ -67,9 +67,13 @@ PharoCASkillRegistry >> discoveryCharacterBudget: anInteger [
 
 { #category : 'discovery' }
 PharoCASkillRegistry >> discoveryInstructionSourceForSession: aSession [
-	| text |
-	self size = 0 ifTrue: [ ^ nil ].
-	text := self discoveryTextForSession: aSession.
+	| discoverable text |
+	"Built-in skills are named by the compact system prompt and remain inspectable via list_skills.
+	Do not spend context repeating their inactive metadata on every model request. Workspace and
+	extension skills are dynamic, so keep their discovery descriptions ephemeral and visible."
+	discoverable := self skills reject: [ :skill | skill scope = #builtin ].
+	discoverable isEmpty ifTrue: [ ^ nil ].
+	text := self discoveryTextForSession: aSession skills: discoverable.
 	^ (PharoCAInstructionSource named: 'available-skills' content: text)
 		kind: #skills;
 		priority: 900;
@@ -78,13 +82,18 @@ PharoCASkillRegistry >> discoveryInstructionSourceForSession: aSession [
 
 { #category : 'discovery' }
 PharoCASkillRegistry >> discoveryTextForSession: aSession [
+	^ self discoveryTextForSession: aSession skills: self skills
+]
+
+{ #category : 'discovery-private' }
+PharoCASkillRegistry >> discoveryTextForSession: aSession skills: skillsToDescribe [
 	| stream count included line activeNames remaining text |
 	stream := String new writeStream.
 	stream nextPutAll: 'Optional skills are available. Activate one only when its procedure is relevant, using activate_skill. Use list_skills for the complete catalog.'; cr.
 	activeNames := (self activeSkillNamesForSession: aSession) asSet.
-	count := self skills size.
+	count := skillsToDescribe size.
 	included := 0.
-	self skills do: [ :skill |
+	skillsToDescribe do: [ :skill |
 		line := '- ', skill name, ': ', skill description,
 			((activeNames includes: skill name) ifTrue: [ ' [active]' ] ifFalse: [ '' ]), String lf.
 		(stream position + line size + 80 <= discoveryCharacterBudget)
