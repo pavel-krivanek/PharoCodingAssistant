@@ -112,6 +112,34 @@ PharoCAAgent >> skillRegistry: aRegistry [
 ]
 
 { #category : 'skills' }
+PharoCAAgent >> activateSkillNamed: skillName forSession: aSession [
+	| skill activatedPacks |
+	skill := skillRegistry activateNamed: skillName session: aSession.
+	activatedPacks := OrderedCollection new.
+	skill recommendedToolPacks do: [ :pack |
+		(toolRegistry activatePackNamed: pack forSession: aSession) ifTrue: [ activatedPacks add: pack ] ].
+	^ {
+		'name' -> skill name.
+		'description' -> skill description.
+		'active' -> true.
+		'recommendedToolPacks' -> skill recommendedToolPacks asArray.
+		'activatedToolPacks' -> activatedPacks asArray
+	} asDictionary
+]
+
+{ #category : 'skills' }
+PharoCAAgent >> autoActivateSkillsForPrompt: aPrompt session: aSession [
+	| active activations |
+	active := (skillRegistry activeSkillNamesForSession: aSession) asSet.
+	activations := OrderedCollection new.
+	skillRegistry skills do: [ :skill |
+		((active includes: skill name) not and: [ skill matchesAutomaticActivationIn: aPrompt ]) ifTrue: [
+			activations add: (self activateSkillNamed: skill name forSession: aSession).
+			active add: skill name ] ].
+	^ activations asArray
+]
+
+{ #category : 'skills' }
 PharoCAAgent >> registerSkill: aSkill [
 	^ skillRegistry register: aSkill
 ]
@@ -377,8 +405,16 @@ PharoCAAgent >> iterationBudgetInstructionSourceForRun: run [
 ]
 
 { #category : 'instructions-private' }
+PharoCAAgent >> isExplorationToolName: aName [
+	| name |
+	name := aName asString.
+	(#('evaluate' 'evaluate_and_print' 'evaluate_expression' 'search_tools' 'ui_list_windows' 'ui_window_info' 'ui_screenshot') includes: name) ifTrue: [ ^ true ].
+	^ #('get_' 'list_' 'search_' 'find_' 'object_') anySatisfy: [ :prefix | name beginsWith: prefix ]
+]
+
+{ #category : 'instructions-private' }
 PharoCAAgent >> progressGuidanceInstructionSourceForRun: run [
-	| events completed consecutiveErrors counting latestChangeSequence successfulTestEvent content |
+	| events completed consecutiveErrors counting latestChangeSequence successfulTestEvent content explorationCount explorationCounting |
 	events := run events.
 	completed := events select: [ :event | event type = #toolExecutionCompleted ].
 	completed isEmpty ifTrue: [ ^ nil ].
@@ -412,6 +448,24 @@ PharoCAAgent >> progressGuidanceInstructionSourceForRun: run [
 	consecutiveErrors >= 3 ifTrue: [
 		content := consecutiveErrors asString, ' consecutive tool calls failed. Reassess the approach instead of trying variants of the same exploratory DoIt. Prefer structured browse/process/UI/test tools, activate the relevant pack/skill, and use diagnostic suggestions returned by the tools.'.
 		^ (PharoCAInstructionSource named: 'no-progress' content: content)
+			kind: #runtime;
+			priority: 1000;
+			yourself ].
+	explorationCount := 0.
+	explorationCounting := true.
+	completed reverseDo: [ :event |
+		| name |
+		explorationCounting ifTrue: [
+			event sequence <= latestChangeSequence
+				ifTrue: [ explorationCounting := false ]
+				ifFalse: [
+					name := event payload at: 'name' ifAbsent: [ '' ].
+					(self isExplorationToolName: name)
+						ifTrue: [ explorationCount := explorationCount + 1 ]
+						ifFalse: [ explorationCounting := false ] ] ] ].
+	explorationCount >= 8 ifTrue: [
+		content := explorationCount asString, ' consecutive browse/evaluation calls occurred without a recorded code/image change. If enough evidence exists, implement the smallest known working change now. Avoid optional architecture/API exploration; use an active domain skill and structured tools for any specific unresolved question.'.
+		^ (PharoCAInstructionSource named: 'exploration-streak' content: content)
 			kind: #runtime;
 			priority: 1000;
 			yourself ].
@@ -699,12 +753,34 @@ PharoCAAgent >> start: aPrompt inSession: aSession eventsDo: anEventBlock [
 		eventsDo: anEventBlock
 ]
 
+{ #category : 'sessions-live' }
+PharoCAAgent >> recordRunTerminalEntryFor: run [
+	| reason payload entry |
+	reason := run status = #cancelled
+		ifTrue: [ run cancellationReason ifNil: [ #cancelled ] ]
+		ifFalse: [
+			run status = #iterationLimitReached
+				ifTrue: [ #iterationLimit ]
+				ifFalse: [ run status = #failed ifTrue: [ #error ] ifFalse: [ #completed ] ] ].
+	payload := {
+		'runId' -> run id.
+		'status' -> run status asString.
+		'reason' -> reason asString.
+		'iterations' -> run iterations.
+		'error' -> (run error ifNil: [ nil ] ifNotNil: [ :error | error description ])
+	} asDictionary.
+	entry := run session appendType: #runTerminal payload: payload.
+	self recordConversationEntry: entry onRun: run.
+	^ entry
+]
+
 { #category : 'sessions-031' }
 PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSession eventsDo: anEventBlock [
-	| run process conversation |
+	| run process conversation autoActivations |
 	(aUserMessage isKindOf: PharoCALLMMessage) ifFalse: [ Error signal: 'User input must be a PharoCALLMMessage' ].
 	aUserMessage role = #user ifFalse: [ Error signal: 'User input message role must be #user' ].
 	self synchronizeLegacyConfiguration.
+	autoActivations := self autoActivateSkillsForPrompt: aPrompt session: aSession.
 	conversation := aSession conversation.
 	conversation addModelSnapshot: model asDictionary.
 	conversation addConfigurationSnapshot: self sessionConfigurationSnapshot.
@@ -720,10 +796,12 @@ PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSessi
 		status: #running;
 		yourself.
 	run whenEventDo: anEventBlock.
+	autoActivations do: [ :activation | run emit: #skillAutoActivated payload: activation ].
 	run beforeFinishDo: [
 		[ extensionRegistry afterRun: run agent: self ]
 			on: Error
 			do: [ :error | run error: error; status: #failed ].
+		self recordRunTerminalEntryFor: run.
 		self unregisterActiveRun: run ].
 	self registerActiveRun: run.
 	process := [

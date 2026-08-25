@@ -153,3 +153,21 @@ PharoCATool class >> classNotFoundResultFor: className [
 	suggestions isEmpty ifFalse: [ result at: 'hint' put: 'Use the exact installed class name; the suggestions are live-image matches.' ].
 	^ result
 ]
+
+{ #category : 'changes' }
+PharoCATool class >> sessionProvenanceForTarget: target createdKinds: createdKinds context: context [
+	| run records matches created result |
+	run := context ifNil: [ nil ] ifNotNil: [ context run ].
+	run ifNil: [ ^ { 'createdThisSession' -> false. 'modifiedThisSession' -> false } asDictionary ].
+	(run session isNil or: [ run environment isNil ]) ifTrue: [
+		^ { 'createdThisSession' -> false. 'modifiedThisSession' -> false } asDictionary ].
+	records := run environment changeJournal entriesForSessionId: run session id.
+	matches := records select: [ :record | record target = target ].
+	created := matches anySatisfy: [ :record | createdKinds includes: record kind ].
+	result := {
+		'createdThisSession' -> created.
+		'modifiedThisSession' -> matches notEmpty
+	} asDictionary.
+	matches ifNotEmpty: [ result at: 'lastChangeId' put: matches last id ].
+	^ result
+]

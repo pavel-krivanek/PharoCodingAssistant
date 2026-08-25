@@ -18,7 +18,7 @@ PharoCAConfigurationTest >> testDefaults [
 	self assert: configuration toolTimeoutMilliseconds equals: 60000.
 	self deny: configuration systemPrompt isEmpty.
 	self assert: (configuration systemPrompt includesSubstring: 'structured tools for browsing').
-	self assert: (configuration systemPrompt includesSubstring: 'tool_search searches harness tools only').
+	self assert: (configuration systemPrompt includesSubstring: 'search_tools searches harness tools only').
 	self assert: (configuration systemPrompt includesSubstring: 'tests, debugging, refactoring').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://class/Class').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://method/Class/instance/selector').

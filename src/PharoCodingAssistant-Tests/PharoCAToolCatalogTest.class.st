@@ -53,7 +53,7 @@ PharoCAToolCatalogTest >> testDefaultSessionExposesCatalogAndCoreButNotBrowsePac
 	agent := PharoCA new.
 	session := agent newSession.
 	names := ((agent toolRegistry llmDefinitionsForSession: session) collect: [ :each | each name ]) asSet.
-	self assert: (names includes: 'tool_search').
+	self assert: (names includes: 'search_tools').
 	self assert: (names includes: 'tool_enable').
 	self assert: (names includes: 'tool_disable').
 	self assert: (names includes: 'list_packages').
@@ -68,7 +68,7 @@ PharoCAToolCatalogTest >> testToolSearchFindsInactiveBrowseToolWithMetadata [
 	| provider agent result raw item |
 	provider := PharoCATestLLMProvider new.
 	provider
-		queueResponse: (self toolCallCompletionNamed: 'tool_search' arguments: '{"query":"get_method"}' id: 'search-1');
+		queueResponse: (self toolCallCompletionNamed: 'search_tools' arguments: '{"query":"get_method"}' id: 'search-1');
 		queueResponse: (self completionWith: 'done').
 	agent := PharoCA new provider: provider; yourself.
 	agent prompt: 'find a tool'.
@@ -176,7 +176,7 @@ PharoCAToolCatalogTest >> testCatalogPackCannotBeDisabledAndRemainsReachable [
 	self deny: (result at: 'ok').
 	self assert: ((result at: 'error') at: 'type') equals: 'tool_execution_error'.
 	names := self advertisedNamesInRequest: provider requests second.
-	self assert: (names includes: 'tool_search').
+	self assert: (names includes: 'search_tools').
 	self assert: (names includes: 'tool_enable').
 	self assert: (names includes: 'tool_disable')
 ]
@@ -312,4 +312,17 @@ PharoCAToolCatalogTest >> testToolSearchResultMakesCatalogScopeExplicit [
 	self assert: (result at: 'scope') equals: 'assistant_tool_catalog'.
 	self assert: ((result at: 'hint') includesSubstring: 'Pharo image code').
 	self assert: (result at: 'tools') isEmpty
+]
+
+{ #category : 'tests-066' }
+PharoCAToolCatalogTest >> testLegacyToolSearchAliasExecutesButIsNotAdvertised [
+	| registry names result |
+	registry := PharoCAToolRegistry default.
+	names := registry definitions collect: [ :definition | (definition at: 'function') at: 'name' ].
+	self assert: (names includes: 'search_tools').
+	self deny: (names includes: 'tool_search').
+	result := registry executeNamed: 'tool_search' arguments: { 'query' -> 'compile' } asDictionary.
+	self deny: (result at: 'ok').
+	self assert: ((result at: 'error') at: 'type') equals: 'tool_execution_error'.
+	self assert: (((result at: 'error') at: 'message') includesSubstring: 'active agent run')
 ]

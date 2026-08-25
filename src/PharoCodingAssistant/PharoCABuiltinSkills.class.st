@@ -99,14 +99,14 @@ PharoCABuiltinSkills class >> spec2Instructions [
 Use this skill for Pharo desktop UI built with Spec2. Activating it also enables the browse and ui tool packs. The supplied Pharo 14 image contains `SpPresenter`, `SpApplication`, `SpBoxLayout`, `SpGridLayout` and the standard presenter classes. Trust the canonical pattern below for common APIs; inspect the live image only for less-common selectors or after a concrete failure.
 
 ### Presenter lifecycle
-A normal presenter subclasses `SpPresenter` and separates responsibilities:
+A normal application/composite presenter subclasses `SpPresenter` (or `SpPresenterWithModel` when appropriate). Do **not** subclass `SpWindowPresenter`; `open`/`asWindow` creates that wrapper. Separate responsibilities:
 - `initializePresenters` creates/configures child presenters.
 - `connectPresenters` installs callbacks/connections.
 - `defaultLayout` answers the layout tree.
 - `initializeWindow:` configures title/extent/window behavior when needed.
 - `setModelBeforeInitialization:` is appropriate when construction depends on an external model.
 - Initialize presenter state needed by `initializePresenters`/`connectPresenters` before `super initialize`, because `super initialize` runs those hooks.
-- Open with `MyPresenter new open` (or an established class-side `open` forwarding to it). Use ui_list_windows/ui_window_* and ui_screenshot for live-window verification instead of hand-written fork/Delay probing.
+- Open with `MyPresenter new open` (or an established class-side `open` forwarding to it). Do not rely on stale `openWithSpec` comments in older image documentation. Use `ui_list_windows`, `ui_window_*`, and `ui_screenshot` for live-window verification instead of hand-written fork/Delay/reflection probing.
 
 ```smalltalk
 MyPresenter >> initializePresenters

@@ -19,7 +19,7 @@ PharoCAToolRegistryTest >> testDefaultRegistryContainsExplicitToolSet [
 	registry := PharoCAToolRegistry default.
 	names := registry tools collect: [ :tool | tool toolName ].
 	self assert: names asArray equals: #(
-		tool_search tool_enable tool_disable get_method get_class_summary list_package_tags search_classes search_selectors search_method_source
+		search_tools tool_enable tool_disable get_method get_class_summary list_package_tags search_classes search_selectors search_method_source
 		find_references find_slot_accesses find_pragmas get_package_dependencies get_method_ast search_ast ast_rewrite_preview
 		check_code evaluate_expression object_summary object_slots object_send object_release
 		test_discover test_results test_failure test_rerun test_coverage transcript_status transcript_tail transcript_clear profile_expression
@@ -33,7 +33,7 @@ PharoCAToolRegistryTest >> testDefaultRegistryContainsExplicitToolSet [
 		iceberg_commit iceberg_fetch iceberg_pull iceberg_push iceberg_create_branch iceberg_switch
 		iceberg_add_remote iceberg_remove_remote iceberg_load_package iceberg_unload_package iceberg_discard_changes
 		iceberg_clone iceberg_add_local_repository ui_list_windows ui_window_info ui_window_activate ui_window_set_state ui_window_set_bounds ui_window_close ui_screenshot
-		activate_skill compile_method format_code quality_rules quality_check quality_results remove_method set_method_protocol deactivate_skill define_class evaluate get_class_comment get_class_definition
+		activate_skill compile_method compile_methods format_code quality_rules quality_check quality_results remove_method set_method_protocol deactivate_skill define_class evaluate get_class_comment get_class_definition
 		get_class_hierarchy get_method_inheritance get_package_comment list_classes_in_package
 		list_implementors list_methods list_packages list_senders list_skills evaluate_and_print
 		remove_class run_tests set_class_comment workspace_create_directory workspace_edit_file
@@ -50,7 +50,7 @@ PharoCAToolRegistryTest >> testDefinitionsContainOnlyEnabledTools [
 	self deny: (names includes: 'remove_class').
 	self assert: (names includes: 'evaluate').
 	self assert: (names includes: 'evaluate_and_print').
-	self assert: names size equals: 25
+	self assert: names size equals: 26
 ]
 
 { #category : 'tests' }

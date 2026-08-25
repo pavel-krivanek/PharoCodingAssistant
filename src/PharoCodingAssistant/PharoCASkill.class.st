@@ -121,3 +121,19 @@ PharoCASkill >> recommendedToolPacks [ ^ recommendedToolPacks ]
 PharoCASkill >> recommendedToolPacks: aCollection [
 	recommendedToolPacks := (aCollection ifNil: [ #() ]) collect: [ :each | each asString ]
 ]
+
+{ #category : 'testing' }
+PharoCASkill >> matchesAutomaticActivationIn: aString [
+	| query needle start after beforeOK afterOK |
+	name = 'Smalltalk Core' ifTrue: [ ^ false ].
+	query := aString asString asLowercase.
+	needle := name asLowercase.
+	start := query findString: needle startingAt: 1.
+	[ start > 0 ] whileTrue: [
+		beforeOK := start = 1 or: [ (query at: start - 1) isAlphaNumeric not ].
+		after := start + needle size.
+		afterOK := after > query size or: [ (query at: after) isAlphaNumeric not ].
+		(beforeOK and: [ afterOK ]) ifTrue: [ ^ true ].
+		start := query findString: needle startingAt: start + 1 ].
+	^ false
+]

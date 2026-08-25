@@ -230,3 +230,71 @@ PharoCAAgentInstructionsTest >> testPassingRunTestsInjectsCompletionGuidanceOnNe
 	run emit: #changeRecorded payload: Dictionary new.
 	self assert: (agent progressGuidanceInstructionSourceForRun: run) isNil
 ]
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesBeforeFirstRequestAndEnablesRecommendedPacks [
+	| provider agent session run system names activeSkills activePacks |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	run := agent run: 'create a Spec2 counter application' inSession: session.
+	self assert: run status equals: #completed.
+	self assert: provider requests size equals: 1.
+	system := self systemContentFromPayload: provider payloads first.
+	self assert: (system includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
+	self assert: (system includesSubstring: 'ui_list_windows').
+	names := (provider requests first toolDefinitions collect: #name) asSet.
+	self assert: (names includes: 'ui_list_windows').
+	self assert: (names includes: 'get_method').
+	activeSkills := agent skillRegistry activeSkillNamesForSession: session.
+	self assert: (activeSkills includes: 'Smalltalk Core').
+	self assert: (activeSkills includes: 'Spec2').
+	activePacks := agent toolRegistry activePackNamesForSession: session.
+	self assert: (activePacks includes: 'browse').
+	self assert: (activePacks includes: 'ui').
+	self assert: (run events anySatisfy: [ :event | event type = #skillAutoActivated ])
+]
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testUnrelatedPromptDoesNotAutoActivateSpec2 [
+	| provider agent session |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	agent run: 'rename a plain domain class' inSession: session.
+	self deny: ((agent skillRegistry activeSkillNamesForSession: session) includes: 'Spec2').
+	self assert: (agent toolRegistry activePackNamesForSession: session) equals: #('catalog' 'core')
+]
+
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testEightReadOnlyExplorationCallsInjectImplementationNudge [
+	| agent run source result |
+	agent := PharoCA new.
+	run := PharoCARun new.
+	result := PharoCAToolResult success: { 'status' -> 'ok' } asDictionary.
+	8 timesRepeat: [
+		run emit: #toolExecutionCompleted payload: {
+			'name' -> 'get_method'.
+			'result' -> result
+		} asDictionary ].
+	source := agent progressGuidanceInstructionSourceForRun: run.
+	self assert: source notNil.
+	self assert: source name equals: 'exploration-streak'.
+	self assert: (source content includesSubstring: 'consecutive browse/evaluation calls').
+	self assert: (source content includesSubstring: 'implement the smallest known working change now')
+]
+
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testAutomaticSkillMatchingUsesNameBoundaries [
+	| provider agent session |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	agent run: 'diagnose a blocking process' inSession: session.
+	self deny: ((agent skillRegistry activeSkillNamesForSession: session) includes: 'Bloc')
+]

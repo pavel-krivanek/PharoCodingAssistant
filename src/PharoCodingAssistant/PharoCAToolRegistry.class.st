@@ -137,6 +137,7 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolUIScreenshot
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
+		PharoCAToolCompileMethods
 		PharoCAToolFormatCode
 		PharoCAToolQualityRules
 		PharoCAToolQualityCheck
@@ -452,12 +453,12 @@ PharoCAToolRegistry >> executionErrorFor: error tool: tool arguments: arguments 
 	| description details |
 	description := error description.
 	details := nil.
-	(tool toolName = #compile_method and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
+	((#(compile_method compile_methods) includes: tool toolName) and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
 		details := {
 			'diagnosticType' -> 'undeclared_variable'.
 			'hint' -> 'A bare identifier in a method body is a variable reference. If you intended a unary message to the receiver, write self selector (for example self classToTest). Otherwise declare the temporary or instance variable.'
 		} asDictionary ].
-	(tool toolName = #compile_method and: [ description includesSubstring: 'SyntaxErrorNotice' ]) ifTrue: [
+	((#(compile_method compile_methods) includes: tool toolName) and: [ description includesSubstring: 'SyntaxErrorNotice' ]) ifTrue: [
 		details := self syntaxErrorDetailsFor: description source: (arguments at: 'source' ifAbsent: [ '' ]) ].
 	(error isKindOf: MessageNotUnderstood) ifTrue: [
 		details := self messageNotUnderstoodDetailsFor: error ].
@@ -739,7 +740,11 @@ PharoCAToolRegistry >> scheduler: aScheduler [
 
 { #category : 'lookup' }
 PharoCAToolRegistry >> toolNamed: aName ifAbsent: aBlock [
-	^ toolsByName at: aName asSymbol ifAbsent: aBlock
+	| key |
+	key := aName asSymbol.
+	"066 compatibility: old clients may still invoke tool_search, but the alias is intentionally not advertised to models."
+	key = #tool_search ifTrue: [ key := #search_tools ].
+	^ toolsByName at: key ifAbsent: aBlock
 ]
 
 { #category : 'accessing' }

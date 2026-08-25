@@ -9,7 +9,12 @@ Class {
 
 { #category : 'definition' }
 PharoCAToolGetClassDefinition class >> execute: args [
-	| aClass classSymbol page |
+	^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
+{ #category : 'execution' }
+PharoCAToolGetClassDefinition class >> execute: args context: context [
+	| aClass classSymbol page result provenance |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
 		^ self classNotFoundResultFor: (args at: 'className') ].
@@ -17,10 +22,13 @@ PharoCAToolGetClassDefinition class >> execute: args [
 		pageText: aClass definitionString
 		arguments: args
 		scope: 'get_class_definition|', aClass name.
-	^ {
+	result := {
 		'definition' -> (page at: 'text').
 		'range' -> (page at: 'range')
-	} asDictionary
+	} asDictionary.
+	provenance := self sessionProvenanceForTarget: aClass name createdKinds: #(classDefined) context: context.
+	result addAll: provenance.
+	^ result
 ]
 
 

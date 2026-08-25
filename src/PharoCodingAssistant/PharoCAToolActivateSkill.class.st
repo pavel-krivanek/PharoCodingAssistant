@@ -14,21 +14,12 @@ PharoCAToolActivateSkill class >> execute: args [
 
 { #category : 'execution' }
 PharoCAToolActivateSkill class >> execute: args context: aContext [
-	| run skill activatedPacks |
+	| run result |
 	run := aContext run ifNil: [ Error signal: 'activate_skill requires an active agent run' ].
-	skill := run agent skillRegistry activateNamed: (args at: 'name') session: run session.
-	activatedPacks := OrderedCollection new.
-	skill recommendedToolPacks do: [ :pack |
-		(run agent toolRegistry activatePackNamed: pack forSession: run session) ifTrue: [ activatedPacks add: pack ] ].
-	run emit: #skillActivated payload: skill asMetadataDictionary.
-	^ {
-		'name' -> skill name.
-		'description' -> skill description.
-		'active' -> true.
-		'instructionsLoadedIntoNextContext' -> true.
-		'recommendedToolPacks' -> skill recommendedToolPacks asArray.
-		'activatedToolPacks' -> activatedPacks asArray
-	} asDictionary
+	result := run agent activateSkillNamed: (args at: 'name') forSession: run session.
+	result at: 'instructionsLoadedIntoNextContext' put: true.
+	run emit: #skillActivated payload: ((run agent skillRegistry skillNamed: (args at: 'name') ifAbsent: [ self error: 'Unknown skill' ]) asMetadataDictionary).
+	^ result
 ]
 
 { #category : 'definition' }
