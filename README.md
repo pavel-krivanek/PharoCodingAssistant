@@ -677,6 +677,10 @@ A project can select one through `settings.json`:
 
 Specific tools can also be allowed or excluded with `tools.allow` and `tools.exclude` arrays.
 
+The default system prompt gives the model a compact map of the available families — browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace operations, Transcript and screenshots — and tells it to use `tool_search` / `tool_enable` for exact names and lazy packs. It intentionally does not duplicate the full catalog in the prompt.
+
+Iteration 057 adds the default-core `format_code` tool. It parses method or expression source with Pharo's native `OCParser` and returns `formattedCode` without changing the image. Formatted text is cursor-paginated, so large methods remain bounded.
+
 ### Tool packs and lazy discovery
 
 The tool registry can contain more tools than are advertised to the model on every request. The original tool set remains in the default `core` pack, while larger/newer families can be activated lazily per durable session. The `catalog` pack is always active and contains:
@@ -687,7 +691,7 @@ The tool registry can contain more tools than are advertised to the model on eve
 
 Pack activation is session-scoped and persisted with the session. It changes the schemas advertised on the **next model request**, including the next round of the same running agent. It does not bypass the selected tool profile or explicit `tools.allow`/`tools.exclude` policy.
 
-Iteration 055 also puts an explicit context budget around this catalog architecture. In the supplied image all 131 registered tool parameter schemas total about 23.5K serialized JSON characters before lazy-pack filtering, while the default active surface is only 22 definitions (~7.5K characters). Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 25 tools / 10,000 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
+Iteration 055 also put an explicit context budget around this catalog architecture. After iteration 058 the supplied image has 137 registered tools whose parameter schemas total 25,328 serialized JSON characters before lazy-pack filtering, while the default active surface remains exactly 25 definitions (8,670 serialized definition characters). Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 25 tools / 10,000 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
 
 The lazy `browse` pack contains the Pharo-native browsing and structural-search tools. Iteration 048 introduced the pack and iteration 049 expanded it substantially:
 
@@ -706,6 +710,26 @@ The lazy `browse` pack contains the Pharo-native browsing and structural-search 
 - `ast_rewrite_preview` — parses a fresh copy of one installed method and previews an `OCParseTreeRewriter` expression/method rewrite without mutating live code.
 
 The agent can therefore discover a capability with `tool_search`, enable `browse`, and use these tools on the next model request — including the next round of the same run — without carrying every future tool schema in every ordinary request.
+
+#### `quality` pack
+
+Iteration 058 adds a lazy read-only code-quality pack backed by the QualityAssistant/Smalllint implementation already present in the supported Pharo 14 image:
+
+- `quality_rules` — lists the enabled native `ReRuleManager` rules with deterministic pagination and optional name/class, group, severity and rationale filtering;
+- `quality_check` — runs `ReCriticEngine` on an installed method, class, or bounded package scope and returns rule/group/severity/title plus source intervals where the native critique supplies one;
+- `quality_results` — pages a short-lived saved analysis without rerunning the critique engine.
+
+Enable it only when useful:
+
+```text
+tool_enable pack:"quality"
+quality_rules query:"long method" severity:"warning"
+quality_check scope:"method" className:"MyClass" selector:"calculate"
+```
+
+Class/package analysis is bounded by `maxEntities` (maximum 500), stored findings by `maxFindings` (maximum 1,000), and each returned page by `limit` (maximum 100). Full critique descriptions are opt-in because rule rationales can be verbose. When more saved findings exist, the first result contains an expiring session-local `analysisHandle`; `quality_results` uses that handle so pagination never reruns QualityAssistant. Package scans are deterministic by class/selector order, cancellation is checked between entities, and native rule exceptions are isolated into bounded `analysisErrors`. The tool uses the image's current QualityAssistant rule/manifests rather than duplicating lint logic in the assistant.
+
+Iteration 058 also replaces the deprecated `Smalltalk os environment` credential lookup with Pharo 14's `OSEnvironment current`, removing the deprecation emitted by the full test suite.
 
 
 Iteration 050 adds three additional lazy packs for stateful runtime work. They use session-scoped transient stores, so live object handles and detailed test-run records do not survive image/session restoration.
@@ -915,7 +939,12 @@ ui_screenshot target:"window" handle:"obj-1"
 
 The static web UI recognizes image artifact descriptors and shows them inline in the corresponding tool row. No screenshot base64 crosses the normal WebSocket/tool-result path and no frontend build dependency is introduced.
 
-Canonical LLM content now also has a provider-neutral `imageArtifact` part reserved for future vision-capable tool-to-model feedback. Current provider adapters deliberately require explicit resolution before transport rather than leaking an environment-local artifact implicitly.
+### Direct method editing
+
+Iteration 056 also fills two small core editing gaps. `remove_method` deletes one locally defined instance- or class-side method and records a checkpoint-rollbackable semantic method change; inherited selectors are rejected. `set_method_protocol` uses Pharo's native `Behavior>>classify:under:` to move an existing method to another protocol/category without recompiling its source. Both are `coding`/`exclusiveMutation` tools, and protocol-only changes are visible in change review as well as rollbackable.
+
+
+Canonical LLM content also has a provider-neutral `imageArtifact` part. Since iteration 056, an image-capable model can consume an image artifact on the next round, but resolution is deliberately late: durable conversation state keeps only the opaque descriptor and the provider adapter reads/encodes bytes only while building the outgoing request. Automatic feedback accepts only a live PNG/JPEG/GIF/WebP artifact owned by the exact tool call (and current run/session), with fixed count and byte ceilings; text-only models, expired artifacts, unsupported MIME types, and oversized images degrade to compact textual diagnostics. Base64/data URLs therefore never enter ordinary tool JSON, durable sessions, run events, or request telemetry. OpenAI-compatible Chat Completions emits all consecutive textual tool results first and then a synthetic multimodal user image message; Anthropic keeps image blocks nested in the corresponding `tool_result` content.
 
 ## Skills, instructions and templates
 

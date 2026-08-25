@@ -112,6 +112,18 @@ PharoCAArtifactStore >> artifactAt: identifier [
 	^ artifact
 ]
 
+
+{ #category : 'lookup' }
+PharoCAArtifactStore >> artifactAt: identifier ifAbsent: absentBlock [
+	| artifact now |
+	identifier isString ifFalse: [ ^ absentBlock value ].
+	mutex critical: [
+		now := self now.
+		self purgeExpiredLockedAt: now.
+		artifact := entries at: identifier ifAbsent: [ nil ] ].
+	^ artifact ifNil: [ absentBlock value ] ifNotNil: [ artifact ]
+]
+
 { #category : 'lookup' }
 PharoCAArtifactStore >> bytesAt: identifier [ ^ (self artifactAt: identifier) bytes ]
 { #category : 'lookup' }

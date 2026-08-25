@@ -148,6 +148,12 @@ PharoCAChangeReview class >> beforeAndAfterTextFor: record [
 	(#(#methodAdded #methodModified) includes: kind) ifTrue: [
 		beforeText := record before ifNil: [ '' ] ifNotNil: [ record before at: 'source' ifAbsent: [ '' ] ].
 		afterText := record after ifNil: [ '' ] ifNotNil: [ record after at: 'source' ifAbsent: [ '' ] ].
+		(record before notNil and: [ record after notNil and: [
+			beforeText = afterText and: [
+				(record before at: 'protocol' ifAbsent: [ '' ]) ~= (record after at: 'protocol' ifAbsent: [ '' ]) ] ] ]) ifTrue: [
+			^ {
+				'Protocol: ', (record before at: 'protocol' ifAbsent: [ '' ]), String lf, beforeText.
+				'Protocol: ', (record after at: 'protocol' ifAbsent: [ '' ]), String lf, afterText } ].
 		^ { beforeText. afterText } ].
 	kind = #classCommentChanged ifTrue: [ ^ { record before ifNil: [ '' ]. record after ifNil: [ '' ] } ].
 	(#(#classDefined #classModified #classRemoved) includes: kind) ifTrue: [

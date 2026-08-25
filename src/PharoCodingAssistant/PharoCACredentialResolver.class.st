@@ -40,7 +40,7 @@ PharoCACredentialResolver >> resolve: aName [
 	value ifNotNil: [ ^ value ].
 	environmentName := environmentVariables at: key ifAbsent: [ nil ].
 	environmentName ifNil: [ ^ nil ].
-	^ Smalltalk os environment at: environmentName ifAbsent: [ nil ]
+	^ OSEnvironment current at: environmentName ifAbsent: [ nil ]
 ]
 
 { #category : 'resolving' }

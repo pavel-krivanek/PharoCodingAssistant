@@ -41,6 +41,12 @@ PharoCAConversation >> addToolResultId: toolCallId content: aString [
 	^ self appendEntryType: #message payload: (PharoCALLMMessage toolResultId: toolCallId content: aString)
 ]
 
+
+{ #category : 'adding' }
+PharoCAConversation >> addToolResultId: toolCallId contentParts: parts [
+	^ self appendEntryType: #message payload: (PharoCALLMMessage toolResultId: toolCallId contentParts: parts)
+]
+
 { #category : 'private' }
 PharoCAConversation >> canonicalMessageFrom: anObject [
 	(anObject isKindOf: PharoCALLMMessage) ifTrue: [ ^ anObject ].

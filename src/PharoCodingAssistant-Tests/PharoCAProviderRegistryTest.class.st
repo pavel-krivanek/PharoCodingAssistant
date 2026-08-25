@@ -39,6 +39,17 @@ PharoCAProviderRegistryTest >> testCredentialResolverNeverSerializesSecretValues
 	self assert: (json includesSubstring: 'anthropic-api-key')
 ]
 
+
+{ #category : 'tests' }
+PharoCAProviderRegistryTest >> testCredentialResolverUsesCurrentOSEnvironment [
+	| resolver value |
+	resolver := PharoCACredentialResolver new.
+	resolver map: 'path-probe' toEnvironmentVariable: 'PATH'.
+	value := resolver resolve: 'path-probe'.
+	self assert: value notNil.
+	self assert: value isString
+]
+
 { #category : 'tests' }
 PharoCAProviderRegistryTest >> testModelRegistrySelectsProviderAndAgentWithoutSecretInSessionSnapshot [
 	| providers models model agent session snapshot |

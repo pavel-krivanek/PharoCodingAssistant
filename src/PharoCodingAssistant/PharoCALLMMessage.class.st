@@ -35,6 +35,12 @@ PharoCALLMMessage class >> toolResultId: anId content: aString [
 	^ self new role: #tool; toolCallId: anId; content: aString; yourself
 ]
 
+
+{ #category : 'instance creation' }
+PharoCALLMMessage class >> toolResultId: anId contentParts: parts [
+	^ self new role: #tool; toolCallId: anId; contentParts: parts; yourself
+]
+
 { #category : 'initialization' }
 PharoCALLMMessage >> initialize [
 	super initialize.

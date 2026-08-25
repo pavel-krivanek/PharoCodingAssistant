@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCALLMRequest',
 	#superclass : 'Object',
-	#instVars : [ 'model', 'messages', 'toolDefinitions', 'temperature', 'reasoningEffort', 'maxOutputTokens', 'toolChoice', 'providerOptions' ],
+	#instVars : [ 'model', 'messages', 'toolDefinitions', 'temperature', 'reasoningEffort', 'maxOutputTokens', 'toolChoice', 'providerOptions', 'artifactResolver' ],
 	#category : 'PharoCodingAssistant-LLM',
 	#package : 'PharoCodingAssistant',
 	#tag : 'LLM'
@@ -16,6 +16,12 @@ PharoCALLMRequest >> initialize [
 	providerOptions := Dictionary new.
 	toolChoice := #auto
 ]
+
+
+{ #category : 'artifacts' }
+PharoCALLMRequest >> artifactResolver [ ^ artifactResolver ]
+{ #category : 'artifacts' }
+PharoCALLMRequest >> artifactResolver: aResolver [ artifactResolver := aResolver ]
 
 { #category : 'accessing' }
 PharoCALLMRequest >> model [ ^ model ]

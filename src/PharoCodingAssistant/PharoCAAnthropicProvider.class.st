@@ -167,13 +167,16 @@ PharoCAAnthropicProvider >> wireMessagesFor: messages [
 
 { #category : 'mapping' }
 PharoCAAnthropicProvider >> wirePayloadForRequest: aRequest [
-	| payload systemText protected |
+	| payload systemText protected messages |
+	messages := aRequest artifactResolver
+		ifNil: [ aRequest messages ]
+		ifNotNil: [ :resolver | resolver resolvedMessages: aRequest messages forModel: aRequest model ].
 	payload := {
 		'model' -> aRequest model name.
 		'max_tokens' -> (aRequest maxOutputTokens ifNil: [ 4096 ]).
-		'messages' -> (self wireMessagesFor: aRequest messages)
+		'messages' -> (self wireMessagesFor: messages)
 	} asDictionary.
-	systemText := self systemTextFrom: aRequest messages.
+	systemText := self systemTextFrom: messages.
 	systemText isEmpty ifFalse: [ payload at: 'system' put: systemText ].
 	aRequest temperature ifNotNil: [ payload at: 'temperature' put: aRequest temperature ].
 	aRequest toolDefinitions notEmpty ifTrue: [
@@ -211,7 +214,13 @@ PharoCAAnthropicProvider >> wireToolDefinitionFor: definition [
 
 { #category : 'mapping' }
 PharoCAAnthropicProvider >> wireToolResultFor: message [
-	^ { 'type' -> 'tool_result'. 'tool_use_id' -> message toolCallId. 'content' -> message textContent } asDictionary
+	| content blocks |
+	(message contentParts size = 1 and: [ message contentParts first type = #text ])
+		ifTrue: [ content := message contentParts first value ]
+		ifFalse: [
+			blocks := message contentParts collect: [ :part | self wireContentPartFor: part ].
+			content := blocks asArray ].
+	^ { 'type' -> 'tool_result'. 'tool_use_id' -> message toolCallId. 'content' -> content } asDictionary
 ]
 
 { #category : 'mapping' }

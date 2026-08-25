@@ -494,3 +494,37 @@ PharoCAToolRefactoringTest >> testEveryRefactoringToolHasExpectedPackCapabilityA
 	(refactoringTools reject: [ :tool | mutators includes: tool ]) do: [ :tool |
 		self assert: (#(#sequential #parallelSafe) includes: tool executionMode) ]
 ]
+
+{ #category : 'tests - lifecycle' }
+PharoCAToolRefactoringTest >> testPlanSignatureIgnoresVolatileHumanDescriptionButTracksStructuralContent [
+	| first second changed firstSignature secondSignature changedSignature |
+	first := { {
+		'type' -> #ReAddMethodChange.
+		'className' -> 'PCARefSignature'.
+		'selector' -> 'example'.
+		'source' -> 'example ^ 1'.
+		'protocol' -> 'testing'.
+		'description' -> '!PCARefSignature methodsFor: ''testing'' stamp: ''8/24/2026 20:10'''
+	} asDictionary }.
+	second := { {
+		'type' -> #ReAddMethodChange.
+		'className' -> 'PCARefSignature'.
+		'selector' -> 'example'.
+		'source' -> 'example ^ 1'.
+		'protocol' -> 'testing'.
+		'description' -> '!PCARefSignature methodsFor: ''testing'' stamp: ''8/24/2026 20:11'''
+	} asDictionary }.
+	changed := { {
+		'type' -> #ReAddMethodChange.
+		'className' -> 'PCARefSignature'.
+		'selector' -> 'example'.
+		'source' -> 'example ^ 2'.
+		'protocol' -> 'testing'.
+		'description' -> 'arbitrary human text'
+	} asDictionary }.
+	firstSignature := PharoCARefactoringTool signatureForPlan: first.
+	secondSignature := PharoCARefactoringTool signatureForPlan: second.
+	changedSignature := PharoCARefactoringTool signatureForPlan: changed.
+	self assert: firstSignature equals: secondSignature.
+	self deny: firstSignature equals: changedSignature
+]

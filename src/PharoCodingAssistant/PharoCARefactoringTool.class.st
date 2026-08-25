@@ -117,7 +117,7 @@ PharoCARefactoringTool class >> signatureForPlan: plan [
 	| text |
 	text := String streamContents: [ :stream |
 		plan do: [ :entry |
-			#('type' 'description' 'className' 'selector' 'source' 'protocol' 'oldName' 'newName') do: [ :key |
+			#('type' 'className' 'selector' 'source' 'protocol' 'oldName' 'newName') do: [ :key |
 				stream nextPutAll: key; nextPut: $=; nextPutAll: (entry at: key ifAbsent: [ '' ]) asString; nextPut: Character lf ] ] ].
 	^ (SHA256 hashMessage: text) hex
 ]

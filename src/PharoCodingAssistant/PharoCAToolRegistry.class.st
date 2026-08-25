@@ -132,6 +132,12 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolUIScreenshot
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
+		PharoCAToolFormatCode
+		PharoCAToolQualityRules
+		PharoCAToolQualityCheck
+		PharoCAToolQualityResults
+		PharoCAToolRemoveMethod
+		PharoCAToolSetMethodProtocol
 		PharoCAToolDeactivateSkill
 		PharoCAToolDefineClass
 		PharoCAToolDoIt

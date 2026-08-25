@@ -16,7 +16,11 @@ PharoCAConfigurationTest >> testDefaults [
 	self assert: configuration timeout equals: 3600.
 	self assert: configuration temperature equals: 0.0.
 	self assert: configuration toolTimeoutMilliseconds equals: 60000.
-	self deny: configuration systemPrompt isEmpty
+	self deny: configuration systemPrompt isEmpty.
+	self assert: (configuration systemPrompt includesSubstring: 'browse/search').
+	self assert: (configuration systemPrompt includesSubstring: 'tool_search/tool_enable').
+	self assert: (configuration systemPrompt includesSubstring: 'debugging/profiling').
+	self assert: configuration systemPrompt size < 1200
 ]
 
 { #category : 'tests' }

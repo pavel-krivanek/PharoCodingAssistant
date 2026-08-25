@@ -205,12 +205,51 @@ PharoCAOpenAIProvider >> wireMessageFor: message [
 	^ result
 ]
 
+
+{ #category : 'mapping-056' }
+PharoCAOpenAIProvider >> wireMessagesForRequest: request [
+	| messages result pendingImageContent flushImages |
+	messages := request artifactResolver
+		ifNil: [ request messages ]
+		ifNotNil: [ :resolver | resolver resolvedMessages: request messages forModel: request model ].
+	result := OrderedCollection new.
+	pendingImageContent := OrderedCollection new.
+	flushImages := [
+		pendingImageContent ifNotEmpty: [
+			| imageMessage |
+			imageMessage := PharoCALLMMessage new
+				role: #user;
+				contentParts: pendingImageContent asArray;
+				yourself.
+			result add: (self wireMessageFor: imageMessage).
+			pendingImageContent removeAll ] ].
+	messages do: [ :message |
+		message role = #tool
+			ifTrue: [
+				| imageParts textParts textMessage |
+				imageParts := message contentParts select: [ :part | part type = #imageURL ].
+				imageParts isEmpty
+					ifTrue: [ result add: (self wireMessageFor: message) ]
+					ifFalse: [
+						textParts := message contentParts select: [ :part | part type = #text ].
+						textMessage := message copy.
+						textMessage contentParts: textParts.
+						result add: (self wireMessageFor: textMessage).
+						pendingImageContent add: (PharoCALLMContentPart text: '[Image output from tool call ', message toolCallId asString, '.]').
+						pendingImageContent addAll: imageParts ] ]
+			ifFalse: [
+				flushImages value.
+				result add: (self wireMessageFor: message) ] ].
+	flushImages value.
+	^ result asArray
+]
+
 { #category : 'mapping' }
 PharoCAOpenAIProvider >> wirePayloadForRequest: aRequest [
 	| payload protected |
 	payload := {
 		'model' -> aRequest model name.
-		'messages' -> (aRequest messages collect: [ :message | self wireMessageFor: message ]) asArray.
+		'messages' -> (self wireMessagesForRequest: aRequest).
 		'temperature' -> aRequest temperature
 	} asDictionary.
 	aRequest toolDefinitions notEmpty ifTrue: [

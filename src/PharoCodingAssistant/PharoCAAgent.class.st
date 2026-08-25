@@ -208,10 +208,16 @@ PharoCAAgent >> executeRun: run prompt: aPrompt [
 						results := results withIndexCollect: [ :result :index |
 							self interceptToolResult: result invocation: (invocations at: index) onRun: run ].
 						invocations withIndexDo: [ :invocation :index |
-							| toolResult resultJson |
+							| toolResult resultJson artifactResolver contentParts |
 							toolResult := results at: index.
 							resultJson := STONJSON toString: toolResult.
-							self recordConversationEntry: (conversation addToolResultId: invocation id content: resultJson) onRun: run ].
+							artifactResolver := PharoCAArtifactContentResolver on: run environment artifactStore.
+							contentParts := artifactResolver
+								contentPartsForToolResult: toolResult
+								json: resultJson
+								invocation: invocation
+								run: run.
+							self recordConversationEntry: (conversation addToolResultId: invocation id contentParts: contentParts) onRun: run ].
 						run cancelled ifTrue: [ ^ run finishCancelled ].
 						self applyPendingSteeringOnRun: run conversation: conversation ]
 					ifFalse: [
@@ -422,6 +428,7 @@ PharoCAAgent >> extensionAdjustedProviderRequest: baseRequest run: run [
 	adjusted messages = baseRequest messages ifFalse: [ Error signal: 'Extension may not modify protected request field: messages' ].
 	adjusted toolDefinitions = baseRequest toolDefinitions ifFalse: [ Error signal: 'Extension may not modify protected request field: toolDefinitions' ].
 	adjusted maxOutputTokens = baseRequest maxOutputTokens ifFalse: [ Error signal: 'Extension may not modify protected request field: maxOutputTokens' ].
+	adjusted artifactResolver == baseRequest artifactResolver ifFalse: [ Error signal: 'Extension may not modify protected request field: artifactResolver' ].
 	^ adjusted
 ]
 
@@ -523,6 +530,7 @@ PharoCAAgent >> requestForContext: aContext tools: tools model: aModel [
 	request := PharoCALLMRequest new
 		model: aModel;
 		messages: aContext messages;
+		artifactResolver: (PharoCAArtifactContentResolver on: environment artifactStore);
 		temperature: configuration temperature;
 		yourself.
 	(aModel supportsTools and: [ tools notEmpty ]) ifTrue: [ request toolDefinitions: tools; toolChoice: #auto ].
