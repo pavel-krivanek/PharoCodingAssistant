@@ -24,6 +24,10 @@ PharoCAToolRichSUnitTest >> testFailureAndErrorDetailsAreCapturedAtFailureTime [
 	run := registry executeNamed: 'run_tests' arguments: { 'className' -> 'PharoCATestFailureFixture' } asDictionary.
 	self assert: (((run at: 'result') at: 'failureCount')) equals: 1.
 	self assert: (((run at: 'result') at: 'errorCount')) equals: 1.
+	self assert: (((run at: 'result') at: 'defects') size) equals: 2.
+	self assert: ((((run at: 'result') at: 'defects') anySatisfy: [ :each | (each at: 'message') includesSubstring: 'PCA050 intentional error' ])).
+	self deny: ((run at: 'result') at: 'defectsTruncated').
+	self assert: ((((run at: 'result') at: 'next') at: 'testFailureTool')) equals: 'test_failure'.
 	runId := (run at: 'result') at: 'runId'.
 	results := registry executeNamed: 'test_results' arguments: { 'runId' -> runId } asDictionary.
 	self assert: ((((results at: 'result') at: 'page') at: 'total')) equals: 3.

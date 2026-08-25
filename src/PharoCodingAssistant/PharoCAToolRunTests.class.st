@@ -19,7 +19,7 @@ PharoCAToolRunTests class >> executionMode [ ^ #sequential ]
 PharoCAToolRunTests class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'run_tests'
-		description: 'Runs SUnit tests in deterministic order or with an explicit shuffle seed. Supports method, class, package, tag, and explicit-selection scopes. Legacy className-only calls remain supported.'
+		description: 'Runs SUnit tests in deterministic order or with an explicit shuffle seed. Supports method, class, package, tag, and explicit-selection scopes. Failed runs include a bounded preview of concrete defects; use test_results/test_failure for the full paginated statuses and bounded stacks. Legacy className-only calls remain supported.'
 		parameters: {
 			'type' -> 'object'.
 			'properties' -> {
@@ -83,6 +83,21 @@ PharoCAToolRunTests class >> suiteForSpec: spec [
 ]
 
 { #category : 'private' }
+PharoCAToolRunTests class >> defectPreviewForResult: result limit: limit [
+	| details sorted selected |
+	details := result defectDetails values.
+	sorted := details asSortedCollection: [ :a :b | (a at: 'testId') <= (b at: 'testId') ].
+	selected := sorted size > limit ifTrue: [ sorted first: limit ] ifFalse: [ sorted ].
+	^ (selected collect: [ :detail |
+		{
+			'testId' -> (detail at: 'testId').
+			'status' -> (detail at: 'status').
+			'exceptionClass' -> (detail at: 'exceptionClass').
+			'message' -> (detail at: 'message')
+		} asDictionary ]) asArray
+]
+
+{ #category : 'private' }
 PharoCAToolRunTests class >> normalizedSpecFrom: args [
 	| spec |
 	spec := args copy.
@@ -126,5 +141,11 @@ PharoCAToolRunTests class >> execute: args context: context [
 	^ (self summaryForResult: result runId: runId)
 		at: 'shuffle' put: shuffle;
 		at: 'seed' put: (shuffle ifTrue: [ seed ] ifFalse: [ nil ]);
+		at: 'defects' put: (self defectPreviewForResult: result limit: 3);
+		at: 'defectsTruncated' put: result defectDetails size > 3;
+		at: 'next' put: {
+			'testResultsTool' -> 'test_results'.
+			'testFailureTool' -> 'test_failure'
+		} asDictionary;
 		yourself
 ]

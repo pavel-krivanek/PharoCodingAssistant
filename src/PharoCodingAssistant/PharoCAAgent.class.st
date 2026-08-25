@@ -156,8 +156,9 @@ PharoCAAgent >> executeRun: run prompt: aPrompt [
 	[
 		run cancelled ifTrue: [ ^ run finishCancelled ].
 		self applyPendingSteeringOnRun: run conversation: conversation.
-		iterations >= configuration maxIterations ifTrue: [
-			^ run finishIterationLimitWithAnswer: (run partialAnswer ifEmpty: [ finalText ]) ].
+		(self iterationLimitReachedAt: iterations) ifTrue: [
+			^ run finishIterationLimitWithAnswer: (run partialAnswer ifEmpty: [
+				finalText ifEmpty: [ 'Task stopped at the configured iteration limit after completing the previous tool batch.' ] ]) ].
 
 		iterations := iterations + 1.
 		run iterations: iterations.
@@ -191,9 +192,7 @@ PharoCAAgent >> executeRun: run prompt: aPrompt [
 
 				hasToolCalls
 					ifTrue: [
-						iterations >= configuration maxIterations ifTrue: [
-							finalText isEmpty ifTrue: [ finalText := 'Task stopped at the iteration limit while tool calls were pending.' ].
-							^ run finishIterationLimitWithAnswer: finalText ].
+						"A model response containing tool calls is a transaction boundary: once recorded, every call must receive a terminal tool result even when this response consumed the configured model-iteration budget. The limit is checked only before the next model request."
 						invocations := self invocationsFromToolCalls: toolCalls.
 						invocations := invocations collect: [ :invocation |
 							self interceptToolInvocation: invocation onRun: run ].
@@ -241,6 +240,11 @@ PharoCAAgent >> executeRun: run prompt: aPrompt [
 											self recordConversationEntry: (conversation addUser: followUp) onRun: run.
 											run emit: #followUpApplied payload: followUp ] ] ] ] ] ]
 	] repeat
+]
+
+{ #category : 'running-private' }
+PharoCAAgent >> iterationLimitReachedAt: completedModelRequests [
+	^ configuration maxIterations notNil and: [ completedModelRequests >= configuration maxIterations ]
 ]
 
 { #category : 'sessions-live' }
@@ -358,14 +362,31 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 ]
 
 { #category : 'instructions-private' }
+PharoCAAgent >> iterationBudgetInstructionSourceForRun: run [
+	| limit remaining threshold content |
+	limit := configuration maxIterations.
+	limit ifNil: [ ^ nil ].
+	remaining := (limit - run iterations) max: 0.
+	threshold := 5 min: ((limit / 5) ceiling max: 1).
+	remaining > threshold ifTrue: [ ^ nil ].
+	content := 'Execution budget: this is model request ', run iterations asString, ' of ', limit asString, '; ', remaining asString, ' further model request(s) remain after this one. Prioritize completing the requested change and essential verification; avoid optional exploration. Tool calls requested in this response will still complete before the guard can stop another model request.'.
+	^ (PharoCAInstructionSource named: 'iteration-budget' content: content)
+		kind: #runtime;
+		priority: 1000;
+		yourself
+]
+
+{ #category : 'instructions-private' }
 PharoCAAgent >> instructionAdjustedMessagesFor: baseMessages run: run model: activeModel [
-	| sources extensionSources discovery activeSkillNames messages |
+	| sources extensionSources discovery activeSkillNames messages budgetSource |
 	sources := OrderedCollection new.
 	extensionSources := extensionRegistry instructionSourcesForRun: run agent: self.
 	sources addAll: extensionSources.
 	sources addAll: (skillRegistry instructionSourcesForSession: run session).
 	discovery := skillRegistry discoveryInstructionSourceForSession: run session.
 	discovery ifNotNil: [ sources add: discovery ].
+	budgetSource := self iterationBudgetInstructionSourceForRun: run.
+	budgetSource ifNotNil: [ sources add: budgetSource ].
 	messages := instructionRegistry
 		messagesFrom: baseMessages
 		basePrompt: configuration systemPrompt
@@ -375,8 +396,11 @@ PharoCAAgent >> instructionAdjustedMessagesFor: baseMessages run: run model: act
 	run emit: #instructionsPrepared payload: {
 		'registeredSources' -> instructionRegistry enabledSources size.
 		'extensionSources' -> extensionSources size.
+		'additionalSourceNames' -> (sources collect: [ :each | each name ]) asArray.
 		'activeSkills' -> activeSkillNames.
-		'skillCatalogSize' -> skillRegistry size
+		'skillCatalogSize' -> skillRegistry size.
+		'iteration' -> run iterations.
+		'maxIterations' -> configuration maxIterations
 	} asDictionary.
 	^ messages
 ]

@@ -1298,7 +1298,7 @@ PharoCAExternalProtocolTest >> testFreshSessionKeepsCompleteSlashCommandCatalogI
 	} asDictionary)).
 	self assert: (completion at: 'ok').
 	labels := (((completion at: 'result') at: 'items') collect: [ :each | each at: 'label' ]) asSet.
-	#('/help' '/status' '/sessions' '/new [name]' '/continue' '/templates' '/models' '/model [modelId]' '/skills' '/reasoning [provider-default|none|low|medium|high|max]' '/checkpoint [label]' '/checkpoints')
+	#('/help' '/status' '/sessions' '/new [name]' '/continue' '/templates' '/models' '/model [modelId]' '/skills' '/reasoning [provider-default|none|low|medium|high|max]' '/max-iterations [off|N]' '/checkpoint [label]' '/checkpoints')
 		do: [ :usage | self assert: (labels includes: usage) ].
 	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
 		'line' -> '/skills'.
@@ -1418,4 +1418,50 @@ PharoCAExternalProtocolTest >> testIDEBrowseRejectsInvalidOrMissingTargetsWithou
 	} asDictionary)).
 	self deny: (response at: 'ok').
 	self assert: ((response at: 'error') at: 'code') equals: 'invalid_params'
+]
+
+{ #category : 'tests-064' }
+PharoCAExternalProtocolTest >> testMaxIterationsSlashCommandIsOptionalAndCompletes [
+	| response result completion items |
+	self assert: harness agent configuration maxIterations isNil.
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/max-iterations'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self deny: (result at: 'enabled').
+	self assert: (result at: 'maxIterations') isNil.
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/max-iterations 25'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	self assert: harness agent configuration maxIterations equals: 25.
+	self assert: (((response at: 'result') at: 'enabled')).
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/max-iterations off'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	self assert: harness agent configuration maxIterations isNil.
+	completion := protocol handleRequest: (self request: 'commands.complete' params: ({
+		'line' -> '/max-iterations o'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	items := (completion at: 'result') at: 'items'.
+	self assert: items size equals: 1.
+	self assert: (items first at: 'completion') equals: '/max-iterations off'
+]
+
+{ #category : 'tests-064' }
+PharoCAExternalProtocolTest >> testMaxIterationsSlashCommandRejectsInvalidValues [
+	| response |
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/max-iterations 0'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'invalid_params'.
+	self assert: harness agent configuration maxIterations isNil
 ]

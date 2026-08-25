@@ -23,7 +23,7 @@ PharoCAToolSearch class >> toolName [ ^ #tool_search ]
 PharoCAToolSearch class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'tool_search'
-		description: 'Searches and deterministically ranks all registered tools, including inactive packs. Optional task text improves relevance ranking. Returns name, description, pack, capability, execution mode, availability and active state. Results are cursor-paginated.'
+		description: 'Searches only the PharoCodingAssistant TOOL CATALOG, including inactive packs. It does not search Pharo classes, selectors, methods, source code, examples, packages, or documentation. Use search_classes/search_selectors/search_method_source and other browse tools for image code. Optional task text improves tool relevance ranking. Returns name, description, pack, capability, execution mode, availability and active state. Results are cursor-paginated.'
 		parameters: {
 			'type' -> 'object'.
 			'properties' -> {

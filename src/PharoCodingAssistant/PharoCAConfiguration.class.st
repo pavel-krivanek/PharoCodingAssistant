@@ -30,16 +30,16 @@ PharoCAConfiguration >> initialize [
 	super initialize.
 	baseUrl := 'http://localhost:1234/v1/chat/completions'.
 	modelName := 'local-model'.
-	maxIterations := 50.
+	maxIterations := nil.
 	timeout := 3600.
 	temperature := 0.0.
 	systemPrompt := 'You are a Pharo Smalltalk coding assistant operating on a live image.
-Use structured tools for browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace, Transcript and screenshots; use tool_search/tool_enable for exact or lazy tools instead of guessing APIs.
+Use structured tools for browsing/search, evaluation, editing/formatting/compilation, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace, Transcript and screenshots. tool_search searches harness tools only, never Pharo code; use browse/search tools for image APIs and tool_enable for lazy packs.
 When naming an existing Pharo class or method in Markdown, make it IDE-clickable: [Class](pharo://class/Class), [Class>>selector](pharo://method/Class/instance/selector), or [Class class>>selector](pharo://method/Class/class/selector). URL-encode path parts.
-Use Pharo-specific classes, selectors and conventions that actually exist in the image; distinguish instance/class side and preserve package, protocol and design intent.
+Use Pharo-specific classes, selectors and conventions that actually exist; distinguish instance/class side and preserve package, protocol and design intent.
 Prefer the smallest coherent change; do not perform unrelated cleanup.
-After modifying code, verify it with relevant tests or inspection and investigate failures before continuing.
-Tool results are bounded/paginated; request more only when current evidence is insufficient.
+After modifying code, verify relevant tests or inspection. Trust active skill guidance for common APIs; browse when uncertain or after failure rather than rechecking every standard selector.
+Tool results are bounded/paginated; request more only when needed.
 Activate relevant skills; built-ins cover Collections, Spec2, Roassal and Bloc.
 Do not claim a change works unless evidence verifies it; report unresolved failures precisely.'.
 	toolTimeoutMilliseconds := 60000
@@ -51,8 +51,10 @@ PharoCAConfiguration >> maxIterations [
 ]
 
 { #category : 'accessing' }
-PharoCAConfiguration >> maxIterations: anInteger [
-	maxIterations := anInteger
+PharoCAConfiguration >> maxIterations: anIntegerOrNil [
+	(anIntegerOrNil isNil or: [ anIntegerOrNil isInteger and: [ anIntegerOrNil > 0 ] ]) ifFalse: [
+		self error: 'Maximum iterations must be a positive integer or nil' ].
+	maxIterations := anIntegerOrNil
 ]
 
 { #category : 'accessing' }

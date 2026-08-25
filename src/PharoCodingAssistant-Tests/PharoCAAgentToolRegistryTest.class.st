@@ -133,3 +133,22 @@ PharoCAAgentToolRegistryTest >> testModelEvaluationCallIsAdvertisedAndExecutable
 	self assert: (result at: 'ok').
 	self assert: ((result at: 'result') at: 'result') equals: '3'
 ]
+
+{ #category : 'tests-064' }
+PharoCAAgentToolRegistryTest >> testIterationLimitNeverLeavesRecordedToolCallsWithoutToolResults [
+	| agent provider run messages toolMessage result |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"1 + 2"}').
+	agent := PharoCA new provider: provider; yourself.
+	agent configuration maxIterations: 1.
+	run := agent run: 'calculate'.
+	self assert: run status equals: #iterationLimitReached.
+	self assert: run iterations equals: 1.
+	self assert: provider requests size equals: 1.
+	messages := run conversation messages.
+	self assert: messages last role equals: #tool.
+	toolMessage := messages last.
+	result := STONJSON fromString: toolMessage textContent.
+	self assert: (result at: 'ok').
+	self assert: ((result at: 'result') at: 'result') equals: '3'
+]

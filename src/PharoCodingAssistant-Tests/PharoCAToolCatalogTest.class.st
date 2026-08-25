@@ -302,3 +302,14 @@ PharoCAToolCatalogTest >> testCatalogCursorIsBoundToTaskRankingContext [
  cursor:=(first at:'page') at:'nextCursor'.
  self should:[agent toolRegistry searchCatalog:'' pack:nil arguments:{'task'->'test coverage'.'limit'->2.'cursor'->cursor} asDictionary session:session] raise:Error
 ]
+
+{ #category : 'tests-064' }
+PharoCAToolCatalogTest >> testToolSearchResultMakesCatalogScopeExplicit [
+	| registry session result |
+	registry := PharoCAToolRegistry default.
+	session := PharoCASession new.
+	result := registry searchCatalog: 'SpLabel' pack: nil arguments: Dictionary new session: session.
+	self assert: (result at: 'scope') equals: 'assistant_tool_catalog'.
+	self assert: ((result at: 'hint') includesSubstring: 'Pharo image code').
+	self assert: (result at: 'tools') isEmpty
+]

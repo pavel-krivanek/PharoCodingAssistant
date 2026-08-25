@@ -177,7 +177,7 @@ PharoCACodingHarnessTest >> testIllTypedSettingIsDiagnosedBeforeMutatingConfigur
 	self write: '{"temperature":"hot","maxIterations":0}' to: global / 'settings.json'.
 	harness reloadResources.
 	self assert: harness agent configuration temperature equals: 0.0.
-	self assert: harness agent configuration maxIterations equals: 50.
+	self assert: harness agent configuration maxIterations isNil.
 	self assert: (harness resources diagnostics count: [ :each | each code = #invalidEffectiveSetting ]) equals: 2
 ]
 

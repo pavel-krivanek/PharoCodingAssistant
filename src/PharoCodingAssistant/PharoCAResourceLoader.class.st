@@ -17,7 +17,7 @@ PharoCAResourceLoader class >> default [
 PharoCAResourceLoader >> initialize [
 	super initialize.
 	defaultSettings := {
-		'maxIterations' -> 50.
+		'maxIterations' -> nil.
 		'timeout' -> 3600.
 		'temperature' -> 0.0.
 		'toolTimeoutMilliseconds' -> 60000.

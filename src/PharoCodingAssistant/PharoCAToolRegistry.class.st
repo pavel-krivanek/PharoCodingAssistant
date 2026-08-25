@@ -422,9 +422,7 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 				errorType: #tool_timeout
 				message: error description ]
 	] on: Error do: [ :error |
-		^ PharoCAToolResult
-			errorType: #tool_execution_error
-			message: error description ].
+		^ self executionErrorFor: error tool: tool ].
 	envelope := self normalizeRawResult: raw.
 	[ serialized := STONJSON toString: envelope ]
 		on: Error
@@ -442,6 +440,22 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 				'maximumCharacters' -> resultBudget maximumSerializedCharacters
 			} asDictionary ].
 	^ envelope
+]
+
+{ #category : 'private' }
+PharoCAToolRegistry >> executionErrorFor: error tool: tool [
+	| description details |
+	description := error description.
+	details := nil.
+	(tool toolName = #compile_method and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
+		details := {
+			'diagnosticType' -> 'undeclared_variable'.
+			'hint' -> 'A bare identifier in a method body is a variable reference. If you intended a unary message to the receiver, write self selector (for example self classToTest). Otherwise declare the temporary or instance variable.'
+		} asDictionary ].
+	^ PharoCAToolResult
+		errorType: #tool_execution_error
+		message: description
+		details: details
 ]
 
 { #category : 'private' }
@@ -873,6 +887,8 @@ PharoCAToolRegistry >> searchCatalog: query pack: packName arguments: arguments 
 	scope := 'tool_search|', normalizedQuery, '|', (normalizedPack ifNil: [ '' ]), '|', task.
 	page := PharoCAToolPagination pageItems: matches arguments: arguments scope: scope.
 	^ {
+		'scope' -> 'assistant_tool_catalog'.
+		'hint' -> 'This searches harness tools only. For Pharo image code use search_classes, search_selectors, search_method_source, list_implementors, find_references, and related browse tools.'.
 		'tools' -> (page at: 'items').
 		'packs' -> self packNames.
 		'activePacks' -> (self activePackNamesForSession: aSession).

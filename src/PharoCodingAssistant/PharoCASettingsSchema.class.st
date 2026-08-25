@@ -38,7 +38,7 @@ PharoCASettingsSchema >> validationErrorForKey: aKey value: value [
 	| key |
 	key := aKey asString.
 	(self includesKey: key) ifFalse: [ ^ 'Unknown setting' ].
-	key = 'maxIterations' ifTrue: [ ^ (value isInteger and: [ value > 0 ]) ifFalse: [ 'Must be a positive integer' ] ].
+	key = 'maxIterations' ifTrue: [ ^ (value isNil or: [ value isInteger and: [ value > 0 ] ]) ifFalse: [ 'Must be nil or a positive integer' ] ].
 	key = 'timeout' ifTrue: [ ^ (value isNumber and: [ value > 0 ]) ifFalse: [ 'Must be a positive number' ] ].
 	key = 'temperature' ifTrue: [ ^ value isNumber ifFalse: [ 'Must be a number' ] ].
 	key = 'toolTimeoutMilliseconds' ifTrue: [ ^ (value isNil or: [ value isInteger and: [ value > 0 ] ]) ifFalse: [ 'Must be nil or a positive integer' ] ].

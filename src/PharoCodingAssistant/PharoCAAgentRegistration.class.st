@@ -37,6 +37,7 @@ PharoCAAgentRegistration >> asDictionary [
 		'environmentId' -> agent environment identifier.
 		'toolProfile' -> agent toolProfile name asString.
 		'reasoningEffort' -> (agent reasoningEffort ifNil: [ nil ] ifNotNil: [ agent reasoningEffort asString ]).
+		'maxIterations' -> agent configuration maxIterations.
 		'activeRunCount' -> agent activeRuns size
 	} asDictionary
 ]

@@ -69,3 +69,19 @@ PharoCAToolASTDiagnosticsTest >> testRewritePreviewRejectsMissingMethod [
 	} asDictionary.
 	self deny: (result at: 'ok')
 ]
+
+{ #category : 'tests-064' }
+PharoCAToolASTDiagnosticsTest >> testCompileMethodExplainsBareUndeclaredIdentifierAsVariableReference [
+	| result error details |
+	result := self registry executeNamed: 'compile_method' arguments: {
+		'className' -> 'PharoCATestFixtureParent'.
+		'source' -> 'pca064BadBareReference ^ missingUnarySelector'
+	} asDictionary.
+	self deny: (result at: 'ok').
+	error := result at: 'error'.
+	self assert: (error at: 'type') equals: 'tool_execution_error'.
+	details := error at: 'details'.
+	self assert: (details at: 'diagnosticType') equals: 'undeclared_variable'.
+	self assert: ((details at: 'hint') includesSubstring: 'self selector').
+	self deny: (PharoCATestFixtureParent includesSelector: #pca064BadBareReference)
+]

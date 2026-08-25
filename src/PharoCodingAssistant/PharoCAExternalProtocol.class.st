@@ -239,6 +239,15 @@ PharoCAExternalProtocol >> commandCompletionSuggestionsForLine: line params: par
 				'label' -> value.
 				'description' -> ((value = 'provider-default') ifTrue: [ 'omit reasoning_effort from requests' ] ifFalse: [ 'reasoning effort for current agent' ])
 			} asDictionary ]) asArray ].
+	commandName = 'max-iterations' ifTrue: [
+		candidates := #('off' 'unlimited') select: [ :value | value beginsWith: argumentPrefix ].
+		^ (candidates collect: [ :value |
+			{
+				'kind' -> 'maxIterations'.
+				'completion' -> ('/max-iterations ', value).
+				'label' -> value.
+				'description' -> 'disable the model-iteration guard'
+			} asDictionary ]) asArray ].
 	commandName = 'model' ifFalse: [ ^ #() ].
 	agentId := self agentIdentifierFromParams: params required: false.
 	currentModel := (self agentDescriptorNamed: agentId) at: 'model'.
@@ -640,6 +649,30 @@ PharoCAExternalProtocol >> skillsList: params [
 ]
 
 { #category : 'commands-private' }
+PharoCAExternalProtocol >> maxIterationsCommand: params [
+	| argument agentId agent normalized value |
+	argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
+	agentId := self agentIdentifierFromParams: params required: false.
+	agent := harness agentManager agentNamed: agentId.
+	argument isEmpty ifFalse: [
+		normalized := argument asLowercase.
+		(#('off' 'none' 'unlimited') includes: normalized)
+			ifTrue: [ value := nil ]
+			ifFalse: [
+				[ value := argument asInteger ]
+					on: Error
+					do: [ :error | PharoCAProtocolError code: 'invalid_params' message: 'max-iterations must be off/unlimited or a positive integer' ].
+				value > 0 ifFalse: [
+					PharoCAProtocolError code: 'invalid_params' message: 'max-iterations must be off/unlimited or a positive integer' ] ].
+		agent configuration maxIterations: value ].
+	^ {
+		'agentId' -> agentId.
+		'maxIterations' -> agent configuration maxIterations.
+		'enabled' -> agent configuration maxIterations notNil
+	} asDictionary
+]
+
+{ #category : 'commands-private' }
 PharoCAExternalProtocol >> registerDefaultCommands [
 	commandRegistry register: (PharoCACommand named: 'help' description: 'List immediate commands' usage: '/help' handler: [ :params | commandRegistry asArray ]).
 	commandRegistry register: (PharoCACommand named: 'status' description: 'Show current harness state' usage: '/status' handler: [ :params | self stateSnapshot ]).
@@ -678,6 +711,8 @@ PharoCAExternalProtocol >> registerDefaultCommands [
 			ifFalse: [
 				p := { 'agentId' -> agentId. 'reasoningEffort' -> ((argument = 'provider-default') ifTrue: [ nil ] ifFalse: [ argument ]) } asDictionary.
 				self agentsSetReasoningEffort: p ] ]).
+	commandRegistry register: (PharoCACommand named: 'max-iterations' description: 'Show, enable, or disable the optional model-iteration guard for the current agent' usage: '/max-iterations [off|N]' handler: [ :params |
+		self maxIterationsCommand: params ]).
 	commandRegistry register: (PharoCACommand named: 'checkpoint' description: 'Create a semantic image checkpoint' usage: '/checkpoint [label]' handler: [ :params |
 		| argument p |
 		argument := params at: 'argument' ifAbsent: [ '' ].

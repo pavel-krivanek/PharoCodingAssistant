@@ -156,3 +156,35 @@ PharoCAAgentInstructionsTest >> testActiveSkillBodyCannotBypassContextBudget [
 	self assert: (run error isKindOf: PharoCAContextOverflow).
 	self assert: provider payloads isEmpty
 ]
+
+{ #category : 'tests-064' }
+PharoCAAgentInstructionsTest >> testConfiguredIterationBudgetAddsEphemeralNearLimitGuidanceAndTrace [
+	| provider agent run payload system event |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	agent configuration maxIterations: 2.
+	run := agent run: 'finish this'.
+	payload := provider payloads first.
+	system := self systemContentFromPayload: payload.
+	self assert: (system includesSubstring: 'Execution budget: this is model request 1 of 2').
+	self deny: ((run session messagesEndingAt: run session currentLeafId) anySatisfy: [ :each |
+		each textContent includesSubstring: 'Execution budget:' ]).
+	event := run events detect: [ :each | each type = #instructionsPrepared ].
+	self assert: ((event payload at: 'additionalSourceNames') includes: 'iteration-budget').
+	self assert: (event payload at: 'maxIterations') equals: 2
+]
+
+{ #category : 'tests-064' }
+PharoCAAgentInstructionsTest >> testUnlimitedDefaultDoesNotInjectIterationBudgetGuidance [
+	| provider agent run payload system event |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	run := agent run: 'finish this'.
+	payload := provider payloads first.
+	system := self systemContentFromPayload: payload.
+	self deny: (system includesSubstring: 'Execution budget:').
+	event := run events detect: [ :each | each type = #instructionsPrepared ].
+	self assert: (event payload at: 'maxIterations') isNil
+]

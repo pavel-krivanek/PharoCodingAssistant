@@ -618,7 +618,7 @@ A simple project `.pharo-ca/settings.json` can look like:
 ```json
 {
   "temperature": 0.0,
-  "maxIterations": 50,
+  "maxIterations": null,
   "toolTimeoutMilliseconds": 60000,
   "reasoningEffort": "medium",
   "context.reservedOutputTokens": 8192,
@@ -632,7 +632,7 @@ A simple project `.pharo-ca/settings.json` can look like:
 
 Known settings are:
 
-- `maxIterations`
+- `maxIterations` — optional positive model-request guard; `null` or omission means unlimited (the default)
 - `timeout`
 - `temperature`
 - `toolTimeoutMilliseconds`
@@ -651,6 +651,8 @@ Known settings are:
 - `tools.exclude`
 
 Project settings take effect only for a trusted workspace. Programmatic harness setting overrides have the highest precedence.
+
+`maxIterations` is disabled by default. It limits **model requests**, not completion of an already accepted tool-call batch. Once the model emits tool calls, the harness always records terminal tool results for that batch before the optional guard can stop another model request. The current agent guard can be inspected or changed interactively with `/max-iterations`, `/max-iterations 25`, or `/max-iterations off` (`none` and `unlimited` are aliases). Existing settings files containing a positive numeric `maxIterations` remain valid.
 
 Example override:
 
@@ -681,7 +683,7 @@ A project can select one through `settings.json`:
 
 Specific tools can also be allowed or excluded with `tools.allow` and `tools.exclude` arrays.
 
-The default system prompt gives the model a compact map of the available families — browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace operations, Transcript and screenshots — and tells it to use `tool_search` / `tool_enable` for exact names and lazy packs. It also tells the agent to make concrete Pharo classes and methods IDE-clickable in Markdown using the `pharo://` link forms described below. It intentionally does not duplicate the full catalog in the prompt.
+The default system prompt gives the model a compact map of the available families — browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace operations, Transcript and screenshots. It explicitly distinguishes `tool_search` (the **assistant tool catalog only**) from Pharo image browsing/search tools, and uses `tool_enable` for lazy packs. Active skill guidance is a trusted starting point for common APIs; the agent should browse when uncertain or after a failure rather than re-verifying every standard selector. Concrete Pharo classes and methods remain IDE-clickable in Markdown using the `pharo://` link forms described below.
 
 Iteration 057 adds the default-core `format_code` tool. It parses method or expression source with Pharo's native `OCParser` and returns `formattedCode` without changing the image. Formatted text is cursor-paginated, so large methods remain bounded.
 
@@ -689,7 +691,7 @@ Iteration 057 adds the default-core `format_code` tool. It parses method or expr
 
 The tool registry can contain more tools than are advertised to the model on every request. The original tool set remains in the default `core` pack, while larger/newer families can be activated lazily per durable session. The `catalog` pack is always active and contains:
 
-- `tool_search` — search the complete registered tool catalog, including inactive packs; an optional `task` hint produces deterministic task-aware ranking and every row reports `rankScore`, current `profile`, and `availabilityReason`;
+- `tool_search` — search the complete **assistant/harness tool catalog**, including inactive packs; it does not search Pharo classes, selectors, methods, source, packages, or documentation. Results identify their scope as `assistant_tool_catalog` and point the model to image browse tools. An optional `task` hint produces deterministic task-aware ranking and every row reports `rankScore`, current `profile`, and `availabilityReason`;
 - `tool_enable` — activate a pack for the current session;
 - `tool_disable` — deactivate a pack for the current session (the `catalog` pack itself cannot be disabled).
 
@@ -1050,6 +1052,7 @@ The current built-in command set includes:
 /model [modelId]
 /skills
 /reasoning [provider-default|none|low|medium|high|max]
+/max-iterations [off|N]
 /checkpoint [label]
 /checkpoints
 ```

@@ -51,7 +51,7 @@ PharoCAToolCompileMethod class >> executionMode [ ^ #exclusiveMutation ]
 PharoCAToolCompileMethod class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'compile_method'
-		description: 'Compiles a method into a class. side: instance|class (default instance). Optional protocol.'
+		description: 'Compiles a method into a class. side: instance|class (default instance). Optional protocol. On undeclared-variable errors, remember that a bare identifier is a variable reference; use self selector for a unary message to the receiver.'
 		parameters: { 'properties' -> { 'source' -> { 'type' -> 'string' } asDictionary. 'side' -> { 'type' -> 'string' } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'protocol' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'className'. 'source' }. 'type' -> 'object' } asDictionary
 ]
 

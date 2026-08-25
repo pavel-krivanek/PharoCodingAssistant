@@ -119,9 +119,10 @@ PharoCAQualitySupport class >> findingForCritique: critique descriptor: descript
 		'severity' -> (self boundedString: ([ rule ifNil: [ 'information' ] ifNotNil: [ rule severity ] ] on: Error do: [ :error | 'information' ]) limit: 40).
 		'title' -> (self boundedString: ([ critique title ] on: Error do: [ :error | critique printString ]) limit: 500)
 	} asDictionary.
-	description := [ critique description ] on: Error do: [ :error |
-		rule ifNil: [ '' ] ifNotNil: [ [ rule rationale ] on: Error do: [ :ignored | '' ] ] ].
-	description ifNotNil: [ result at: 'description' put: (self boundedString: description limit: 600) ].
+	description := [ critique description ] on: Error do: [ :error | nil ].
+	(description isNil or: [ description isEmpty ]) ifTrue: [
+		description := rule ifNil: [ '' ] ifNotNil: [ [ rule rationale ] on: Error do: [ :ignored | '' ] ] ].
+	result at: 'description' put: (self boundedString: description limit: 600).
 	anchor := [ critique sourceAnchor ] on: Error do: [ :error | nil ].
 	(anchor notNil and: [ [ anchor providesInterval ] on: Error do: [ :error | false ] ]) ifTrue: [
 		interval := [ anchor interval ] on: Error do: [ :error | nil ].
