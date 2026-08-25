@@ -861,7 +861,12 @@ PharoCAExternalProtocol >> sessionsContinue: params [
 
 { #category : 'sessions' }
 PharoCAExternalProtocol >> sessionsDelete: params [
-	(self sessionManagerFromParams: params) deleteSessionId: (self requiredString: 'sessionId' from: params).
+	| manager sessionId session |
+	manager := self sessionManagerFromParams: params.
+	sessionId := self requiredString: 'sessionId' from: params.
+	session := manager sessionForId: sessionId.
+	self ensureSessionNotBusy: session.
+	manager deleteSessionId: sessionId.
 	^ true
 ]
 

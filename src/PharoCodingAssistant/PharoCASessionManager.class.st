@@ -259,10 +259,16 @@ PharoCASessionManager >> unarchiveSessionId: aSessionId [
 
 { #category : 'removing' }
 PharoCASessionManager >> deleteSessionId: aSessionId [
-	currentSession ifNotNil: [ currentSession id = aSessionId ifTrue: [ currentSession := nil. currentName := nil ] ].
-	ephemeralSessionIds remove: aSessionId ifAbsent: [ ].
-	ephemeralSessionsById removeKey: aSessionId ifAbsent: [ ].
-	repository deleteSessionId: aSessionId workspace: workspace.
+	| ephemeral |
+	self validateConfigured.
+	ephemeral := ephemeralSessionIds includes: aSessionId.
+	ephemeral
+		ifTrue: [
+			ephemeralSessionIds remove: aSessionId ifAbsent: [ ].
+			ephemeralSessionsById removeKey: aSessionId ifAbsent: [ ] ]
+		ifFalse: [ repository deleteSessionId: aSessionId workspace: workspace ].
+	currentSession ifNotNil: [
+		currentSession id = aSessionId ifTrue: [ currentSession := nil. currentName := nil ] ].
 	^ self
 ]
 

@@ -126,6 +126,26 @@ PharoCASessionManagerTest >> testDeleteCurrentSessionClearsSelection [
 	self assert: manager sessions isEmpty
 ]
 
+
+{ #category : 'tests-059' }
+PharoCASessionManagerTest >> testDeleteEphemeralCurrentSessionDoesNotTouchRepository [
+	| session |
+	session := manager newEphemeralSessionNamed: 'Scratch delete'.
+	manager deleteSessionId: session id.
+	self assert: manager currentSession isNil.
+	self assert: manager sessions isEmpty
+]
+
+{ #category : 'tests-059' }
+PharoCASessionManagerTest >> testFailedDeleteDoesNotClearCurrentSelection [
+	| session |
+	session := manager newSessionNamed: 'Still selected'.
+	repository deleteSessionId: session id workspace: workspace.
+	self should: [ manager deleteSessionId: session id ] raise: Error.
+	self assert: manager currentSession identicalTo: session.
+	self assert: manager currentName equals: 'Still selected'
+]
+
 { #category : 'tests' }
 PharoCASessionManagerTest >> testExportImportSelectsImportedSession [
 	| original exportFile secondWorkspace secondRepository secondManager imported |

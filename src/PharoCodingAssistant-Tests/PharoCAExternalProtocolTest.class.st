@@ -397,6 +397,44 @@ PharoCAExternalProtocolTest >> testSessionGetAfterRunProvidesCanonicalConversati
 	self assert: (messages anySatisfy: [ :each | (each at: 'role') = 'assistant' ])
 ]
 
+
+{ #category : 'tests-059' }
+PharoCAExternalProtocolTest >> testSessionsDeleteRemovesDurableSession [
+	| sessionId deleted listed |
+	sessionId := ((protocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Delete me' } asDictionary))) at: 'result') at: 'id'.
+	deleted := protocol handleRequest: (self request: 'sessions.delete' params: ({ 'sessionId' -> sessionId } asDictionary)).
+	self assert: (deleted at: 'ok').
+	self assert: (deleted at: 'result').
+	listed := (protocol handleRequest: (self request: 'sessions.list' params: Dictionary new)) at: 'result'.
+	self deny: (listed anySatisfy: [ :each | (each at: 'id') = sessionId ])
+]
+
+{ #category : 'tests-059' }
+PharoCAExternalProtocolTest >> testSessionsDeleteRejectsSessionWithActiveRun [
+	| blocking blockingHarness blockingProtocol sessionId started run response listed |
+	blocking := PharoCATestBlockingLLMProvider new.
+	blockingHarness := PharoCACodingHarness new
+		workspace: workspace;
+		resourceLoader: loader;
+		sessionRepository: repository;
+		yourself.
+	blockingHarness reloadResources.
+	blockingHarness agent provider: blocking.
+	blockingProtocol := PharoCAExternalProtocol on: blockingHarness.
+	sessionId := ((blockingProtocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Busy delete' } asDictionary))) at: 'result') at: 'id'.
+	started := blockingProtocol handleRequest: (self request: 'runs.start' params: ({ 'prompt' -> 'work'. 'sessionId' -> sessionId } asDictionary)).
+	run := blockingProtocol runNamed: ((started at: 'result') at: 'id').
+	[ blocking entered ] whileFalse: [ (Delay forMilliseconds: 1) wait ].
+	response := blockingProtocol handleRequest: (self request: 'sessions.delete' params: ({ 'sessionId' -> sessionId } asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'session_busy'.
+	listed := (blockingProtocol handleRequest: (self request: 'sessions.list' params: Dictionary new)) at: 'result'.
+	self assert: (listed anySatisfy: [ :each | (each at: 'id') = sessionId ]).
+	run cancel.
+	[ run isFinished ] whileFalse: [ (Delay forMilliseconds: 1) wait ].
+	blockingHarness sessionManager waitForAutosaves
+]
+
 { #category : 'tests' }
 PharoCAExternalProtocolTest >> testSessionsCanBeCreatedListedAndFetchedWithoutChangingProtocolShape [
 	| created id listed fetched |

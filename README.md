@@ -990,7 +990,7 @@ harness forkCurrentSessionNamed: 'Alternative approach'.
 
 Each configured agent has its own current-session manager, although all use the harness session repository.
 
-The browser provides session creation/resume and a conversation tree. Conversation names are derived from the first words of the first real prompt unless explicitly named.
+The browser provides session creation/resume/deletion and a conversation tree. Conversation names are derived from the first words of the first real prompt unless explicitly named. The Sessions sidebar shows the 10 most recently updated sessions by default; **Show older sessions** expands the rest, and the local filter searches the complete loaded list. Deletion is confirmed and is rejected while the target session has an active run.
 
 ## Web UI
 
@@ -1013,6 +1013,7 @@ web/
 The UI includes, among other things:
 
 - multiple agents/models;
+- a latest-10 session sidebar with expand/filter controls and confirmed session deletion;
 - slash-command completion;
 - streamed assistant text, reasoning and tool calls in chronological order;
 - live steering from the normal composer while a run is active (`Send` becomes `Steer`);
