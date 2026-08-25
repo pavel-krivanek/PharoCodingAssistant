@@ -16,23 +16,24 @@ PharoCAToolWorkspaceCreateDirectory class >> executionMode [ ^ #exclusiveMutatio
 
 { #category : 'execution' }
 PharoCAToolWorkspaceCreateDirectory class >> execute: args context: context [
-	| workspace access path directory existed |
+	| workspace access path portablePath directory existed |
 	context checkActive.
 	workspace := self workspaceFor: context.
 	access := self fileAccessFor: context.
 	path := args at: 'path'.
 	directory := access resolver resolveWritableDirectory: path.
 	existed := directory exists.
+	portablePath := access resolver relativePathOf: directory.
 	existed ifFalse: [
 		directory ensureCreateDirectory.
 		access resolver ensureInsideWorkspace: directory canonicalize.
 		context
 			recordChangeKind: #workspaceDirectoryCreated
-			target: path
+			target: portablePath
 			before: { 'exists' -> false } asDictionary
 			after: { 'exists' -> true } asDictionary
 			metadata: { 'workspaceId' -> workspace identifier. 'rollbackRequiresCheckpoint' -> true } asDictionary ].
-	^ { 'path' -> path. 'created' -> existed not } asDictionary
+	^ { 'path' -> portablePath. 'created' -> existed not } asDictionary
 ]
 
 { #category : 'definition' }

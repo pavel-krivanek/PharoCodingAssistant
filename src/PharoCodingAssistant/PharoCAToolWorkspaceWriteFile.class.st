@@ -18,7 +18,7 @@ PharoCAToolWorkspaceWriteFile class >> maximumContentCharacters [ ^ 1048576 ]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceWriteFile class >> execute: args context: context [
-	| access workspace path content target existed beforeText beforeHash expected afterHash beforeSnapshot afterSnapshot |
+	| access workspace path portablePath content target existed beforeText beforeHash expected afterHash beforeSnapshot afterSnapshot |
 	context checkActive.
 	workspace := self workspaceFor: context.
 	access := self fileAccessFor: context.
@@ -26,6 +26,7 @@ PharoCAToolWorkspaceWriteFile class >> execute: args context: context [
 	content := args at: 'content'.
 	content size > self maximumContentCharacters ifTrue: [ Error signal: 'workspace_write_file content exceeds 1 MiB safety limit' ].
 	target := access resolver resolveWritableFile: path.
+	portablePath := access resolver relativePathOf: target.
 	existed := target exists.
 	beforeText := existed ifTrue: [ target contents ] ifFalse: [ nil ].
 	beforeHash := existed ifTrue: [ access sha256ForText: beforeText ] ifFalse: [ nil ].
@@ -40,7 +41,7 @@ PharoCAToolWorkspaceWriteFile class >> execute: args context: context [
 	afterSnapshot := { 'exists' -> true. 'sha256' -> afterHash. 'size' -> content size } asDictionary.
 	context
 		recordChangeKind: (existed ifTrue: [ #workspaceFileModified ] ifFalse: [ #workspaceFileCreated ])
-		target: path
+		target: portablePath
 		before: beforeSnapshot
 		after: afterSnapshot
 		metadata: (PharoCAChangeReview
@@ -49,7 +50,7 @@ PharoCAToolWorkspaceWriteFile class >> execute: args context: context [
 			afterText: content
 			extra: ({ 'rollbackRequiresCheckpoint' -> true } asDictionary)).
 	^ {
-		'path' -> path.
+		'path' -> portablePath.
 		'created' -> existed not.
 		'sha256' -> afterHash.
 		'size' -> content size

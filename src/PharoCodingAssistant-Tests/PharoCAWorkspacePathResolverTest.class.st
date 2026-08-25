@@ -84,3 +84,87 @@ PharoCAWorkspacePathResolverTest >> testRejectsSymbolicLinkEscapingWorkspace [
 		[ outside ensureDeleteAll ] on: Error do: [ :error | ].
 		[ base ensureDeleteAll ] on: Error do: [ :error | ] ]
 ]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testAcceptsWindowsBackslashSeparatorsAndReturnsPortablePath [
+	| fixture root resolver file resolved |
+	fixture := self fixture.
+	root := fixture first.
+	resolver := fixture third.
+	file := root / 'src' / 'nested' / 'a.txt'.
+	file parent ensureCreateDirectory.
+	file writeStreamDo: [ :stream | stream nextPutAll: 'x' ].
+	resolved := resolver resolveExistingFile: 'src\nested\a.txt'.
+	self assert: resolved fullName equals: file fullName.
+	self assert: (resolver relativePathOf: resolved) equals: 'src/nested/a.txt'
+]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testAcceptsMixedSeparatorsAndCanonicalizesDotSegments [
+	| fixture root resolver file resolved |
+	fixture := self fixture.
+	root := fixture first.
+	resolver := fixture third.
+	file := root / 'src' / 'a.txt'.
+	file parent ensureCreateDirectory.
+	file writeStreamDo: [ :stream | stream nextPutAll: 'x' ].
+	resolved := resolver resolveExistingFile: 'src\\nested/.././a.txt'.
+	self assert: resolved fullName equals: file fullName.
+	self assert: (resolver relativePathOf: resolved) equals: 'src/a.txt'
+]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testRejectsWindowsDriveAbsoluteAndDriveRelativePathsOnEveryHost [
+	| resolver |
+	resolver := self fixture third.
+	self should: [ resolver resolve: 'C:\Windows\system.ini' ] raise: Error.
+	self should: [ resolver resolve: 'C:/Windows/system.ini' ] raise: Error.
+	self should: [ resolver resolve: 'C:relative.txt' ] raise: Error
+]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testRejectsWindowsRootedAndUNCPathsOnEveryHost [
+	| resolver |
+	resolver := self fixture third.
+	self should: [ resolver resolve: '\Windows\system.ini' ] raise: Error.
+	self should: [ resolver resolve: '\\server\share\file.txt' ] raise: Error.
+	self should: [ resolver resolve: '\\?\C:\Windows\system.ini' ] raise: Error
+]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testRejectsTraversalExpressedWithWindowsOrMixedSeparators [
+	| resolver |
+	resolver := self fixture third.
+	self should: [ resolver resolve: '..\outside.txt' ] raise: Error.
+	self should: [ resolver resolve: 'src\..\..\outside.txt' ] raise: Error.
+	self should: [ resolver resolve: 'src/..\../outside.txt' ] raise: Error
+]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testAllowsWindowsTraversalThatRemainsInsideWorkspace [
+	| fixture root resolver file resolved |
+	fixture := self fixture.
+	root := fixture first.
+	resolver := fixture third.
+	file := root / 'other.txt'.
+	file writeStreamDo: [ :stream | stream nextPutAll: 'x' ].
+	resolved := resolver resolveExistingFile: 'src\..\other.txt'.
+	self assert: resolved fullName equals: file fullName.
+	self assert: (resolver relativePathOf: resolved) equals: 'other.txt'
+]
+
+{ #category : 'tests-062' }
+PharoCAWorkspacePathResolverTest >> testResolverUsesPortableGrammarWithWindowsStorePaths [
+	| fileSystem root workspace resolver slash backslash normalized |
+	fileSystem := FileSystem store: WindowsStore new.
+	root := fileSystem referenceTo: 'C:\project'.
+	workspace := PharoCAWorkspace rootedAt: root.
+	resolver := PharoCAWorkspacePathResolver on: workspace.
+	slash := resolver resolve: 'src/nested/file.txt'.
+	backslash := resolver resolve: 'src\nested\file.txt'.
+	normalized := resolver resolve: 'src\tmp\..\nested/file.txt'.
+	self assert: slash path segments equals: backslash path segments.
+	self assert: slash path segments equals: normalized path segments.
+	self assert: (resolver relativePathOf: slash) equals: 'src/nested/file.txt'.
+	self assert: (resolver relativePathOf: backslash) equals: 'src/nested/file.txt'
+]

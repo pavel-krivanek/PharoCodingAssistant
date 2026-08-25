@@ -259,3 +259,48 @@ PharoCAToolWorkspaceFileTest >> testLargeWorkspaceEditKeepsBoundedReplacementRev
 	self assert: ((detail at: 'diff') includesSubstring: 'OLD_TOKEN').
 	self assert: ((detail at: 'diff') includesSubstring: 'NEW_TOKEN')
 ]
+
+{ #category : 'tests-062' }
+PharoCAToolWorkspaceFileTest >> testWorkspaceFileToolsAcceptWindowsSeparatorsAndReturnPortablePaths [
+	| fixture root registry create write read hash edit list search |
+	fixture := self fixture.
+	root := fixture first.
+	registry := fixture fourth.
+	create := registry executeNamed: #workspace_create_directory arguments: { 'path' -> 'win\nested' } asDictionary.
+	self assert: (create at: 'ok').
+	self assert: ((create at: 'result') at: 'path') equals: 'win/nested'.
+	write := registry executeNamed: #workspace_write_file arguments: {
+		'path' -> 'win\nested\sample.txt'.
+		'content' -> 'needle old' } asDictionary.
+	self assert: (write at: 'ok').
+	self assert: ((write at: 'result') at: 'path') equals: 'win/nested/sample.txt'.
+	read := registry executeNamed: #workspace_read_file arguments: { 'path' -> 'win\nested\sample.txt' } asDictionary.
+	self assert: (read at: 'ok').
+	self assert: ((read at: 'result') at: 'path') equals: 'win/nested/sample.txt'.
+	hash := (read at: 'result') at: 'sha256'.
+	edit := registry executeNamed: #workspace_edit_file arguments: {
+		'path' -> 'win\nested\sample.txt'.
+		'expectedSha256' -> hash.
+		'oldText' -> 'old'.
+		'newText' -> 'new' } asDictionary.
+	self assert: (edit at: 'ok').
+	self assert: ((edit at: 'result') at: 'path') equals: 'win/nested/sample.txt'.
+	self assert: (root / 'win' / 'nested' / 'sample.txt') contents equals: 'needle new'.
+	list := registry executeNamed: #workspace_list_directory arguments: { 'path' -> 'win\nested' } asDictionary.
+	self assert: (list at: 'ok').
+	self assert: ((((list at: 'result') at: 'items') first) at: 'path') equals: 'win/nested/sample.txt'.
+	search := registry executeNamed: #workspace_search_text arguments: {
+		'path' -> 'win\nested'.
+		'query' -> 'needle' } asDictionary.
+	self assert: (search at: 'ok').
+	self assert: ((((search at: 'result') at: 'items') first) at: 'path') equals: 'win/nested/sample.txt'
+]
+
+{ #category : 'tests-062' }
+PharoCAToolWorkspaceFileTest >> testWindowsStyleTraversalIsRejectedThroughToolBoundary [
+	| registry result |
+	registry := self fixture fourth.
+	result := registry executeNamed: #workspace_read_file arguments: { 'path' -> '..\outside' } asDictionary.
+	self deny: (result at: 'ok').
+	self assert: ((result at: 'error') at: 'type') equals: 'tool_execution_error'
+]

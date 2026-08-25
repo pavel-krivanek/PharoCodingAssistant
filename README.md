@@ -531,6 +531,8 @@ harness := PharoCACodingHarness new workspace: workspace; yourself.
 harness reloadResources.
 ```
 
+Workspace filesystem tools are cross-platform. Tool path arguments are always workspace-relative and may use either `/` or `\` separators, so both `src/Foo.st` and `src\Foo.st` are accepted. Returned paths are normalized to `/`. Absolute/drive-qualified, rooted, UNC/device and escaping paths are rejected. This portability applies to structured filesystem operations and path filters; the default external process/Git command runner remains a separate platform capability.
+
 The runtime profile persists:
 
 - reconstructible custom OpenAI-compatible providers;

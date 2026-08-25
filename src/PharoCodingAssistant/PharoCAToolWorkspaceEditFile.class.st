@@ -30,17 +30,19 @@ PharoCAToolWorkspaceEditFile class >> occurrencesOf: needle in: haystack [
 
 { #category : 'execution' }
 PharoCAToolWorkspaceEditFile class >> execute: args context: context [
-	| access workspace path oldText newText expected expectedOccurrences current currentHash count updated afterHash reviewMetadata |
+	| access workspace path portablePath file oldText newText expected expectedOccurrences current currentHash count updated afterHash reviewMetadata |
 	context checkActive.
 	workspace := self workspaceFor: context.
 	access := self fileAccessFor: context.
 	path := args at: 'path'.
+	file := access resolver resolveExistingFile: path.
+	portablePath := access resolver relativePathOf: file.
 	oldText := args at: 'oldText'.
 	newText := args at: 'newText'.
 	expected := args at: 'expectedSha256'.
 	expectedOccurrences := args at: 'expectedOccurrences' ifAbsent: [ 1 ].
 	oldText isEmpty ifTrue: [ Error signal: 'oldText must not be empty' ].
-	current := access textAt: path.
+	current := file contents.
 	currentHash := access sha256ForText: current.
 	currentHash = expected ifFalse: [ Error signal: 'Workspace file changed since it was read (sha256 mismatch)' ].
 	count := self occurrencesOf: oldText in: current.
@@ -62,12 +64,12 @@ PharoCAToolWorkspaceEditFile class >> execute: args context: context [
 		toMetadata: reviewMetadata.
 	context
 		recordChangeKind: #workspaceFileModified
-		target: path
+		target: portablePath
 		before: { 'exists' -> true. 'sha256' -> currentHash. 'size' -> current size } asDictionary
 		after: { 'exists' -> true. 'sha256' -> afterHash. 'size' -> updated size } asDictionary
 		metadata: reviewMetadata.
 	^ {
-		'path' -> path.
+		'path' -> portablePath.
 		'replacements' -> count.
 		'sha256' -> afterHash.
 		'size' -> updated size

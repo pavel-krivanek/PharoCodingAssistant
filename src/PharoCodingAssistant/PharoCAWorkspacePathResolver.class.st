@@ -25,11 +25,29 @@ PharoCAWorkspacePathResolver >> validateRelativePath: aPathString [
 	aPathString isString ifFalse: [ Error signal: 'Workspace path must be a string' ].
 	path := aPathString trimBoth.
 	path isEmpty ifTrue: [ Error signal: 'Workspace path must not be empty' ].
-	(path asFileReference isAbsolute or: [ path first = $/ or: [ path first = $\ ] ]) ifTrue: [
+	(path first = $/ or: [ path first = $\ ]) ifTrue: [
 		Error signal: 'Workspace path must be relative' ].
 	(path size >= 2 and: [ path second = $: ]) ifTrue: [ Error signal: 'Workspace path must be relative' ].
 	(path includes: Character null) ifTrue: [ Error signal: 'Workspace path contains a null character' ].
 	^ path
+]
+
+{ #category : 'private-resolving' }
+PharoCAWorkspacePathResolver >> relativeSegmentsFor: aPathString [
+	| path normalized segments result |
+	path := self validateRelativePath: aPathString.
+	"Workspace tool paths use a platform-neutral grammar. Accept both separators even when the current image runs on Unix, then hand individual path segments to FileReference. This makes Windows-style agent paths deterministic on every host."
+	normalized := path copyReplaceAll: '\' with: '/'.
+	segments := normalized findTokens: '/'.
+	result := OrderedCollection new.
+	segments do: [ :segment |
+		segment = '.' ifFalse: [
+			segment = '..'
+				ifTrue: [
+					result isEmpty ifTrue: [ Error signal: 'Workspace path escapes the workspace root' ].
+					result removeLast ]
+				ifFalse: [ result addLast: segment ] ] ].
+	^ result asArray
 ]
 
 { #category : 'private-resolving' }
@@ -49,7 +67,7 @@ PharoCAWorkspacePathResolver >> resolveSymlinksIn: aFileReference depth: depth [
 			targetPath := current symlinkEntry targetPath.
 			targetReference := targetPath isAbsolute
 				ifTrue: [ fileSystem referenceTo: targetPath ]
-				ifFalse: [ current parent / targetPath pathString ].
+				ifFalse: [ current parent resolvePath: targetPath ].
 			current := self resolveSymlinksIn: targetReference depth: depth + 1 ] ].
 	^ current canonicalize
 ]
@@ -62,9 +80,10 @@ PharoCAWorkspacePathResolver >> canonicalRoot [
 
 { #category : 'resolving' }
 PharoCAWorkspacePathResolver >> resolve: aPathString [
-	| path candidate resolved |
-	path := self validateRelativePath: aPathString.
-	candidate := workspace root / path.
+	| segments candidate resolved |
+	segments := self relativeSegmentsFor: aPathString.
+	candidate := workspace root.
+	segments do: [ :segment | candidate := candidate / segment ].
 	resolved := self resolveSymlinksIn: candidate.
 	self ensureResolvedInsideWorkspace: resolved.
 	^ resolved
@@ -123,8 +142,10 @@ PharoCAWorkspacePathResolver >> ensureInsideWorkspace: aFileReference [
 PharoCAWorkspacePathResolver >> ensureResolvedInsideWorkspace: resolvedReference [
 	| root relative |
 	root := self canonicalRoot.
+	resolvedReference fileSystem = root fileSystem ifFalse: [
+		Error signal: 'Workspace path escapes the workspace root' ].
 	relative := resolvedReference relativeTo: root.
-	(relative segments anySatisfy: [ :each | each = '..' ]) ifTrue: [
+	(relative isAbsolute or: [ relative segments anySatisfy: [ :each | each = '..' ] ]) ifTrue: [
 		Error signal: 'Workspace path escapes the workspace root' ].
 	^ resolvedReference
 ]
