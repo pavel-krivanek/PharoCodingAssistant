@@ -305,3 +305,22 @@ PharoCAToolUITest >> testWindowCloseWithoutForceClosesPlainSystemWindow [
 	self assert: ((result at: 'result') at: 'closed').
 	self deny: ((result at: 'result') at: 'force')
 ]
+
+
+{ #category : 'tests-067' }
+PharoCAToolUITest >> testScreenshotRepairsMissingArtifactStoreAfterLazyUIActivation [
+	| environment registry session result descriptor artifact |
+	environment := PharoCAEnvironment named: 'screenshot-artifact-repair-', UUID new asString.
+	environment artifactStore: nil.
+	registry := (PharoCAToolRegistry defaultInEnvironment: environment)
+		useProfileNamed: 'full';
+		yourself.
+	session := PharoCASession new.
+	registry activatePackNamed: 'ui' forSession: session.
+	result := registry executeNamed: 'ui_screenshot' arguments: { 'target' -> 'world' } asDictionary.
+	self assert: (result at: 'ok').
+	descriptor := (result at: 'result') at: 'artifact'.
+	artifact := environment artifactStore artifactAt: (descriptor at: 'artifactId').
+	self assert: artifact mimeType equals: 'image/png'.
+	self assert: artifact size > 8
+]

@@ -32,7 +32,7 @@ PharoCAToolActivateSkill class >> executionMode [ ^ #sequential ]
 PharoCAToolActivateSkill class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'activate_skill'
-		description: 'Activates a named skill for this session. The full skill instructions are not returned by the tool; they are injected into subsequent model context.'
+		description: 'Activates a named skill for this session. Instructions are injected into later context; recommended tool packs remain lazy and can be enabled with tool_enable.'
 		parameters: { 'properties' -> { 'name' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'name' }. 'type' -> 'object' } asDictionary
 ]
 

@@ -113,17 +113,15 @@ PharoCAAgent >> skillRegistry: aRegistry [
 
 { #category : 'skills' }
 PharoCAAgent >> activateSkillNamed: skillName forSession: aSession [
-	| skill activatedPacks |
+	| skill |
 	skill := skillRegistry activateNamed: skillName session: aSession.
-	activatedPacks := OrderedCollection new.
-	skill recommendedToolPacks do: [ :pack |
-		(toolRegistry activatePackNamed: pack forSession: aSession) ifTrue: [ activatedPacks add: pack ] ].
 	^ {
 		'name' -> skill name.
 		'description' -> skill description.
 		'active' -> true.
 		'recommendedToolPacks' -> skill recommendedToolPacks asArray.
-		'activatedToolPacks' -> activatedPacks asArray
+		'activatedToolPacks' -> #().
+		'toolPacksRemainLazy' -> true
 	} asDictionary
 ]
 

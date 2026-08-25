@@ -231,8 +231,8 @@ PharoCAAgentInstructionsTest >> testPassingRunTestsInjectsCompletionGuidanceOnNe
 	self assert: (agent progressGuidanceInstructionSourceForRun: run) isNil
 ]
 
-{ #category : 'tests-066' }
-PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesBeforeFirstRequestAndEnablesRecommendedPacks [
+{ #category : 'tests-067' }
+PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesInstructionsButKeepsRecommendedPacksLazy [
 	| provider agent session run system names activeSkills activePacks |
 	provider := PharoCATestLLMProvider new.
 	provider queueResponse: (self completionWith: 'done').
@@ -243,16 +243,16 @@ PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesBeforeFirstRe
 	self assert: provider requests size equals: 1.
 	system := self systemContentFromPayload: provider payloads first.
 	self assert: (system includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
-	self assert: (system includesSubstring: 'ui_list_windows').
+	self assert: (system includesSubstring: 'browse and ui packs are recommended but remain lazy').
 	names := (provider requests first toolDefinitions collect: #name) asSet.
-	self assert: (names includes: 'ui_list_windows').
-	self assert: (names includes: 'get_method').
+	self deny: (names includes: 'ui_list_windows').
+	self assert: (names includes: 'list_methods').
+	self assert: (names includes: 'tool_enable').
 	activeSkills := agent skillRegistry activeSkillNamesForSession: session.
 	self assert: (activeSkills includes: 'Smalltalk Core').
 	self assert: (activeSkills includes: 'Spec2').
 	activePacks := agent toolRegistry activePackNamesForSession: session.
-	self assert: (activePacks includes: 'browse').
-	self assert: (activePacks includes: 'ui').
+	self assert: activePacks equals: #('catalog' 'core').
 	self assert: (run events anySatisfy: [ :event | event type = #skillAutoActivated ])
 ]
 

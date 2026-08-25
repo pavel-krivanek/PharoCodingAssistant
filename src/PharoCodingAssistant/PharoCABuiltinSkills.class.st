@@ -96,7 +96,7 @@ PharoCABuiltinSkills class >> spec2 [
 PharoCABuiltinSkills class >> spec2Instructions [
 	^ '## Spec2 UI
 
-Use this skill for Pharo desktop UI built with Spec2. Activating it also enables the browse and ui tool packs. The supplied Pharo 14 image contains `SpPresenter`, `SpApplication`, `SpBoxLayout`, `SpGridLayout` and the standard presenter classes. Trust the canonical pattern below for common APIs; inspect the live image only for less-common selectors or after a concrete failure.
+Use this skill for Pharo desktop UI built with Spec2. The browse and ui packs are recommended but remain lazy: enable browse only when the core browse tools are insufficient, and enable ui only when live-window/screenshot operations are actually needed. The supplied Pharo 14 image contains `SpPresenter`, `SpApplication`, `SpBoxLayout`, `SpGridLayout` and the standard presenter classes. Trust the canonical pattern below for common APIs; inspect the live image only for less-common selectors or after a concrete failure.
 
 ### Presenter lifecycle
 A normal application/composite presenter subclasses `SpPresenter` (or `SpPresenterWithModel` when appropriate). Do **not** subclass `SpWindowPresenter`; `open`/`asWindow` creates that wrapper. Separate responsibilities:

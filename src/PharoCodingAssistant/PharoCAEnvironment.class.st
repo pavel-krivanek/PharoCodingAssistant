@@ -29,7 +29,10 @@ PharoCAEnvironment class >> resetCurrentImage [
 
 
 { #category : 'artifacts' }
-PharoCAEnvironment >> artifactStore [ ^ artifactStore ]
+PharoCAEnvironment >> artifactStore [
+	"Long-lived images may contain an environment instance created before artifact storage was initialized. Repair that migrated state lazily at the ownership boundary."
+	^ artifactStore ifNil: [ artifactStore := PharoCAArtifactStore new ]
+]
 
 { #category : 'artifacts' }
 PharoCAEnvironment >> artifactStore: aStore [ artifactStore := aStore ]

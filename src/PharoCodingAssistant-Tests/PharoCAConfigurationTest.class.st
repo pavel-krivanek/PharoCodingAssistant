@@ -23,6 +23,12 @@ PharoCAConfigurationTest >> testDefaults [
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://class/Class').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://method/Class/instance/selector').
 	self assert: (configuration systemPrompt includesSubstring: 'URL-encode path parts').
+	self assert: (configuration systemPrompt includesSubstring: 'Skills are lightweight domain guidance, separate from tools').
+	self assert: (configuration systemPrompt includesSubstring: 'Collections (idioms)').
+	self assert: (configuration systemPrompt includesSubstring: 'Spec2 (desktop UI)').
+	self assert: (configuration systemPrompt includesSubstring: 'Roassal (visualization/charts)').
+	self assert: (configuration systemPrompt includesSubstring: 'Bloc (scene-graph UI)').
+	self assert: (configuration systemPrompt includesSubstring: 'packs stay lazy').
 	self assert: configuration systemPrompt size < 1400
 ]
 

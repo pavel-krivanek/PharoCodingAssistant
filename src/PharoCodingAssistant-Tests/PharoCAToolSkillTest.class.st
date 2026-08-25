@@ -89,17 +89,19 @@ PharoCAToolSkillTest >> testListSkillsSearchesBuiltinKeywords [
 ]
 
 
-{ #category : 'tests-065' }
-PharoCAToolSkillTest >> testSpec2ActivationAlsoActivatesRecommendedToolPacks [
-	| fixture agent run context activation packs |
+{ #category : 'tests-067' }
+PharoCAToolSkillTest >> testSpec2ActivationKeepsRecommendedToolPacksLazyByDefault [
+	| fixture agent run context activation result packs |
 	fixture := self agentRunAndContext.
 	agent := fixture first.
 	run := fixture second.
 	context := fixture third.
 	activation := agent toolRegistry executeNamed: 'activate_skill' arguments: { 'name' -> 'Spec2' } asDictionary context: context.
 	self assert: (activation at: 'ok').
-	self assert: ((((activation at: 'result') at: 'activatedToolPacks') asSet) includesAll: #('browse' 'ui')).
+	result := activation at: 'result'.
+	self assert: (result at: 'activatedToolPacks') isEmpty.
+	self assert: (result at: 'toolPacksRemainLazy').
+	self assert: (((result at: 'recommendedToolPacks') asSet) includesAll: #('browse' 'ui')).
 	packs := agent toolRegistry activePackNamesForSession: run session.
-	self assert: (packs includes: 'browse').
-	self assert: (packs includes: 'ui')
+	self assert: packs equals: #('catalog' 'core')
 ]
