@@ -188,3 +188,45 @@ PharoCAAgentInstructionsTest >> testUnlimitedDefaultDoesNotInjectIterationBudget
 	event := run events detect: [ :each | each type = #instructionsPrepared ].
 	self assert: (event payload at: 'maxIterations') isNil
 ]
+
+{ #category : 'tests-065' }
+PharoCAAgentInstructionsTest >> testThreeConsecutiveToolFailuresInjectNoProgressGuidanceWithoutStoppingRun [
+	| provider agent run fourthSystem |
+	provider := PharoCATestLLMProvider new.
+	provider
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"1 definitelyMissingSelector"}' id: 'e1');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"2 definitelyMissingSelector"}' id: 'e2');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"3 definitelyMissingSelector"}' id: 'e3');
+		queueResponse: (self completionWith: 'recovered').
+	agent := PharoCA new provider: provider; yourself.
+	run := agent run: 'diagnose carefully'.
+	self assert: run status equals: #completed.
+	self assert: run answer equals: 'recovered'.
+	fourthSystem := self systemContentFromPayload: provider payloads fourth.
+	self assert: (fourthSystem includesSubstring: 'consecutive tool calls failed').
+	self assert: (fourthSystem includesSubstring: 'Reassess the approach')
+]
+
+{ #category : 'tests-065' }
+PharoCAAgentInstructionsTest >> testPassingRunTestsInjectsCompletionGuidanceOnNextModelRequest [
+	| agent run source result |
+	agent := PharoCA new.
+	run := PharoCARun new.
+	result := PharoCAToolResult success: {
+		'status' -> 'passed'.
+		'runCount' -> 2.
+		'failureCount' -> 0.
+		'errorCount' -> 0
+	} asDictionary.
+	run emit: #toolExecutionCompleted payload: {
+		'name' -> 'run_tests'.
+		'result' -> result
+	} asDictionary.
+	source := agent progressGuidanceInstructionSourceForRun: run.
+	self assert: source notNil.
+	self assert: source name equals: 'verification-complete'.
+	self assert: (source content includesSubstring: 'Relevant run_tests verification is passing').
+	self assert: (source content includesSubstring: 'Prefer answering now').
+	run emit: #changeRecorded payload: Dictionary new.
+	self assert: (agent progressGuidanceInstructionSourceForRun: run) isNil
+]

@@ -91,7 +91,7 @@ PharoCASessionManagerTest >> testForkGetsNewSessionIdAndCopiesTreeAndActiveSkill
 	self deny: clone id equals: original id.
 	self assert: clone entries size equals: original entries size.
 	self assert: clone conversation messages first textContent equals: 'root'.
-	self assert: (agent skillRegistry activeSkillNamesForSession: clone) equals: #('fork-skill').
+	self assert: (agent skillRegistry activeSkillNamesForSession: clone) asSet equals: #('Smalltalk Core' 'fork-skill') asSet.
 	self assert: manager sessions size equals: 2
 ]
 

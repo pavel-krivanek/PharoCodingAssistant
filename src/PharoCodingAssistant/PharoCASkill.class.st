@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCASkill',
 	#superclass : 'Object',
-	#instVars : [ 'name', 'description', 'instructions', 'priority', 'scope', 'sourcePath', 'keywords' ],
+	#instVars : [ 'name', 'description', 'instructions', 'priority', 'scope', 'sourcePath', 'keywords', 'recommendedToolPacks', 'embeddedInSystemPrompt' ],
 	#category : 'PharoCodingAssistant-Skills',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
@@ -33,7 +33,9 @@ PharoCASkill >> asMetadataDictionary [
 		'description' -> description.
 		'scope' -> (scope ifNil: [ nil ] ifNotNil: [ scope asString ]).
 		'sourcePath' -> sourcePath.
-		'keywords' -> keywords asArray
+		'keywords' -> (Array withAll: keywords).
+		'recommendedToolPacks' -> (Array withAll: recommendedToolPacks).
+		'embeddedInSystemPrompt' -> embeddedInSystemPrompt
 	} asDictionary
 ]
 
@@ -47,8 +49,18 @@ PharoCASkill >> description: aString [ description := aString ]
 PharoCASkill >> initialize [
 	super initialize.
 	priority := 500.
-	keywords := #()
+	keywords := #().
+	recommendedToolPacks := #().
+	embeddedInSystemPrompt := false
 ]
+
+
+
+{ #category : 'accessing' }
+PharoCASkill >> embeddedInSystemPrompt [ ^ embeddedInSystemPrompt ]
+
+{ #category : 'accessing' }
+PharoCASkill >> embeddedInSystemPrompt: aBoolean [ embeddedInSystemPrompt := aBoolean = true ]
 
 { #category : 'accessing' }
 PharoCASkill >> instructions [ ^ instructions ]
@@ -100,3 +112,12 @@ PharoCASkill >> sourcePath [ ^ sourcePath ]
 
 { #category : 'accessing' }
 PharoCASkill >> sourcePath: anObject [ sourcePath := anObject ]
+
+
+{ #category : 'accessing' }
+PharoCASkill >> recommendedToolPacks [ ^ recommendedToolPacks ]
+
+{ #category : 'accessing' }
+PharoCASkill >> recommendedToolPacks: aCollection [
+	recommendedToolPacks := (aCollection ifNil: [ #() ]) collect: [ :each | each asString ]
+]

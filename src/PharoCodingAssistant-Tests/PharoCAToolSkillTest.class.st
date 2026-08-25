@@ -52,13 +52,13 @@ PharoCAToolSkillTest >> testActivateAndDeactivateSkillUseSessionState [
 	activation := agent toolRegistry executeNamed: 'activate_skill' arguments: { 'name' -> 'alpha' } asDictionary context: context.
 	self assert: (activation at: 'ok').
 	self assert: ((activation at: 'result') at: 'active').
-	self assert: (agent skillRegistry activeSkillNamesForSession: run session) equals: #('alpha').
+	self assert: (agent skillRegistry activeSkillNamesForSession: run session) asSet equals: #('Smalltalk Core' 'alpha') asSet.
 	listing := agent toolRegistry executeNamed: 'list_skills' arguments: { 'substring' -> 'alpha' } asDictionary context: context.
 	self assert: ((((listing at: 'result') at: 'skills') first) at: 'active').
 	deactivation := agent toolRegistry executeNamed: 'deactivate_skill' arguments: { 'name' -> 'alpha' } asDictionary context: context.
 	self assert: (deactivation at: 'ok').
 	self assert: ((deactivation at: 'result') at: 'wasActive').
-	self assert: (agent skillRegistry activeSkillNamesForSession: run session) isEmpty
+	self assert: (agent skillRegistry activeSkillNamesForSession: run session) equals: #('Smalltalk Core')
 ]
 
 { #category : 'tests' }
@@ -86,4 +86,20 @@ PharoCAToolSkillTest >> testListSkillsSearchesBuiltinKeywords [
 	raw := result at: 'result'.
 	names := (raw at: 'skills') collect: [ :each | each at: 'name' ].
 	self assert: names equals: #('Roassal')
+]
+
+
+{ #category : 'tests-065' }
+PharoCAToolSkillTest >> testSpec2ActivationAlsoActivatesRecommendedToolPacks [
+	| fixture agent run context activation packs |
+	fixture := self agentRunAndContext.
+	agent := fixture first.
+	run := fixture second.
+	context := fixture third.
+	activation := agent toolRegistry executeNamed: 'activate_skill' arguments: { 'name' -> 'Spec2' } asDictionary context: context.
+	self assert: (activation at: 'ok').
+	self assert: ((((activation at: 'result') at: 'activatedToolPacks') asSet) includesAll: #('browse' 'ui')).
+	packs := agent toolRegistry activePackNamesForSession: run session.
+	self assert: (packs includes: 'browse').
+	self assert: (packs includes: 'ui')
 ]

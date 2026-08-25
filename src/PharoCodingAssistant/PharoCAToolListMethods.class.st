@@ -12,7 +12,7 @@ PharoCAToolListMethods class >> execute: args [
 	| aClass classSymbol side targetClass protocol selectors methods page scope |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
+		^ self classNotFoundResultFor: (args at: 'className') ].
 	side := args at: 'side' ifAbsent: [ 'instance' ].
 	targetClass := (side = 'class') ifTrue: [ aClass class ] ifFalse: [ aClass ].
 	protocol := args at: 'protocol' ifAbsent: [ nil ].

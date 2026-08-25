@@ -79,7 +79,7 @@ PharoCASessionRepositoryTest >> testRenamePreservesPersistedAgentState [
 	restoredAgent := PharoCA new.
 	restoredAgent registerSkill: skill.
 	restored := repository loadSessionId: session id workspace: workspace agent: restoredAgent.
-	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restored) equals: #('repo-skill')
+	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restored) asSet equals: #('Smalltalk Core' 'repo-skill') asSet
 ]
 
 { #category : 'tests' }
@@ -120,7 +120,7 @@ PharoCASessionRepositoryTest >> testImportRefusesCollisionBeforeRestoringAgentSt
 	agent skillRegistry deactivateNamed: 'collision-skill' session: session.
 	self should: [ repository importFrom: exportFile workspace: workspace agent: agent ] raise: Error.
 	otherSession := agent newSession.
-	self assert: (agent skillRegistry activeSkillNamesForSession: otherSession) isEmpty
+	self assert: (agent skillRegistry activeSkillNamesForSession: otherSession) equals: #('Smalltalk Core')
 ]
 
 { #category : 'tests' }

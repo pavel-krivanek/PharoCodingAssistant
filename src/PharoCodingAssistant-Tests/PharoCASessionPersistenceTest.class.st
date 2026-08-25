@@ -102,7 +102,7 @@ PharoCASessionPersistenceTest >> testSkillAndOptInExtensionStateRestoreButTransi
 	restoredAgent registerExtension: persistent2.
 	restoredAgent registerExtension: transient2.
 	restoredSession := restoredAgent restoreSessionFromString: snapshot.
-	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restoredSession) equals: #('persisted-skill').
+	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restoredSession) asSet equals: #('Smalltalk Core' 'persisted-skill') asSet.
 	self assert: (restoredAgent toolRegistry activePackNamesForSession: restoredSession) equals: #('browse' 'catalog' 'core').
 	provider2 := PharoCATestLLMProvider new.
 	provider2 queueResponse: (self completionWith: 'two').

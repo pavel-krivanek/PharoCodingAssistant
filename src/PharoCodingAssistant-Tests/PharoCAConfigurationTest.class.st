@@ -17,9 +17,9 @@ PharoCAConfigurationTest >> testDefaults [
 	self assert: configuration temperature equals: 0.0.
 	self assert: configuration toolTimeoutMilliseconds equals: 60000.
 	self deny: configuration systemPrompt isEmpty.
-	self assert: (configuration systemPrompt includesSubstring: 'browse/search').
+	self assert: (configuration systemPrompt includesSubstring: 'structured tools for browsing').
 	self assert: (configuration systemPrompt includesSubstring: 'tool_search searches harness tools only').
-	self assert: (configuration systemPrompt includesSubstring: 'debugging/profiling').
+	self assert: (configuration systemPrompt includesSubstring: 'tests, debugging, refactoring').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://class/Class').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://method/Class/instance/selector').
 	self assert: (configuration systemPrompt includesSubstring: 'URL-encode path parts').

@@ -377,8 +377,50 @@ PharoCAAgent >> iterationBudgetInstructionSourceForRun: run [
 ]
 
 { #category : 'instructions-private' }
+PharoCAAgent >> progressGuidanceInstructionSourceForRun: run [
+	| events completed consecutiveErrors counting latestChangeSequence successfulTestEvent content |
+	events := run events.
+	completed := events select: [ :event | event type = #toolExecutionCompleted ].
+	completed isEmpty ifTrue: [ ^ nil ].
+	latestChangeSequence := 0.
+	events do: [ :event | event type = #changeRecorded ifTrue: [ latestChangeSequence := event sequence ] ].
+	successfulTestEvent := nil.
+	completed reverseDo: [ :event |
+		| payload result inner |
+		successfulTestEvent ifNil: [
+			payload := event payload.
+			((payload at: 'name' ifAbsent: [ '' ]) asString = 'run_tests') ifTrue: [
+				result := payload at: 'result' ifAbsent: [ nil ].
+				(result isDictionary and: [ result at: 'ok' ifAbsent: [ false ] ]) ifTrue: [
+					inner := result at: 'result' ifAbsent: [ Dictionary new ].
+					(inner isDictionary and: [ (inner at: 'status' ifAbsent: [ '' ]) = 'passed' ]) ifTrue: [ successfulTestEvent := event ] ] ] ] ].
+	(successfulTestEvent notNil and: [ successfulTestEvent sequence > latestChangeSequence ]) ifTrue: [
+		content := 'Relevant run_tests verification is passing and no later code/image change was recorded. The requested change may already be complete. Prefer answering now; continue only for a specific unresolved requirement or defect, not optional review/probing.'.
+		^ (PharoCAInstructionSource named: 'verification-complete' content: content)
+			kind: #runtime;
+			priority: 1000;
+			yourself ].
+	consecutiveErrors := 0.
+	counting := true.
+	completed reverseDo: [ :event |
+		| result |
+		counting ifTrue: [
+			result := event payload at: 'result' ifAbsent: [ nil ].
+			(result isDictionary and: [ result at: 'ok' ifAbsent: [ false ] ])
+				ifTrue: [ counting := false ]
+				ifFalse: [ consecutiveErrors := consecutiveErrors + 1 ] ] ].
+	consecutiveErrors >= 3 ifTrue: [
+		content := consecutiveErrors asString, ' consecutive tool calls failed. Reassess the approach instead of trying variants of the same exploratory DoIt. Prefer structured browse/process/UI/test tools, activate the relevant pack/skill, and use diagnostic suggestions returned by the tools.'.
+		^ (PharoCAInstructionSource named: 'no-progress' content: content)
+			kind: #runtime;
+			priority: 1000;
+			yourself ].
+	^ nil
+]
+
+{ #category : 'instructions-private' }
 PharoCAAgent >> instructionAdjustedMessagesFor: baseMessages run: run model: activeModel [
-	| sources extensionSources discovery activeSkillNames messages budgetSource |
+	| sources extensionSources discovery activeSkillNames messages budgetSource progressSource |
 	sources := OrderedCollection new.
 	extensionSources := extensionRegistry instructionSourcesForRun: run agent: self.
 	sources addAll: extensionSources.
@@ -387,6 +429,8 @@ PharoCAAgent >> instructionAdjustedMessagesFor: baseMessages run: run model: act
 	discovery ifNotNil: [ sources add: discovery ].
 	budgetSource := self iterationBudgetInstructionSourceForRun: run.
 	budgetSource ifNotNil: [ sources add: budgetSource ].
+	progressSource := self progressGuidanceInstructionSourceForRun: run.
+	progressSource ifNotNil: [ sources add: progressSource ].
 	messages := instructionRegistry
 		messagesFrom: baseMessages
 		basePrompt: configuration systemPrompt
@@ -698,7 +742,10 @@ PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSessi
 
 { #category : 'sessions' }
 PharoCAAgent >> newSession [
-	^ PharoCASession new
+	| session |
+	session := PharoCASession new.
+	skillRegistry activateNamed: 'Smalltalk Core' session: session.
+	^ session
 ]
 
 { #category : 'sessions' }

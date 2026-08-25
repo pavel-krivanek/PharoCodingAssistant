@@ -9,7 +9,26 @@ Class {
 
 { #category : 'accessing' }
 PharoCABuiltinSkills class >> all [
-	^ { self collections. self spec2. self bloc. self roassal }
+	^ { self smalltalkCore. self collections. self spec2. self bloc. self roassal }
+]
+
+{ #category : 'skills' }
+PharoCABuiltinSkills class >> smalltalkCore [
+	^ (PharoCASkill
+		named: 'Smalltalk Core'
+		description: 'Always-active Pharo/Smalltalk language fundamentals: message precedence, blocks/parentheses, temporaries, Points, class/instance side, processes and SUnit basics.'
+		instructions: self smalltalkCoreInstructions)
+		keywords: #(Smalltalk Pharo syntax precedence unary binary keyword block temporary Point SUnit TestCase classSide instanceSide);
+		embeddedInSystemPrompt: true;
+		scope: #builtin;
+		yourself
+]
+
+{ #category : 'instructions-private' }
+PharoCABuiltinSkills class >> smalltalkCoreInstructions [
+	^ '## Smalltalk Core
+
+Precedence is unary, then binary, then keyword; `(...)` groups expressions and `[...]` creates blocks. A bare method identifier is a variable reference; use `self selector` for a unary send. DoIts support `| temporaries |` and multiple statements, but evaluation returns only the final expression. Construct Points as `x @ y`. Respect instance/class side diagnostics. Prefer structured browse/process/UI/test tools over reflection DoIts. SUnit subclasses `TestCase`. After relevant tests pass, finish unless a concrete defect remains.'
 ]
 
 { #category : 'skills' }
@@ -68,6 +87,7 @@ PharoCABuiltinSkills class >> spec2 [
 		description: 'Pharo Spec2 desktop UI: presenters, layouts, widgets, events, models and window lifecycle.'
 		instructions: self spec2Instructions)
 		keywords: #(Spec2 SpPresenter SpApplication SpBoxLayout SpGridLayout SpPanedLayout initializePresenters connectPresenters defaultLayout initializeWindow newButton newTextInput newLabel newList newTable newTree newNotebook presenter widget dialog);
+		recommendedToolPacks: #('browse' 'ui');
 		scope: #builtin;
 		yourself
 ]
@@ -76,7 +96,7 @@ PharoCABuiltinSkills class >> spec2 [
 PharoCABuiltinSkills class >> spec2Instructions [
 	^ '## Spec2 UI
 
-Use this skill for Pharo desktop UI built with Spec2. The supplied Pharo 14 image contains `SpPresenter`, `SpApplication`, `SpBoxLayout`, `SpGridLayout` and the standard presenter classes. Still inspect the live class/method before relying on a less-common selector.
+Use this skill for Pharo desktop UI built with Spec2. Activating it also enables the browse and ui tool packs. The supplied Pharo 14 image contains `SpPresenter`, `SpApplication`, `SpBoxLayout`, `SpGridLayout` and the standard presenter classes. Trust the canonical pattern below for common APIs; inspect the live image only for less-common selectors or after a concrete failure.
 
 ### Presenter lifecycle
 A normal presenter subclasses `SpPresenter` and separates responsibilities:
@@ -85,6 +105,8 @@ A normal presenter subclasses `SpPresenter` and separates responsibilities:
 - `defaultLayout` answers the layout tree.
 - `initializeWindow:` configures title/extent/window behavior when needed.
 - `setModelBeforeInitialization:` is appropriate when construction depends on an external model.
+- Initialize presenter state needed by `initializePresenters`/`connectPresenters` before `super initialize`, because `super initialize` runs those hooks.
+- Open with `MyPresenter new open` (or an established class-side `open` forwarding to it). Use ui_list_windows/ui_window_* and ui_screenshot for live-window verification instead of hand-written fork/Delay probing.
 
 ```smalltalk
 MyPresenter >> initializePresenters
@@ -113,7 +135,7 @@ Factories on `SpPresenter` (`newButton`, `newTextInput`, `newLabel`, `newList`, 
 Connect events once; avoid installing duplicate handlers during refresh. UI mutation belongs on the UI process. For asynchronous work, keep long computation off the UI process and marshal only the presentation update back to it.
 
 ### Verification
-Spec2 evolves. Before emitting unfamiliar code, browse/search the concrete presenter class and selector in the running image. Reuse an existing presenter pattern from the target package when one exists.'
+Spec2 evolves. Before emitting unfamiliar code, browse/search the concrete presenter class and selector in the running image. Actual working methods in the target image are authoritative over stale comments. Reuse an existing presenter pattern from the target package when one exists. After the minimal code compiles, prefer a small SUnit regression plus structured ui window/screenshot tools over repeated evaluator probes.'
 ]
 
 { #category : 'skills' }

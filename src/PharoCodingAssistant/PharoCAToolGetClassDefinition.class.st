@@ -12,7 +12,7 @@ PharoCAToolGetClassDefinition class >> execute: args [
 	| aClass classSymbol page |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
+		^ self classNotFoundResultFor: (args at: 'className') ].
 	page := PharoCAToolPagination
 		pageText: aClass definitionString
 		arguments: args

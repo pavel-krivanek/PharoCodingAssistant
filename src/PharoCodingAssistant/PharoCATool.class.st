@@ -120,3 +120,36 @@ PharoCATool class >> withEvaluationLocalHintDo: aBlock [
 		Error signal: description,
 			'. DoIt local temporaries are supported when declared at the beginning, for example | x y | x := 1. y := 2. x + y. Temporaries are scoped to this evaluation call and do not persist across tool calls.' ]
 ]
+
+
+{ #category : 'diagnostics' }
+PharoCATool class >> classSuggestionsFor: className limit: limit [
+	| query names matches prefix |
+	query := className asString asLowercase.
+	names := SystemNavigation default allClasses collect: [ :each | each name asString ].
+	matches := names select: [ :name |
+		| lower |
+		lower := name asLowercase.
+		(lower includesSubstring: query) or: [ query includesSubstring: lower ] ].
+	matches isEmpty ifTrue: [
+		prefix := query copyFrom: 1 to: (query size min: 4).
+		matches := names select: [ :name | name asLowercase beginsWith: prefix ] ].
+	^ ((matches asSortedCollection: [ :a :b |
+		(a size - className size) abs = (b size - className size) abs
+			ifTrue: [ a <= b ]
+			ifFalse: [ (a size - className size) abs < (b size - className size) abs ] ])
+		copyFrom: 1 to: (limit min: matches size)) asArray
+]
+
+{ #category : 'diagnostics' }
+PharoCATool class >> classNotFoundResultFor: className [
+	| suggestions result |
+	suggestions := self classSuggestionsFor: className limit: 5.
+	result := {
+		'error' -> ('Class not found: ', className asString).
+		'diagnosticType' -> 'class_not_found'.
+		'suggestions' -> suggestions
+	} asDictionary.
+	suggestions isEmpty ifFalse: [ result at: 'hint' put: 'Use the exact installed class name; the suggestions are live-image matches.' ].
+	^ result
+]

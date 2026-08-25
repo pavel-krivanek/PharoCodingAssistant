@@ -129,6 +129,11 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolIcebergClone
 		PharoCAToolIcebergAddLocalRepository
 		PharoCAToolUIListWindows
+		PharoCAToolUIWindowInfo
+		PharoCAToolUIWindowActivate
+		PharoCAToolUIWindowSetState
+		PharoCAToolUIWindowSetBounds
+		PharoCAToolUIWindowClose
 		PharoCAToolUIScreenshot
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
@@ -422,7 +427,7 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 				errorType: #tool_timeout
 				message: error description ]
 	] on: Error do: [ :error |
-		^ self executionErrorFor: error tool: tool ].
+		^ self executionErrorFor: error tool: tool arguments: arguments ].
 	envelope := self normalizeRawResult: raw.
 	[ serialized := STONJSON toString: envelope ]
 		on: Error
@@ -443,7 +448,7 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 ]
 
 { #category : 'private' }
-PharoCAToolRegistry >> executionErrorFor: error tool: tool [
+PharoCAToolRegistry >> executionErrorFor: error tool: tool arguments: arguments [
 	| description details |
 	description := error description.
 	details := nil.
@@ -452,10 +457,99 @@ PharoCAToolRegistry >> executionErrorFor: error tool: tool [
 			'diagnosticType' -> 'undeclared_variable'.
 			'hint' -> 'A bare identifier in a method body is a variable reference. If you intended a unary message to the receiver, write self selector (for example self classToTest). Otherwise declare the temporary or instance variable.'
 		} asDictionary ].
+	(tool toolName = #compile_method and: [ description includesSubstring: 'SyntaxErrorNotice' ]) ifTrue: [
+		details := self syntaxErrorDetailsFor: description source: (arguments at: 'source' ifAbsent: [ '' ]) ].
+	(error isKindOf: MessageNotUnderstood) ifTrue: [
+		details := self messageNotUnderstoodDetailsFor: error ].
 	^ PharoCAToolResult
 		errorType: #tool_execution_error
 		message: description
 		details: details
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> commonPrefixLengthBetween: firstString and: secondString [
+	| limit index |
+	limit := firstString size min: secondString size.
+	index := 1.
+	[ index <= limit and: [ (firstString at: index) = (secondString at: index) ] ] whileTrue: [ index := index + 1 ].
+	^ index - 1
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> selectorSuggestionsFor: selector receiver: receiver limit: limit [
+	| query candidates prefix filtered sorted |
+	query := selector asString.
+	candidates := receiver class allSelectors collect: [ :each | each asString ].
+	prefix := query copyFrom: 1 to: (query size min: 3).
+	filtered := candidates select: [ :candidate |
+		(candidate beginsWith: prefix) or: [
+			(self commonPrefixLengthBetween: query and: candidate) >= 2 ] ].
+	sorted := filtered asSortedCollection: [ :a :b |
+		| aPrefix bPrefix |
+		aPrefix := self commonPrefixLengthBetween: query and: a.
+		bPrefix := self commonPrefixLengthBetween: query and: b.
+		aPrefix = bPrefix
+			ifTrue: [
+				(query size - a size) abs = (query size - b size) abs
+					ifTrue: [ a <= b ]
+					ifFalse: [ (query size - a size) abs < (query size - b size) abs ] ]
+			ifFalse: [ aPrefix > bPrefix ] ].
+	^ (sorted copyFrom: 1 to: (limit min: sorted size)) asArray
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> messageNotUnderstoodDetailsFor: error [
+	| selector receiver suggestions details |
+	selector := error message selector.
+	receiver := error receiver.
+	suggestions := self selectorSuggestionsFor: selector receiver: receiver limit: 5.
+	details := {
+		'diagnosticType' -> 'message_not_understood'.
+		'receiverClass' -> receiver class name asString.
+		'selector' -> selector asString.
+		'suggestions' -> suggestions
+	} asDictionary.
+	suggestions isEmpty ifFalse: [
+		details at: 'hint' put: 'Nearby selectors are from the actual receiver class hierarchy; prefer them or browse the receiver before trying more reflection DoIts.' ].
+	^ details
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> syntaxErrorOffsetFrom: description [
+	| marker start index digits character |
+	marker := 'SyntaxErrorNotice('.
+	start := description findString: marker startingAt: 1.
+	start = 0 ifTrue: [ ^ nil ].
+	index := start + marker size.
+	digits := String new writeStream.
+	[ index <= description size and: [ character := description at: index. character isDigit ] ] whileTrue: [
+		digits nextPut: character.
+		index := index + 1 ].
+	digits position = 0 ifTrue: [ ^ nil ].
+	^ digits contents asInteger
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> syntaxErrorDetailsFor: description source: source [
+	| offset line column previousNewline details lines |
+	offset := self syntaxErrorOffsetFrom: description.
+	details := { 'diagnosticType' -> 'syntax_error' } asDictionary.
+	offset ifNotNil: [
+		line := 1.
+		previousNewline := 0.
+		1 to: (offset min: source size) do: [ :index |
+			(source at: index) = Character lf ifTrue: [ line := line + 1. previousNewline := index ] ].
+		column := offset - previousNewline.
+		details
+			at: 'offset' put: offset;
+			at: 'line' put: line;
+			at: 'column' put: column.
+		lines := source lines.
+		(line between: 1 and: lines size) ifTrue: [ details at: 'sourceLine' put: (lines at: line) ] ].
+	((source includesSubstring: ' at ') and: [ source includesSubstring: 'extent:' ]) ifTrue: [
+		details at: 'hint' put: 'If you intended a Point, use x @ y (for example 260 @ 180). `at:` is collection access; `260 at 180` is not Point construction syntax.' ].
+	^ details
 ]
 
 { #category : 'private' }

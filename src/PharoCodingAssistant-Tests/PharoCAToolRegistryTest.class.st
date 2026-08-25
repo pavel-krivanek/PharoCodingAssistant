@@ -32,7 +32,7 @@ PharoCAToolRegistryTest >> testDefaultRegistryContainsExplicitToolSet [
 		iceberg_branches iceberg_remotes iceberg_packages
 		iceberg_commit iceberg_fetch iceberg_pull iceberg_push iceberg_create_branch iceberg_switch
 		iceberg_add_remote iceberg_remove_remote iceberg_load_package iceberg_unload_package iceberg_discard_changes
-		iceberg_clone iceberg_add_local_repository ui_list_windows ui_screenshot
+		iceberg_clone iceberg_add_local_repository ui_list_windows ui_window_info ui_window_activate ui_window_set_state ui_window_set_bounds ui_window_close ui_screenshot
 		activate_skill compile_method format_code quality_rules quality_check quality_results remove_method set_method_protocol deactivate_skill define_class evaluate get_class_comment get_class_definition
 		get_class_hierarchy get_method_inheritance get_package_comment list_classes_in_package
 		list_implementors list_methods list_packages list_senders list_skills evaluate_and_print
@@ -227,4 +227,33 @@ PharoCAToolRegistryTest >> testSchedulerCanBeInjected [
 	scheduler := PharoCAToolScheduler new.
 	registry scheduler: scheduler.
 	self assert: registry scheduler identicalTo: scheduler
+]
+
+
+{ #category : 'tests-065' }
+PharoCAToolRegistryTest >> testMessageNotUnderstoodIncludesNearbySelectors [
+	| result details |
+	result := self fullRegistry
+		executeNamed: 'evaluate_and_print'
+		arguments: { 'code' -> 'SpBoxLayout newLeftToBottom' } asDictionary.
+	self deny: (result at: 'ok').
+	details := (result at: 'error') at: 'details'.
+	self assert: (details at: 'diagnosticType') equals: 'message_not_understood'.
+	self assert: ((details at: 'suggestions') includes: 'newLeftToRight')
+]
+
+{ #category : 'tests-065' }
+PharoCAToolRegistryTest >> testCompileSyntaxDiagnosticIncludesPointHintAndLocation [
+	| result details |
+	result := self fullRegistry
+		executeNamed: 'compile_method'
+		arguments: {
+			'className' -> 'PharoCATestFixtureChild'.
+			'source' -> 'pharoCATestBadPoint | w | w := SpWindowPresenter new. w extent: 260 at 180'
+		} asDictionary.
+	self deny: (result at: 'ok').
+	details := (result at: 'error') at: 'details'.
+	self assert: (details at: 'diagnosticType') equals: 'syntax_error'.
+	self assert: (details includesKey: 'line').
+	self assert: ((details at: 'hint') includesSubstring: '260 @ 180')
 ]
