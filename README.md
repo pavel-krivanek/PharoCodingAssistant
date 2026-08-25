@@ -677,7 +677,7 @@ A project can select one through `settings.json`:
 
 Specific tools can also be allowed or excluded with `tools.allow` and `tools.exclude` arrays.
 
-The default system prompt gives the model a compact map of the available families — browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace operations, Transcript and screenshots — and tells it to use `tool_search` / `tool_enable` for exact names and lazy packs. It intentionally does not duplicate the full catalog in the prompt.
+The default system prompt gives the model a compact map of the available families — browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace operations, Transcript and screenshots — and tells it to use `tool_search` / `tool_enable` for exact names and lazy packs. It also tells the agent to make concrete Pharo classes and methods IDE-clickable in Markdown using the `pharo://` link forms described below. It intentionally does not duplicate the full catalog in the prompt.
 
 Iteration 057 adds the default-core `format_code` tool. It parses method or expression source with Pharo's native `OCParser` and returns `formattedCode` without changing the image. Formatted text is cursor-paginated, so large methods remain bounded.
 
@@ -1025,7 +1025,8 @@ The UI includes, among other things:
 - live Changes and conversation-tree projections;
 - checkpoints/change review;
 - light/dark/system theme switching;
-- small `i` actions that open live Pharo Inspectors for supported entities when the image is interactive.
+- small `i` actions that open live Pharo Inspectors for supported entities when the image is interactive;
+- reactive Markdown links such as `[PharoCASession](pharo://class/PharoCASession)` and `[PharoCASession>>save](pharo://method/PharoCASession/instance/save)` that open the native Pharo code browser.
 
 ## Useful slash commands
 
@@ -1266,3 +1267,20 @@ This is the recommended steady-state startup shape: configure providers/models/a
 ### Source-search runtime note
 
 Image-wide `search_method_source` searches only retrievable source text (`CompiledMethod>>sourceCodeOrNil`). It deliberately skips methods without real source instead of invoking Pharo's `codeForNoSource` reconstruction path. Pagination cursor/limit validation also happens before image-wide traversal, so invalid continuation cursors fail without rescanning the image.
+
+
+## Reactive Pharo IDE links (060)
+
+Assistant Markdown can navigate directly from the web conversation into the live Pharo code browser. The supported forms are intentionally narrow:
+
+```markdown
+[PharoCASession](pharo://class/PharoCASession)
+[PharoCASession>>save](pharo://method/PharoCASession/instance/save)
+[PharoCASession class>>new](pharo://method/PharoCASession/class/new)
+```
+
+Each URI path component should be URL-encoded; this is important for binary selectors such as `/`. The browser intercepts the click and sends the structured `ide.browse` protocol request over the existing WebSocket. The server resolves only an existing global class/trait and, for a method link, an existing selector on the requested instance/class side before opening Calypso through Pharo's normal browser tool on the Morphic UI process.
+
+These links are navigation-only. They cannot contain Smalltalk expressions, arbitrary selectors to execute, or generic object messages. Missing targets produce structured `class_not_found` / `method_not_found` errors, malformed links are not made reactive, and headless images return `ide_unavailable`.
+
+The default system prompt explicitly asks the coding agent to use these links whenever it names existing Pharo classes or methods, so normal answers become a useful navigation surface without expanding the LLM tool catalog.

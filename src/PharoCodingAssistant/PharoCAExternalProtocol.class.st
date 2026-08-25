@@ -280,6 +280,7 @@ PharoCAExternalProtocol >> dispatchMethod: method params: params eventsDo: event
 	method = 'agents.setModel' ifTrue: [ ^ self agentsSetModel: params ].
 	method = 'agents.setReasoningEffort' ifTrue: [ ^ self agentsSetReasoningEffort: params ].
 	method = 'inspect.open' ifTrue: [ ^ self inspectOpen: params ].
+	method = 'ide.browse' ifTrue: [ ^ self ideBrowse: params ].
 	method = 'models.list' ifTrue: [ ^ self modelsList ].
 	method = 'models.get' ifTrue: [ ^ self modelsGet: params ].
 	method = 'models.register' ifTrue: [ ^ self modelsRegister: params ].
@@ -400,7 +401,7 @@ PharoCAExternalProtocol >> helloResult [
 	^ {
 		'name' -> 'PharoCodingAssistant'.
 		'protocolVersion' -> self class protocolVersion.
-		'features' -> #('requestResponse' 'structuredUserInput' 'attachments' 'changeReview' 'runtimeProfile' 'credentialEnvironmentMapping' 'liveRunEvents' 'boundedEventReplay' 'asyncEventSubscribers' 'eventReplay' 'sessions' 'sessionTree' 'checkpoints' 'templates' 'commands' 'multiAgent' 'modelControl' 'modelDiscovery' 'reasoningControl' 'runTelemetry' 'pharoInspector' 'jsonl' 'webReady').
+		'features' -> #('requestResponse' 'structuredUserInput' 'attachments' 'changeReview' 'runtimeProfile' 'credentialEnvironmentMapping' 'liveRunEvents' 'boundedEventReplay' 'asyncEventSubscribers' 'eventReplay' 'sessions' 'sessionTree' 'checkpoints' 'templates' 'commands' 'multiAgent' 'modelControl' 'modelDiscovery' 'reasoningControl' 'runTelemetry' 'pharoInspector' 'ideNavigation' 'jsonl' 'webReady').
 		'methods' -> self methodNames.
 		'eventEnvelope' -> 'run.event'
 	} asDictionary
@@ -435,7 +436,7 @@ PharoCAExternalProtocol >> methodNames [
 	^ #(
 		'protocol.hello' 'state.snapshot' 'runtime.profile.get' 'runtime.profile.save' 'credentials.status' 'credentials.mapEnvironment'
 		'agents.list' 'agents.get' 'agents.create' 'agents.setDefault' 'agents.setModel' 'agents.setReasoningEffort'
-		'inspect.open'
+		'inspect.open' 'ide.browse'
 		'models.list' 'models.get' 'models.register'
 		'providers.list' 'providers.get' 'providers.registerOpenAICompatible' 'providers.discoverModels'
 		'sessions.list' 'sessions.get' 'sessions.tree' 'sessions.selectEntry' 'sessions.new' 'sessions.resume' 'sessions.continue' 'sessions.fork' 'sessions.rename' 'sessions.archive' 'sessions.unarchive' 'sessions.delete'
@@ -443,6 +444,47 @@ PharoCAExternalProtocol >> methodNames [
 		'checkpoints.list' 'checkpoints.create' 'checkpoints.planRollback' 'checkpoints.rollback'
 		'templates.list' 'templates.render' 'templates.run'
 		'commands.list' 'commands.complete' 'commands.invoke' 'commands.executeLine')
+]
+
+{ #category : 'ide-navigation' }
+PharoCAExternalProtocol >> ideBrowse: params [
+	| kind className class side behavior selector browser |
+	kind := self requiredString: 'kind' from: params.
+	(#('class' 'method') includes: kind) ifFalse: [
+		PharoCAProtocolError code: 'invalid_params' message: 'kind must be class or method' ].
+	className := self requiredString: 'className' from: params.
+	class := Smalltalk globals at: className asSymbol ifAbsent: [
+		PharoCAProtocolError code: 'class_not_found' message: 'Class not found: ', className ].
+	class isClassOrTrait ifFalse: [
+		PharoCAProtocolError code: 'class_not_found' message: 'Global is not a class or trait: ', className ].
+	side := params at: 'side' ifAbsent: [ 'instance' ].
+	(#('instance' 'class') includes: side) ifFalse: [
+		PharoCAProtocolError code: 'invalid_params' message: 'side must be instance or class' ].
+	behavior := side = 'class' ifTrue: [ class class ] ifFalse: [ class ].
+	selector := nil.
+	kind = 'method' ifTrue: [
+		selector := (self requiredString: 'selector' from: params) asSymbol.
+		(behavior lookupSelector: selector) ifNil: [
+			PharoCAProtocolError
+				code: 'method_not_found'
+				message: 'Method not found: ', className, (side = 'class' ifTrue: [ ' class>>' ] ifFalse: [ '>>' ]), selector asString ] ].
+	Smalltalk isInteractive ifFalse: [
+		PharoCAProtocolError code: 'ide_unavailable' message: 'Pharo IDE navigation requires an interactive image' ].
+	[
+		PharoCAUICapture onUIProcess: [
+			browser := Smalltalk tools toolNamed: #browser.
+			kind = 'class'
+				ifTrue: [ browser openOnClass: class ]
+				ifFalse: [ browser openOnClass: behavior selector: selector ] ]
+	] on: Error do: [ :error |
+		PharoCAProtocolError code: 'ide_browse_failed' message: error description ].
+	^ {
+		'opened' -> true.
+		'kind' -> kind.
+		'className' -> className.
+		'side' -> side.
+		'selector' -> (selector ifNil: [ nil ] ifNotNil: [ selector asString ])
+	} asDictionary
 ]
 
 { #category : 'inspection' }

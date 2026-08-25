@@ -1347,3 +1347,73 @@ PharoCAExternalProtocolTest >> testProtocolCanDiscoverAndRegisterProviderModels 
 	self assert: (result at: 'added') equals: #('discovered-via-protocol').
 	self assert: (harness modelRegistry modelNamed: 'discovered-via-protocol') contextSize equals: 65536
 ]
+
+{ #category : 'tests-060' }
+PharoCAExternalProtocolTest >> testIDEBrowseValidatesClassAndMethodBeforeHeadlessAvailabilityGate [
+	| response |
+	self assert: (protocol methodNames includes: 'ide.browse').
+	self assert: ((protocol helloResult at: 'features') includes: 'ideNavigation').
+	self assert: ((Smalltalk tools toolNamed: #browser) respondsTo: #openOnClass:).
+	self assert: ((Smalltalk tools toolNamed: #browser) respondsTo: #openOnClass:selector:).
+
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'class'.
+		'className' -> 'PharoCAConfiguration'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'ide_unavailable'.
+
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'method'.
+		'className' -> 'PharoCAConfiguration'.
+		'side' -> 'instance'.
+		'selector' -> 'systemPrompt'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'ide_unavailable'.
+
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'method'.
+		'className' -> 'PharoCAConfiguration'.
+		'side' -> 'class'.
+		'selector' -> 'new'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'ide_unavailable'
+]
+
+{ #category : 'tests-060' }
+PharoCAExternalProtocolTest >> testIDEBrowseRejectsInvalidOrMissingTargetsWithoutEvaluation [
+	| response |
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'class'.
+		'className' -> 'DefinitelyMissingPCAClass060'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'class_not_found'.
+
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'method'.
+		'className' -> 'PharoCAConfiguration'.
+		'side' -> 'instance'.
+		'selector' -> 'definitelyMissingPCASelector060'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'method_not_found'.
+
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'method'.
+		'className' -> 'PharoCAConfiguration'.
+		'side' -> 'metaclass'.
+		'selector' -> 'new'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'invalid_params'.
+
+	response := protocol handleRequest: (self request: 'ide.browse' params: ({
+		'kind' -> 'workspace'.
+		'className' -> 'PharoCAConfiguration'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'invalid_params'
+]

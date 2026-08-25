@@ -20,6 +20,9 @@ PharoCAConfigurationTest >> testDefaults [
 	self assert: (configuration systemPrompt includesSubstring: 'browse/search').
 	self assert: (configuration systemPrompt includesSubstring: 'tool_search/tool_enable').
 	self assert: (configuration systemPrompt includesSubstring: 'debugging/profiling').
+	self assert: (configuration systemPrompt includesSubstring: 'pharo://class/Class').
+	self assert: (configuration systemPrompt includesSubstring: 'pharo://method/Class/instance/selector').
+	self assert: (configuration systemPrompt includesSubstring: 'URL-encode path parts').
 	self assert: configuration systemPrompt size < 1200
 ]
 
