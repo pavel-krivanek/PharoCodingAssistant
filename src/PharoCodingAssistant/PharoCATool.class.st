@@ -109,3 +109,14 @@ PharoCATool class >> requiresWorkspace [
 
 { #category : 'testing' }
 PharoCATool class >> isAbstract [ ^ self = PharoCATool or: [ self = PharoCAWorkspaceTool ] ]
+
+{ #category : 'evaluation' }
+PharoCATool class >> withEvaluationLocalHintDo: aBlock [
+	^ [ aBlock value ] on: Error do: [ :error |
+		| description |
+		description := error description.
+		((description includesSubstring: 'Undeclared variable named') and: [ description includesSubstring: 'DoIt' ])
+			ifFalse: [ error pass ].
+		Error signal: description,
+			'. DoIt local temporaries are supported when declared at the beginning, for example | x y | x := 1. y := 2. x + y. Temporaries are scoped to this evaluation call and do not persist across tool calls.' ]
+]

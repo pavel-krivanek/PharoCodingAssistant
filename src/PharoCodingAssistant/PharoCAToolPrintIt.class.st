@@ -16,7 +16,7 @@ PharoCAToolPrintIt class >> execute: args [
 PharoCAToolPrintIt class >> execute: args context: context [
 	| code printed |
 	code := args at: 'code'.
-	printed := (Smalltalk compiler evaluate: code) printString.
+	printed := (self withEvaluationLocalHintDo: [ Smalltalk compiler evaluate: code ]) printString.
 	context
 		recordChangeKind: #opaqueEvaluation
 		target: 'Smalltalk image'
@@ -40,7 +40,7 @@ PharoCAToolPrintIt class >> executionMode [ ^ #exclusiveMutation ]
 PharoCAToolPrintIt class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'evaluate_and_print'
-		description: 'Evaluates Pharo code and returns the printString of the result.'
+		description: 'Evaluates one complete Pharo DoIt and returns its printString. Explicit local temporaries such as | x y | and multiple statements are supported within this call; temporaries do not persist across calls.'
 		parameters: { 'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'code' }. 'type' -> 'object' } asDictionary
 ]
 

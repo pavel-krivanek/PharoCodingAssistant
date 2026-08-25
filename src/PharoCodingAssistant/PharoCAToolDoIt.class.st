@@ -16,7 +16,7 @@ PharoCAToolDoIt class >> execute: args [
 PharoCAToolDoIt class >> execute: args context: context [
 	| code |
 	code := args at: 'code'.
-	Smalltalk compiler evaluate: code.
+	self withEvaluationLocalHintDo: [ Smalltalk compiler evaluate: code ].
 	context
 		recordChangeKind: #opaqueEvaluation
 		target: 'Smalltalk image'
@@ -39,7 +39,7 @@ PharoCAToolDoIt class >> executionMode [ ^ #exclusiveMutation ]
 PharoCAToolDoIt class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'evaluate'
-		description: 'Evaluates Pharo code (DoIt). Returns status only.'
+		description: 'Evaluates one complete Pharo DoIt. Explicit local temporaries such as | x y | and multiple statements are supported within this call; temporaries do not persist across calls. Returns status only.'
 		parameters: { 'properties' -> { 'code' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'code' }. 'type' -> 'object' } asDictionary
 ]
 

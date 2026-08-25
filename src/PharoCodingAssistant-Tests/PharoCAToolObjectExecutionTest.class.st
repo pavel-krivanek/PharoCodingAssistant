@@ -101,3 +101,13 @@ PharoCAToolObjectExecutionTest >> testHandlesDoNotCrossSessionScopes [
 	cross := registry executeNamed: 'object_summary' arguments: { 'handle' -> handle } asDictionary context: secondContext.
 	self deny: (cross at: 'ok')
 ]
+
+{ #category : 'tests' }
+PharoCAToolObjectExecutionTest >> testEvaluateExpressionSupportsDoItLocalTemporaries [
+	| result |
+	result := self fullRegistry
+		executeNamed: 'evaluate_expression'
+		arguments: { 'code' -> '| x y | x := 40. y := 2. x + y' } asDictionary.
+	self assert: (result at: 'ok').
+	self assert: ((result at: 'result') at: 'printString') equals: '42'
+]

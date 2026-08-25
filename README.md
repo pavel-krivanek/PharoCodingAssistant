@@ -669,6 +669,8 @@ The settings schema recognizes these tool profiles:
 
 Since iteration 055, Pharo evaluation is deliberately part of the normal `coding` profile. A coding agent must be able to execute expressions/DoIts while investigating and validating live-image behavior. Use `read-only` when evaluation must be prohibited, and `tools.exclude` when only selected evaluation tools should be removed.
 
+`evaluate`, `evaluate_and_print`, and `evaluate_expression` accept complete DoIts, including explicit local temporaries (`| x y |`) and multiple statements. Those temporaries are lexical to one tool invocation and deliberately do not persist between separate calls; combine dependent statements in one DoIt, or use `evaluate_expression` object handles for live objects that must be referenced later. Undeclared-variable errors include this guidance.
+
 A project can select one through `settings.json`:
 
 ```json

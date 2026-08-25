@@ -19,7 +19,7 @@ PharoCAToolEvaluateExpression class >> executionMode [ ^ #exclusiveMutation ]
 PharoCAToolEvaluateExpression class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'evaluate_expression'
-		description: 'Evaluates a Pharo expression with OpalEvaluator and returns timing, class, bounded printString, and an opaque live-object handle.'
+		description: 'Evaluates one complete Pharo DoIt/expression with OpalEvaluator and returns timing, class, bounded printString, and a live-object handle. Explicit | x y | temporaries and multiple statements are supported within this call; temporaries do not persist across calls.'
 		parameters: {
 			'type' -> 'object'.
 			'properties' -> { 'code' -> { 'type' -> 'string'. 'maxLength' -> 50000 } asDictionary } asDictionary.
@@ -45,7 +45,7 @@ PharoCAToolEvaluateExpression class >> execute: args context: context [
 	code isEmpty ifTrue: [ Error signal: 'Code must not be empty' ].
 	context checkActive.
 	started := Time millisecondClockValue.
-	object := OpalEvaluator new evaluate: code.
+	object := self withEvaluationLocalHintDo: [ OpalEvaluator new evaluate: code ].
 	elapsed := Time millisecondClockValue - started.
 	context checkActive.
 	handle := context requireObjectHandleRegistry add: object.
