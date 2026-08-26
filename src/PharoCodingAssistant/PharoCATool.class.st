@@ -21,6 +21,12 @@ PharoCATool class >> isEnabled [
 	^ true
 ]
 
+{ #category : 'definition' }
+PharoCATool class >> isAdvertisedToModel [
+	"Compatibility/internal tools may override this while remaining executable through the registry."
+	^ true
+]
+
 
 { #category : 'execution' }
 PharoCATool class >> execute: args context: aContext [

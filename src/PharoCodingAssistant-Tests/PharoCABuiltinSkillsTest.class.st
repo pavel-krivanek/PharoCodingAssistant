@@ -37,7 +37,9 @@ PharoCABuiltinSkillsTest >> testSmalltalkCoreIsActiveButEmbeddedInBasePrompt [
 	self assert: core embeddedInSystemPrompt.
 	self assert: (agent skillRegistry activeSkillNamesForSession: session) equals: #('Smalltalk Core').
 	self assert: (agent skillRegistry instructionSourcesForSession: session) isEmpty.
-	self assert: (agent configuration systemPrompt includesSubstring: 'DoIts return only the final expression')
+	self assert: (agent configuration systemPrompt includesSubstring: 'DoIts return only the final expression').
+	self assert: (PharoCABuiltinSkills smalltalkCore instructions includesSubstring: 'do not synthesize accessor methods').
+	self assert: (PharoCABuiltinSkills smalltalkCore instructions includesSubstring: 'on: Error do:')
 ]
 
 { #category : 'tests' }
@@ -121,4 +123,15 @@ PharoCABuiltinSkillsTest >> testSpec2RecommendsBrowseAndUIPacks [
 	packs := PharoCABuiltinSkills spec2 recommendedToolPacks.
 	self assert: (packs includes: 'browse').
 	self assert: (packs includes: 'ui')
+]
+
+
+{ #category : 'tests-068' }
+PharoCABuiltinSkillsTest >> testSpec2DocumentsLifecycleAndDynamicLabelVerificationPath [
+	| text |
+	text := PharoCABuiltinSkills spec2 instructions.
+	self assert: (text includesSubstring: 'Do not manually call these lifecycle hooks').
+	self assert: (text includesSubstring: 'countLabel label:').
+	self assert: (text includesSubstring: 'write a focused SUnit regression').
+	self assert: (text includesSubstring: 'Enable `ui` only when visual verification is needed')
 ]

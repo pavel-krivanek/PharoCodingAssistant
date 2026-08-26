@@ -461,8 +461,8 @@ PharoCAAgent >> progressGuidanceInstructionSourceForRun: run [
 					(self isExplorationToolName: name)
 						ifTrue: [ explorationCount := explorationCount + 1 ]
 						ifFalse: [ explorationCounting := false ] ] ] ].
-	explorationCount >= 8 ifTrue: [
-		content := explorationCount asString, ' consecutive browse/evaluation calls occurred without a recorded code/image change. If enough evidence exists, implement the smallest known working change now. Avoid optional architecture/API exploration; use an active domain skill and structured tools for any specific unresolved question.'.
+	explorationCount >= 6 ifTrue: [
+		content := 'Exploration budget reached: ', explorationCount asString, ' consecutive browse/evaluation calls occurred without a recorded code/image change. In the next response, implement the smallest known working change. If one specific fact genuinely blocks implementation, make at most one targeted browse call first; do not continue general API/architecture exploration.'.
 		^ (PharoCAInstructionSource named: 'exploration-streak' content: content)
 			kind: #runtime;
 			priority: 1000;

@@ -177,22 +177,27 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 { #category : 'accessing' }
 PharoCAToolRegistry >> definitions [
 	"Compatibility projection retained for pre-016 clients. The agent uses llmDefinitions."
-	^ (self enabledTools collect: [ :tool | tool toolDefinition ]) asArray
+	^ ((self advertisedToolsForSession: nil) collect: [ :tool | tool toolDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> llmDefinitions [
-	^ (self enabledTools collect: [ :tool | tool llmDefinition ]) asArray
+	^ ((self advertisedToolsForSession: nil) collect: [ :tool | tool llmDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> llmDefinitionsForSession: aSession [
-	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
+	^ ((self advertisedToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> definitionsForSession: aSession [
-	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
+	^ ((self advertisedToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
+]
+
+{ #category : 'accessing' }
+PharoCAToolRegistry >> advertisedToolsForSession: aSession [
+	^ (self enabledToolsForSession: aSession) select: [ :tool | tool isAdvertisedToModel ]
 ]
 
 { #category : 'accessing' }
@@ -500,11 +505,54 @@ PharoCAToolRegistry >> selectorSuggestionsFor: selector receiver: receiver limit
 ]
 
 { #category : 'diagnostics' }
+PharoCAToolRegistry >> keywordPrefixSelectorFor: selector receiver: receiver [
+	| source firstColon secondColon prefix |
+	source := selector asString.
+	firstColon := source findString: ':' startingAt: 1.
+	firstColon = 0 ifTrue: [ ^ nil ].
+	secondColon := source findString: ':' startingAt: firstColon + 1.
+	secondColon = 0 ifTrue: [ ^ nil ].
+	prefix := (source copyFrom: 1 to: firstColon) asSymbol.
+	(receiver respondsTo: prefix) ifFalse: [ ^ nil ].
+	^ prefix
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> slotMatchingSelector: selector receiver: receiver [
+	| selectorName |
+	selector numArgs = 0 ifFalse: [ ^ nil ].
+	selectorName := selector asString.
+	^ receiver class allSlots
+		detect: [ :slot | slot name asString = selectorName ]
+		ifNone: [ nil ]
+]
+
+{ #category : 'diagnostics' }
 PharoCAToolRegistry >> messageNotUnderstoodDetailsFor: error [
-	| selector receiver suggestions details |
+	| selector receiver suggestions details slot prefixSelector |
 	selector := error message selector.
 	receiver := error receiver.
 	suggestions := self selectorSuggestionsFor: selector receiver: receiver limit: 5.
+	slot := self slotMatchingSelector: selector receiver: receiver.
+	slot ifNotNil: [
+		^ {
+			'diagnosticType' -> 'slot_without_accessor'.
+			'receiverClass' -> receiver class name asString.
+			'selector' -> selector asString.
+			'slotName' -> slot name asString.
+			'suggestions' -> suggestions.
+			'hint' -> ('The receiver class has an instance slot named #', slot name asString, ' but no accessor method #', selector asString, '. Slots are not automatically messages. Inside methods of the class use the bare slot name; for external access compile an accessor such as `', selector asString, ' ^ ', slot name asString, '`.')
+		} asDictionary ].
+	prefixSelector := self keywordPrefixSelectorFor: selector receiver: receiver.
+	prefixSelector ifNotNil: [
+		^ {
+			'diagnosticType' -> 'probable_keyword_message_chaining'.
+			'receiverClass' -> receiver class name asString.
+			'selector' -> selector asString.
+			'knownPrefixSelector' -> prefixSelector asString.
+			'suggestions' -> suggestions.
+			'hint' -> ('Smalltalk combines adjacent keyword parts into one selector. This receiver understands #', prefixSelector asString, ' but not #', selector asString, '. If you intended a second keyword message, parenthesize the first keyword expression before sending the next one.')
+		} asDictionary ].
 	details := {
 		'diagnosticType' -> 'message_not_understood'.
 		'receiverClass' -> receiver class name asString.

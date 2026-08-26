@@ -48,6 +48,8 @@ PharoCAToolRegistryTest >> testDefinitionsContainOnlyEnabledTools [
 	names := registry definitions collect: [ :definition |
 		(definition at: 'function') at: 'name' ].
 	self deny: (names includes: 'remove_class').
+	self deny: (names includes: 'search_tools').
+	self assert: (names includes: 'search_classes').
 	self assert: (names includes: 'evaluate').
 	self assert: (names includes: 'evaluate_and_print').
 	self assert: names size equals: 26
@@ -256,4 +258,34 @@ PharoCAToolRegistryTest >> testCompileSyntaxDiagnosticIncludesPointHintAndLocati
 	self assert: (details at: 'diagnosticType') equals: 'syntax_error'.
 	self assert: (details includesKey: 'line').
 	self assert: ((details at: 'hint') includesSubstring: '260 @ 180')
+]
+
+
+{ #category : 'tests-068' }
+PharoCAToolRegistryTest >> testMessageNotUnderstoodIdentifiesSlotWithoutAccessor [
+	| result details |
+	result := self fullRegistry
+		executeNamed: 'evaluate_and_print'
+		arguments: { 'code' -> 'PharoCATestFixtureChild new childSlot' } asDictionary.
+	self deny: (result at: 'ok').
+	details := (result at: 'error') at: 'details'.
+	self assert: (details at: 'diagnosticType') equals: 'slot_without_accessor'.
+	self assert: (details at: 'receiverClass') equals: 'PharoCATestFixtureChild'.
+	self assert: (details at: 'slotName') equals: 'childSlot'.
+	self assert: ((details at: 'hint') includesSubstring: 'Slots are not automatically messages').
+	self assert: ((details at: 'hint') includesSubstring: 'childSlot ^ childSlot')
+]
+
+{ #category : 'tests-068' }
+PharoCAToolRegistryTest >> testMessageNotUnderstoodIdentifiesProbableKeywordMessageChaining [
+	| result details |
+	result := self fullRegistry
+		executeNamed: 'evaluate_and_print'
+		arguments: { 'code' -> '(#abcdef includesSubstring: ''abc'' or: [ false ])' } asDictionary.
+	self deny: (result at: 'ok').
+	details := (result at: 'error') at: 'details'.
+	self assert: (details at: 'diagnosticType') equals: 'probable_keyword_message_chaining'.
+	self assert: (details at: 'selector') equals: 'includesSubstring:or:'.
+	self assert: (details at: 'knownPrefixSelector') equals: 'includesSubstring:'.
+	self assert: ((details at: 'hint') includesSubstring: 'parenthesize')
 ]

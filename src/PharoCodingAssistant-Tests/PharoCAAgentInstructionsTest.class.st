@@ -246,6 +246,8 @@ PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesInstructionsB
 	self assert: (system includesSubstring: 'browse and ui packs are recommended but remain lazy').
 	names := (provider requests first toolDefinitions collect: #name) asSet.
 	self deny: (names includes: 'ui_list_windows').
+	self deny: (names includes: 'search_tools').
+	self assert: (names includes: 'search_classes').
 	self assert: (names includes: 'list_methods').
 	self assert: (names includes: 'tool_enable').
 	activeSkills := agent skillRegistry activeSkillNamesForSession: session.
@@ -270,12 +272,12 @@ PharoCAAgentInstructionsTest >> testUnrelatedPromptDoesNotAutoActivateSpec2 [
 
 
 { #category : 'tests-066' }
-PharoCAAgentInstructionsTest >> testEightReadOnlyExplorationCallsInjectImplementationNudge [
+PharoCAAgentInstructionsTest >> testSixReadOnlyExplorationCallsInjectImplementationDirective [
 	| agent run source result |
 	agent := PharoCA new.
 	run := PharoCARun new.
 	result := PharoCAToolResult success: { 'status' -> 'ok' } asDictionary.
-	8 timesRepeat: [
+	6 timesRepeat: [
 		run emit: #toolExecutionCompleted payload: {
 			'name' -> 'get_method'.
 			'result' -> result
@@ -283,8 +285,9 @@ PharoCAAgentInstructionsTest >> testEightReadOnlyExplorationCallsInjectImplement
 	source := agent progressGuidanceInstructionSourceForRun: run.
 	self assert: source notNil.
 	self assert: source name equals: 'exploration-streak'.
-	self assert: (source content includesSubstring: 'consecutive browse/evaluation calls').
-	self assert: (source content includesSubstring: 'implement the smallest known working change now')
+	self assert: (source content includesSubstring: 'Exploration budget reached').
+	self assert: (source content includesSubstring: 'In the next response, implement the smallest known working change').
+	self assert: (source content includesSubstring: 'at most one targeted browse call')
 ]
 
 

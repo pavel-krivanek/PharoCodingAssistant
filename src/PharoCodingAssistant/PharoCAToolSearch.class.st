@@ -14,6 +14,9 @@ PharoCAToolSearch class >> capability [ ^ #session ]
 PharoCAToolSearch class >> executionMode [ ^ #parallelSafe ]
 
 { #category : 'definition' }
+PharoCAToolSearch class >> isAdvertisedToModel [ ^ false ]
+
+{ #category : 'definition' }
 PharoCAToolSearch class >> toolPack [ ^ #catalog ]
 
 { #category : 'definition' }

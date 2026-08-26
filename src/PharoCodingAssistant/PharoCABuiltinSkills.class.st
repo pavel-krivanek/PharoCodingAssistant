@@ -28,7 +28,7 @@ PharoCABuiltinSkills class >> smalltalkCore [
 PharoCABuiltinSkills class >> smalltalkCoreInstructions [
 	^ '## Smalltalk Core
 
-Precedence is unary, then binary, then keyword; `(...)` groups expressions and `[...]` creates blocks. A bare method identifier is a variable reference; use `self selector` for a unary send. DoIts support `| temporaries |` and multiple statements, but evaluation returns only the final expression. Construct Points as `x @ y`. Respect instance/class side diagnostics. Prefer structured browse/process/UI/test tools over reflection DoIts. SUnit subclasses `TestCase`. After relevant tests pass, finish unless a concrete defect remains.'
+Precedence is unary, then binary, then keyword; `(...)` groups expressions and `[...]` creates blocks. Slots/instance variables do not synthesize accessor methods: inside the class use the bare slot name, while `object slotName` requires a compiled accessor. Use `self selector` for a unary send. Handle exceptions with `[ risky ] on: Error do: [ :ex | ... ]`. DoIts support `| temporaries |` and multiple statements, but evaluation returns only the final expression. Construct Points as `x @ y`. Respect instance/class side diagnostics. Prefer structured tools over reflection DoIts. SUnit subclasses `TestCase`. After relevant tests pass, finish unless a concrete defect remains.'
 ]
 
 { #category : 'skills' }
@@ -102,6 +102,7 @@ Use this skill for Pharo desktop UI built with Spec2. The browse and ui packs ar
 A normal application/composite presenter subclasses `SpPresenter` (or `SpPresenterWithModel` when appropriate). Do **not** subclass `SpWindowPresenter`; `open`/`asWindow` creates that wrapper. Separate responsibilities:
 - `initializePresenters` creates/configures child presenters.
 - `connectPresenters` installs callbacks/connections.
+- Do not manually call these lifecycle hooks during normal use or verification; Spec2 invokes them.
 - `defaultLayout` answers the layout tree.
 - `initializeWindow:` configures title/extent/window behavior when needed.
 - `setModelBeforeInitialization:` is appropriate when construction depends on an external model.
@@ -123,7 +124,7 @@ MyPresenter >> defaultLayout
         yourself
 ```
 
-Keep domain logic outside widget callbacks where possible; callbacks should delegate to presenter/model behavior.
+Keep domain logic outside widget callbacks where possible; callbacks should delegate to presenter/model behavior. For a dynamic label, the normal mutable API is direct and live: `countLabel label: ''Count: '', count asString`. Do not spend exploratory calls proving this common pattern.
 
 ### Layouts
 Use `SpBoxLayout` for ordinary vertical/horizontal composition, `SpGridLayout` for aligned rows/columns, and paned/notebook layouts only when the interaction requires them. Prefer layout constraints over manual pixel positioning. Do not create widgets in `defaultLayout`; create them once in `initializePresenters` and compose them in the layout.
@@ -135,7 +136,7 @@ Factories on `SpPresenter` (`newButton`, `newTextInput`, `newLabel`, `newList`, 
 Connect events once; avoid installing duplicate handlers during refresh. UI mutation belongs on the UI process. For asynchronous work, keep long computation off the UI process and marshal only the presentation update back to it.
 
 ### Verification
-Spec2 evolves. Before emitting unfamiliar code, browse/search the concrete presenter class and selector in the running image. Actual working methods in the target image are authoritative over stale comments. Reuse an existing presenter pattern from the target package when one exists. After the minimal code compiles, prefer a small SUnit regression plus structured ui window/screenshot tools over repeated evaluator probes.'
+Spec2 evolves. Before emitting unfamiliar code, browse/search the concrete presenter class and selector in the running image. Actual working methods in the target image are authoritative over stale comments. Reuse an existing presenter pattern from the target package when one exists. After the minimal code compiles, write a focused SUnit regression for behavior. Enable `ui` only when visual verification is needed, then use `ui_list_windows`/`ui_screenshot` instead of adapter/reflection DoIts. Do not manually re-run Spec2 lifecycle hooks during verification.'
 ]
 
 { #category : 'skills' }
