@@ -53,7 +53,8 @@ PharoCAToolCatalogTest >> testDefaultSessionExposesCatalogAndCoreButNotBrowsePac
 	agent := PharoCA new.
 	session := agent newSession.
 	names := ((agent toolRegistry llmDefinitionsForSession: session) collect: [ :each | each name ]) asSet.
-	self assert: (names includes: 'tool_search').
+	self deny: (names includes: 'search_tools').
+	self assert: (names includes: 'search_classes').
 	self assert: (names includes: 'tool_enable').
 	self assert: (names includes: 'tool_disable').
 	self assert: (names includes: 'list_packages').
@@ -68,7 +69,7 @@ PharoCAToolCatalogTest >> testToolSearchFindsInactiveBrowseToolWithMetadata [
 	| provider agent result raw item |
 	provider := PharoCATestLLMProvider new.
 	provider
-		queueResponse: (self toolCallCompletionNamed: 'tool_search' arguments: '{"query":"get_method"}' id: 'search-1');
+		queueResponse: (self toolCallCompletionNamed: 'search_tools' arguments: '{"query":"get_method"}' id: 'search-1');
 		queueResponse: (self completionWith: 'done').
 	agent := PharoCA new provider: provider; yourself.
 	agent prompt: 'find a tool'.
@@ -176,7 +177,8 @@ PharoCAToolCatalogTest >> testCatalogPackCannotBeDisabledAndRemainsReachable [
 	self deny: (result at: 'ok').
 	self assert: ((result at: 'error') at: 'type') equals: 'tool_execution_error'.
 	names := self advertisedNamesInRequest: provider requests second.
-	self assert: (names includes: 'tool_search').
+	self deny: (names includes: 'search_tools').
+	self assert: (names includes: 'search_classes').
 	self assert: (names includes: 'tool_enable').
 	self assert: (names includes: 'tool_disable')
 ]
@@ -214,7 +216,7 @@ PharoCAToolCatalogTest >> testToolSearchCanFilterByPackAndReportsActivePacks [
 		arguments: Dictionary new
 		session: session.
 	self assert: ((result at: 'tools') collect: [ :each | each at: 'name' ]) asSet
-		equals: #('get_method' 'get_class_summary' 'list_package_tags' 'search_classes' 'search_selectors' 'search_method_source' 'find_references' 'find_slot_accesses' 'find_pragmas' 'get_package_dependencies' 'get_method_ast' 'search_ast' 'ast_rewrite_preview') asSet.
+		equals: #('get_method' 'get_class_summary' 'list_package_tags' 'search_selectors' 'search_method_source' 'find_references' 'find_slot_accesses' 'find_pragmas' 'get_package_dependencies' 'get_method_ast' 'search_ast' 'ast_rewrite_preview') asSet.
 	self assert: ((result at: 'tools') allSatisfy: [ :each | (each at: 'pack') = 'browse' and: [ (each at: 'active') not ] ]).
 	self assert: (result at: 'activePacks') equals: #('catalog' 'core')
 ]
@@ -312,4 +314,48 @@ PharoCAToolCatalogTest >> testToolSearchResultMakesCatalogScopeExplicit [
 	self assert: (result at: 'scope') equals: 'assistant_tool_catalog'.
 	self assert: ((result at: 'hint') includesSubstring: 'Pharo image code').
 	self assert: (result at: 'tools') isEmpty
+]
+
+{ #category : 'tests-066' }
+PharoCAToolCatalogTest >> testToolSearchAndLegacyAliasRemainExecutableButAreNotAdvertised [
+	| registry names result |
+	registry := PharoCAToolRegistry default.
+	names := registry definitions collect: [ :definition | (definition at: 'function') at: 'name' ].
+	self deny: (names includes: 'search_tools').
+	self deny: (names includes: 'tool_search').
+	result := registry executeNamed: 'tool_search' arguments: { 'query' -> 'compile' } asDictionary.
+	self deny: (result at: 'ok').
+	self assert: ((result at: 'error') at: 'type') equals: 'tool_execution_error'.
+	self assert: (((result at: 'error') at: 'message') includesSubstring: 'active agent run')
+]
+
+
+{ #category : 'tests-068' }
+PharoCAToolCatalogTest >> testDefaultSearchSurfacePrefersLiveImageClassSearch [
+	| agent session names result |
+	agent := PharoCA new.
+	session := agent newSession.
+	names := (agent toolRegistry llmDefinitionsForSession: session) collect: #name.
+	self assert: (names includes: 'search_classes').
+	self deny: (names includes: 'search_tools').
+	result := agent toolRegistry executeNamed: 'search_classes' arguments: {
+		'query' -> 'SpPresenter'.
+		'match' -> 'exact'
+	} asDictionary.
+	self assert: (result at: 'ok').
+	self assert: ((((result at: 'result') at: 'classes') collect: [ :each | each at: 'className' ]) includes: 'SpPresenter')
+]
+
+
+{ #category : 'tests-070' }
+PharoCAToolCatalogTest >> testSavedImageStyleStaleAgentToolRegistrySelfHealsDefaultCatalog [
+	| agent stale names |
+	agent := PharoCA new.
+	stale := PharoCAToolRegistry new.
+	agent toolRegistry: stale.
+	names := agent toolRegistry tools collect: [ :tool | tool toolName asString ].
+	self assert: (names includes: 'compile_methods').
+	self assert: (names includes: 'ui_screenshot').
+	self assert: (names includes: 'search_classes').
+	self assert: agent toolRegistry tools size equals: PharoCAToolRegistry defaultToolClassNames size
 ]

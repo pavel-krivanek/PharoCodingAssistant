@@ -102,7 +102,7 @@ PharoCASessionPersistenceTest >> testSkillAndOptInExtensionStateRestoreButTransi
 	restoredAgent registerExtension: persistent2.
 	restoredAgent registerExtension: transient2.
 	restoredSession := restoredAgent restoreSessionFromString: snapshot.
-	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restoredSession) equals: #('persisted-skill').
+	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restoredSession) asSet equals: #('Smalltalk Core' 'persisted-skill') asSet.
 	self assert: (restoredAgent toolRegistry activePackNamesForSession: restoredSession) equals: #('browse' 'catalog' 'core').
 	provider2 := PharoCATestLLMProvider new.
 	provider2 queueResponse: (self completionWith: 'two').
@@ -219,4 +219,48 @@ PharoCASessionPersistenceTest >> testOlderSnapshotWithoutToolPackStateRestoresDe
 	restoredAgent := PharoCA new.
 	restoredSession := restoredAgent restoreSessionFromString: (STONJSON toString: dictionary).
 	self assert: (restoredAgent toolRegistry activePackNamesForSession: restoredSession) equals: #('catalog' 'core')
+]
+
+{ #category : 'tests-070' }
+PharoCASessionPersistenceTest >> testSnapshotPersistsOptionalSkillsButNotMandatoryCoreDerivedState [
+	| agent session dictionary activeSkills |
+	agent := PharoCA new.
+	session := agent newSession.
+	agent skillRegistry activateNamed: 'Spec2' session: session.
+	dictionary := agent sessionPersistence dictionaryForSession: session agent: agent.
+	activeSkills := (dictionary at: 'agentState') at: 'activeSkills'.
+	self assert: activeSkills equals: #('Spec2').
+	self deny: (activeSkills includes: 'Smalltalk Core')
+]
+
+{ #category : 'tests-070' }
+PharoCASessionPersistenceTest >> testOldSnapshotRestoresIntoSavedImageStyleStaleAgentRegistry [
+	| source session dictionary state restoredAgent restored |
+	source := PharoCA new.
+	session := source newSession.
+	dictionary := source sessionPersistence dictionaryForSession: session agent: source.
+	state := dictionary at: 'agentState'.
+	state at: 'activeSkills' put: #('Smalltalk Core' 'Spec2').
+	restoredAgent := PharoCA new.
+	restoredAgent skillRegistry: PharoCASkillRegistry new.
+	restored := restoredAgent sessionPersistence sessionFromDictionary: dictionary agent: restoredAgent.
+	self assert: (restoredAgent skillRegistry activeSkillNamesForSession: restored) asSet
+		equals: #('Smalltalk Core' 'Spec2') asSet
+]
+
+{ #category : 'tests-070' }
+PharoCASessionPersistenceTest >> testRestoreIgnoresObsoleteSkillAndToolPackNamesWhileKeepingCurrentDefaults [
+	| source session dictionary state restoredAgent restored activePacks activeSkills |
+	source := PharoCA new.
+	session := source newSession.
+	dictionary := source sessionPersistence dictionaryForSession: session agent: source.
+	state := dictionary at: 'agentState'.
+	state at: 'activeSkills' put: #('Smalltalk Core' 'removed-skill').
+	state at: 'activeToolPacks' put: #('catalog' 'removed-pack').
+	restoredAgent := PharoCA new.
+	restored := restoredAgent sessionPersistence sessionFromDictionary: dictionary agent: restoredAgent.
+	activeSkills := restoredAgent skillRegistry activeSkillNamesForSession: restored.
+	activePacks := restoredAgent toolRegistry activePackNamesForSession: restored.
+	self assert: activeSkills equals: #('Smalltalk Core').
+	self assert: activePacks asSet equals: restoredAgent toolRegistry class defaultActivePackNames asSet
 ]

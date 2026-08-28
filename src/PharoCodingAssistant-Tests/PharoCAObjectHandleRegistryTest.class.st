@@ -62,3 +62,15 @@ PharoCAObjectHandleRegistryTest >> testClearingSessionStateReleasesHandlesAndTes
 	self assert: tests size equals: 1.
 	self deny: (tools testRunStoreForSession: session) identicalTo: tests
 ]
+
+
+{ #category : 'tests-065' }
+PharoCAObjectHandleRegistryTest >> testAddOrReuseReturnsStableHandleForIdenticalObject [
+	| registry object first second |
+	registry := PharoCAObjectHandleRegistry new.
+	object := Object new.
+	first := registry addOrReuse: object.
+	second := registry addOrReuse: object.
+	self assert: first equals: second.
+	self assert: registry size equals: 1
+]

@@ -22,8 +22,11 @@ PharoCASessionPersistence >> dictionaryForSession: aSession agent: anAgentOrNil 
 	| state |
 	state := Dictionary new.
 	anAgentOrNil ifNotNil: [
+		| persistedSkills |
+		persistedSkills := (anAgentOrNil skillRegistry activeSkillsForSession: aSession)
+			reject: [ :skill | skill embeddedInSystemPrompt ].
 		state
-			at: 'activeSkills' put: (anAgentOrNil skillRegistry activeSkillNamesForSession: aSession);
+			at: 'activeSkills' put: ((persistedSkills collect: [ :skill | skill name ]) asArray);
 			at: 'activeToolPacks' put: (anAgentOrNil toolRegistry activePackNamesForSession: aSession);
 			at: 'extensions' put: (anAgentOrNil extensionRegistry persistentStateForSession: aSession) ].
 	^ {

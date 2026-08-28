@@ -683,28 +683,34 @@ A project can select one through `settings.json`:
 
 Specific tools can also be allowed or excluded with `tools.allow` and `tools.exclude` arrays.
 
-The default system prompt gives the model a compact map of the available families — browse/search, evaluation, edit/format/compile, tests/quality, debugging/profiling, refactoring, Tonel/Git/workspace operations, Transcript and screenshots. It explicitly distinguishes `tool_search` (the **assistant tool catalog only**) from Pharo image browsing/search tools, and uses `tool_enable` for lazy packs. Active skill guidance is a trusted starting point for common APIs; the agent should browse when uncertain or after a failure rather than re-verifying every standard selector. Concrete Pharo classes and methods remain IDE-clickable in Markdown using the `pharo://` link forms described below.
+The default system prompt gives the model a compact map of the available tool families and embeds the always-active **Smalltalk Core** invariants: unary/binary/keyword precedence, `(...)` grouping versus `[...]` blocks, `x @ y` Point construction, slot-versus-accessor semantics, canonical `on:do:` exception handling, bare-variable versus `self selector` sends, and final-expression DoIt results. The obvious default search route is now `search_classes`, which searches the **live Pharo image**. Harness-tool catalog search remains executable for compatibility/external callers but is intentionally not advertised to the LLM. Active skill guidance is a trusted starting point for common APIs; browse only when uncertain or after a concrete failure. After six consecutive read-only browse/evaluation calls without a recorded mutation, the runtime instruction explicitly directs the next response to implement the smallest known working change, permitting at most one targeted browse call for a genuine blocker. Concrete Pharo classes and methods remain IDE-clickable in Markdown using the `pharo://` link forms described below.
+
+Runtime guidance is deliberately **cache-friendly**. Frequently changing run-state hints such as exploration counts, repeated-failure recovery, finite iteration-budget warnings, and post-test completion guidance are not rewritten into the first system message. They are sent as one ephemeral harness-guidance message at the current tail and are not persisted in the session. This keeps the accumulated prompt prefix stable across ordinary agent iterations, allowing compatible local servers to reuse their prompt/KV cache instead of repeatedly prefilling the whole conversation. Stable project/package instructions and active skill bodies remain in the normal instruction prefix; deliberate skill/tool-surface changes can still cause a one-time prefix change.
 
 Iteration 057 adds the default-core `format_code` tool. It parses method or expression source with Pharo's native `OCParser` and returns `formattedCode` without changing the image. Formatted text is cursor-paginated, so large methods remain bounded.
+
+Iteration 066 adds the default-core `compile_methods` tool beside `compile_method`. `compile_method` intentionally accepts one method source; `compile_methods` accepts up to 50 method definitions for one class/side, with an optional batch protocol and per-method overrides. The batch is atomic: every source precompiles before installation, duplicate selectors are rejected, cancellation is checked during preflight/install, and an unexpected installation failure restores all methods already changed by that batch. Each installed method still gets its own change-journal record and per-method result row.
+
+Iteration 068 enriches `MessageNotUnderstood` recovery before generic fuzzy-selector suggestions. If a missing unary selector exactly matches an installed slot, the tool returns `slot_without_accessor` and explains that slots are variables, not automatically generated messages. If a missing multi-keyword selector has a valid receiver prefix such as `collect:` or `includesSubstring:`, the tool returns `probable_keyword_message_chaining` and explains that adjacent keyword parts form one selector; parenthesize the first send when a second keyword message was intended. `set_class_comment` also removes one accidental outer pair of Smalltalk comment delimiters supplied inside the JSON string and reports that normalization.
 
 ### Tool packs and lazy discovery
 
 The tool registry can contain more tools than are advertised to the model on every request. The original tool set remains in the default `core` pack, while larger/newer families can be activated lazily per durable session. The `catalog` pack is always active and contains:
 
-- `tool_search` — search the complete **assistant/harness tool catalog**, including inactive packs; it does not search Pharo classes, selectors, methods, source, packages, or documentation. Results identify their scope as `assistant_tool_catalog` and point the model to image browse tools. An optional `task` hint produces deterministic task-aware ranking and every row reports `rankScore`, current `profile`, and `availabilityReason`;
+- `search_tools` — compatibility/external search over the complete **assistant/harness tool catalog**, including inactive packs. It remains registered and executable (and `tool_search` remains an invocation-only legacy alias), but neither name is advertised to the LLM in iteration 068 because local models repeatedly misused harness search as source/API search;
 - `tool_enable` — activate a pack for the current session;
 - `tool_disable` — deactivate a pack for the current session (the `catalog` pack itself cannot be disabled).
 
 Pack activation is session-scoped and persisted with the session. It changes the schemas advertised on the **next model request**, including the next round of the same running agent. It does not bypass the selected tool profile or explicit `tools.allow`/`tools.exclude` policy.
 
-Iteration 055 also put an explicit context budget around this catalog architecture. After iteration 058 the supplied image has 137 registered tools whose parameter schemas total 25,328 serialized JSON characters before lazy-pack filtering, while the default active surface remains exactly 25 definitions (8,670 serialized definition characters). Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 25 tools / 10,000 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
+Iteration 055 also put an explicit context budget around this catalog architecture. In iteration 068 the supplied image still has **143 registered tools** whose parameter schemas total **26,333 serialized JSON characters** before lazy filtering, while the default advertised surface remains **26 definitions / 9,845 serialized characters**. `search_tools` leaves that default surface and live-image `search_classes` moves into `core`, so the count stays flat. Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 26 tools / 10,000 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
 
 The lazy `browse` pack contains the Pharo-native browsing and structural-search tools. Iteration 048 introduced the pack and iteration 049 expanded it substantially:
 
 - `get_method` — exact local method source plus package/tag/protocol/pragma metadata;
 - `get_class_summary` — superclass, package/tag, slots, class variables, traits and method/subclass counts;
 - `list_package_tags` — real Pharo package tags and class counts without mutating package organization;
-- `search_classes` — class-name search with exact/prefix/substring and package/tag filters;
+- `search_classes` — **default-core** class-name search over the live image with exact/prefix/substring and package/tag filters;
 - `search_selectors` — implemented-selector search with package/tag/class filters and implementation counts;
 - `search_method_source` — paginated live-image source search returning compact snippets and metadata; class/package/tag filters narrow the candidate methods *before* source scanning, so scoped searches do not traverse source for the complete image;
 - `find_references` — references to an installed Smalltalk global binding;
@@ -715,7 +721,7 @@ The lazy `browse` pack contains the Pharo-native browsing and structural-search 
 - `search_ast` — structural code search using Pharo's native `OCParseTreeSearcher` pattern language, including native pattern-capture bindings;
 - `ast_rewrite_preview` — parses a fresh copy of one installed method and previews an `OCParseTreeRewriter` expression/method rewrite without mutating live code.
 
-The agent can therefore discover a capability with `tool_search`, enable `browse`, and use these tools on the next model request — including the next round of the same run — without carrying every future tool schema in every ordinary request.
+The model starts with live-image `search_classes` plus the compact core browsing/editing surface. When a domain skill or a concrete failure indicates a deeper capability, `tool_enable` activates `browse` or another lazy pack for the next model request. Harness-tool catalog search is still available to external/compatibility callers, but it no longer competes with image search for the model's attention.
 
 #### `quality` pack
 
@@ -931,19 +937,27 @@ iceberg_commit repository:"MyProject" message:"Implement parser fix"
 iceberg_push repository:"MyProject" remote:"origin"
 ```
 
-### Artifact and UI screenshot pack
+### Artifact and UI/window pack
 
-Iteration 054 adds an ephemeral binary artifact store and a lazy `ui` pack:
+Iteration 054 adds an ephemeral binary artifact store and a lazy `ui` pack. Iteration 065 turns the original window listing into a reusable **window-control surface**:
 
 ```text
 tool_enable pack:"ui"
 ui_list_windows limit:20
+ui_window_info handle:"obj-1"
+ui_window_activate handle:"obj-1"
+ui_window_set_state handle:"obj-1" state:"collapsed"
+ui_window_set_state handle:"obj-1" state:"expanded"
+ui_window_set_bounds handle:"obj-1" x:40 y:60 width:900 height:700
 ui_screenshot target:"window" handle:"obj-1"
+ui_window_close handle:"obj-1"
 ```
 
-`ui_screenshot` can capture `world`, a listed `window`, an arbitrary Morph object handle, or a bounded rectangle in World coordinates. It renders through Morphic and encodes PNG directly in memory. The textual tool result contains only a compact artifact descriptor; image bytes are kept in the environment-scoped `PharoCAArtifactStore` and served to the local browser at `/artifacts/<artifactId>`. Default storage is bounded by entry count, per-artifact bytes, total bytes and a fixed lifetime, so repeated screenshots cannot grow the image indefinitely.
+`ui_list_windows` enumerates the live Morphic `SystemWindow`s and returns **stable session-scoped handles**: listing the same live window again reuses its existing handle and refreshes the handle TTL. Rows include title, bounds, visibility/collapse/open state, concrete window class, and model/presenter class metadata when available. `ui_window_info` refreshes that metadata. `ui_window_activate` calls the real `SystemWindow>>activate` / `takeKeyboardFocus`; `ui_window_set_state` uses `collapse` / `expand`; `ui_window_set_bounds` changes selected geometry while preserving omitted dimensions; and `ui_window_close` requests the normal close protocol, with `force:true` explicitly opting into direct deletion. Window mutations execute on the Morphic UI process and are recorded as runtime-only changes. A handle is rejected once it no longer identifies an open `SystemWindow`, and non-window Morph handles cannot be used with the window tools.
 
-The static web UI recognizes image artifact descriptors and shows them inline in the corresponding tool row. No screenshot base64 crosses the normal WebSocket/tool-result path and no frontend build dependency is introduced.
+`ui_screenshot` uses the same handles and can capture `world`, a listed `window`, an arbitrary Morph object handle, or a bounded rectangle in World coordinates. It renders through Morphic and encodes PNG directly in memory. The textual tool result contains only a compact artifact descriptor; image bytes are kept in the environment-scoped `PharoCAArtifactStore` and served to the local browser at `/artifacts/<artifactId>`. Default storage is bounded by entry count, per-artifact bytes, total bytes and a fixed lifetime, so repeated screenshots cannot grow the image indefinitely. Iteration 067 makes the environment artifact-store accessor self-healing: a long-lived/migrated `PharoCAEnvironment` whose artifact-store slot is nil lazily recreates the store, preventing `ui_screenshot` from leaking an internal `defaultLifetimeMilliseconds`-to-nil failure.
+
+The static web UI recognizes image artifact descriptors and shows them inline in the corresponding tool row. No screenshot base64 crosses the normal WebSocket/tool-result path and no frontend build dependency is introduced. Skills and tool packs are deliberately separate: activating or auto-routing the built-in `Spec2` skill loads its lightweight guidance only. The `browse` and `ui` packs remain lazy and are enabled with `tool_enable` only when image browsing or live-window/screenshot operations are actually needed.
 
 ### Direct method editing
 
@@ -963,7 +977,7 @@ Markdown files under `instructions/` are loaded as instruction sources. `system.
 Each `skills/*.md` file becomes a named skill. The filename without `.md` is the skill name. The first non-empty Markdown line is used as the short description when possible; the complete file is the lazily activated skill body.
 
 
-The default agent also registers four built-in domain skills adapted from ChatPharo's MIT-licensed `AI-ChatPharo-Skills`: `Collections`, `Spec2`, `Roassal`, and `Bloc`. They are inactive by default and their bodies enter model context only after `activate_skill`; `list_skills` can find them by class/selector keywords as well as by name/description. Their inactive descriptions are not repeated as an ephemeral discovery block on every provider request—the compact system prompt already names the built-ins—so small-context models do not pay a permanent metadata cost. Dynamic workspace/extension skills still receive ephemeral discovery descriptions. The Bloc skill explicitly verifies availability because Bloc is not part of the supplied base image.
+The default agent registers five built-in skills adapted from/alongside ChatPharo's MIT-licensed `AI-ChatPharo-Skills`: **`Smalltalk Core`**, `Collections`, `Spec2`, `Roassal`, and `Bloc`. The compact base prompt explains what these skills are for: Smalltalk Core supplies language invariants, Collections covers idioms, Spec2 covers desktop UI, Roassal covers visualization/charts, and Bloc covers scene-graph UI. Skills are lightweight domain playbooks, **not tool packs**. `Smalltalk Core` is active for every new/restored/forked session; its embedded invariant sheet now explicitly says that slots do **not** synthesize accessor messages and gives the canonical `[ ... ] on: Error do: [ :ex | ... ]` form. The four domain skills remain lazy in ordinary sessions; exact word-bounded names in a user prompt may auto-activate the corresponding guidance before the first provider request. Recommended tool packs remain lazy under both automatic and manual skill activation and are merely reported; use `tool_enable` when the capability is actually needed. The Spec2 skill now explicitly forbids manually invoking `initializePresenters`/`connectPresenters` during normal use or verification, documents `label:` as the normal live dynamic-label API, and directs post-compile verification to focused SUnit plus lazy `ui_list_windows`/`ui_screenshot` rather than adapter/reflection DoIts. Dynamic workspace/extension skills still receive ephemeral discovery descriptions. The Bloc skill explicitly verifies availability because Bloc is not part of the supplied base image.
 
 In the browser/command interface:
 
@@ -986,6 +1000,8 @@ to list them in the command interface.
 ## Sessions
 
 Sessions are durable by default and stored under the global session repository (`~/.pharo-ca/sessions` with the default resource loader).
+
+Iteration 066 persists a `runTerminal` entry whenever a run completes, fails, reaches an explicitly configured iteration guard, or is cancelled. The entry records run id, terminal status/reason, iteration count and bounded error description; user cancellation is explicitly recorded as `userInterrupt`. This makes an exported interrupted session self-describing instead of merely ending in an inactive state. Key class/method browse results also include session provenance (`createdThisSession`, `modifiedThisSession`, and `lastChangeId` when applicable), derived from the existing change journal, so an agent can distinguish pre-existing image state from work performed in the current session.
 
 Typical Smalltalk operations:
 
@@ -1294,3 +1310,12 @@ Each URI path component should be URL-encoded; this is important for binary sele
 These links are navigation-only. They cannot contain Smalltalk expressions, arbitrary selectors to execute, or generic object messages. Missing targets produce structured `class_not_found` / `method_not_found` errors, malformed links are not made reactive, and headless images return `ide_unavailable`.
 
 The default system prompt explicitly asks the coding agent to use these links whenever it names existing Pharo classes or methods, so normal answers become a useful navigation surface without expanding the LLM tool catalog.
+
+
+## Iteration 070 — saved-image restore resilience and active-skill UI
+
+Saved Pharo images can retain `PharoCAAgent`/registry instances created by an older package version. The agent now lazily synchronizes those existing skill/tool registries against the current built-in catalogs without replacing session-scoped state; the repair is revision-gated so current objects take a fast path after the one-time upgrade synchronization. Session restore treats `Smalltalk Core` and current default packs as derived mandatory defaults, persists only optional active skills, and ignores obsolete skill/pack names rather than rejecting the entire snapshot. `Smalltalk Core` cannot be deactivated.
+
+The external protocol now exposes `skills.list`, and the static Zinc browser shows active skills as compact top-bar chips that refresh on session changes and skill activation/deactivation events. This is status only: skill guidance remains lightweight and `ui`/`browse` tool packs remain lazy.
+
+Fresh supplied Pharo 14 gates for the frozen source are **893/893** normally and **893/893** with explicit shuffle seed `70070`. See `ARCHITECTURE-070.md` and `VALIDATION-070.txt`.

@@ -73,3 +73,17 @@ PharoCAToolCompileMethodTest >> testInvalidSourcePropagatesCompilationError [
 		} asDictionary ]
 		raise: Error
 ]
+
+
+{ #category : 'tests-065' }
+PharoCAToolCompileMethodTest >> testNormalizesAccidentalSmalltalkQuotesAroundProtocolArgument [
+	| result |
+	result := PharoCAToolCompileMethod execute: {
+		'className' -> 'PharoCATestFixtureChild'.
+		'source' -> 'pharoCATestCompiledProtocol ^ true'.
+		'protocol' -> '''pharo-ca-generated-test'''
+	} asDictionary.
+	self assert: (result at: 'protocol') equals: 'pharo-ca-generated-test'.
+	self assert: (result at: 'protocolNormalizedFrom') equals: '''pharo-ca-generated-test'''.
+	self assert: (PharoCATestFixtureChild methodNamed: #pharoCATestCompiledProtocol) protocolName equals: 'pharo-ca-generated-test'
+]

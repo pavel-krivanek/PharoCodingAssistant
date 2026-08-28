@@ -288,6 +288,7 @@ PharoCAExternalProtocol >> dispatchMethod: method params: params eventsDo: event
 	method = 'agents.setDefault' ifTrue: [ ^ self agentsSetDefault: params ].
 	method = 'agents.setModel' ifTrue: [ ^ self agentsSetModel: params ].
 	method = 'agents.setReasoningEffort' ifTrue: [ ^ self agentsSetReasoningEffort: params ].
+	method = 'skills.list' ifTrue: [ ^ self skillsList: params ].
 	method = 'inspect.open' ifTrue: [ ^ self inspectOpen: params ].
 	method = 'ide.browse' ifTrue: [ ^ self ideBrowse: params ].
 	method = 'models.list' ifTrue: [ ^ self modelsList ].
@@ -445,6 +446,7 @@ PharoCAExternalProtocol >> methodNames [
 	^ #(
 		'protocol.hello' 'state.snapshot' 'runtime.profile.get' 'runtime.profile.save' 'credentials.status' 'credentials.mapEnvironment'
 		'agents.list' 'agents.get' 'agents.create' 'agents.setDefault' 'agents.setModel' 'agents.setReasoningEffort'
+		'skills.list'
 		'inspect.open' 'ide.browse'
 		'models.list' 'models.get' 'models.register'
 		'providers.list' 'providers.get' 'providers.registerOpenAICompatible' 'providers.discoverModels'

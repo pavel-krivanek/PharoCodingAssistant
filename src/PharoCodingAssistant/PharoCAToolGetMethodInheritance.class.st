@@ -9,24 +9,40 @@ Class {
 
 { #category : 'definition' }
 PharoCAToolGetMethodInheritance class >> execute: args [
-	| aClass classSymbol side targetClass selSymbol implementorClass source page scope |
+	^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
+{ #category : 'execution' }
+PharoCAToolGetMethodInheritance class >> execute: args context: context [
+	| aClass classSymbol side targetClass selSymbol implementorClass source page scope result provenance target |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
+		^ self classNotFoundResultFor: (args at: 'className') ].
 	side := args at: 'side' ifAbsent: [ 'instance' ].
 	targetClass := (side = 'class') ifTrue: [ aClass class ] ifFalse: [ aClass ].
 	selSymbol := (args at: 'selector') asSymbol.
 	implementorClass := targetClass whichClassIncludesSelector: selSymbol.
 	implementorClass ifNil: [
-		^ {
+		| oppositeSide oppositeTarget oppositeImplementor notFound |
+		oppositeSide := side = 'class' ifTrue: [ 'instance' ] ifFalse: [ 'class' ].
+		oppositeTarget := oppositeSide = 'class' ifTrue: [ aClass class ] ifFalse: [ aClass ].
+		oppositeImplementor := oppositeTarget whichClassIncludesSelector: selSymbol.
+		notFound := {
 			'error' -> ('Selector not found in hierarchy: ', (args at: 'selector')).
 			'className' -> aClass name.
 			'side' -> side
-		} asDictionary ].
+		} asDictionary.
+		oppositeImplementor ifNotNil: [
+			notFound
+				at: 'diagnosticType' put: 'side_mismatch';
+				at: 'foundSide' put: oppositeSide;
+				at: 'implementedIn' put: oppositeImplementor name;
+				at: 'hint' put: ('Selector exists on ', oppositeSide, ' side; retry with side: ', oppositeSide, '.') ].
+		^ notFound ].
 	source := implementorClass sourceCodeAt: selSymbol.
 	scope := 'get_method_inheritance|', aClass name, '|', side, '|', selSymbol asString.
 	page := PharoCAToolPagination pageText: source arguments: args scope: scope.
-	^ {
+	result := {
 		'className' -> aClass name.
 		'side' -> side.
 		'selector' -> selSymbol asString.
@@ -35,7 +51,11 @@ PharoCAToolGetMethodInheritance class >> execute: args [
 		'lookupOrder' -> ((targetClass withAllSuperclasses collect: [ :c | c name ]) asArray).
 		'source' -> (page at: 'text').
 		'sourceRange' -> (page at: 'range')
-	} asDictionary
+	} asDictionary.
+	target := self methodTargetForClass: aClass side: side selector: selSymbol.
+	provenance := self sessionProvenanceForTarget: target createdKinds: #(methodAdded) context: context.
+	result addAll: provenance.
+	^ result
 ]
 
 

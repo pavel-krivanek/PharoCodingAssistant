@@ -42,3 +42,19 @@ PharoCAToolSetClassCommentTest >> testMissingClassReturnsError [
 		} asDictionary)
 		contains: 'Class not found'
 ]
+
+
+{ #category : 'tests-068' }
+PharoCAToolSetClassCommentTest >> testStripsOnePairOfSmalltalkCommentDelimitersFromJSONString [
+	| original result |
+	original := PharoCATestFixtureChild comment.
+	[
+		result := PharoCAToolSetClassComment execute: {
+			'className' -> 'PharoCATestFixtureChild'.
+			'comment' -> '"wrapped fixture comment"'
+		} asDictionary.
+		self assert: PharoCATestFixtureChild comment equals: 'wrapped fixture comment'.
+		self assert: (result at: 'comment') equals: 'wrapped fixture comment'.
+		self assert: (result at: 'normalizedSmalltalkDelimiters')
+	] ensure: [ PharoCATestFixtureChild comment: original ]
+]

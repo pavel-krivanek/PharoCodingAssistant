@@ -19,7 +19,7 @@ PharoCAToolUIListWindows class >> executionMode [ ^ #sequential ]
 PharoCAToolUIListWindows class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'ui_list_windows'
-		description: 'Lists current Morphic SystemWindows with session-scoped object handles, titles and bounds. Enable the ui tool pack first.'
+		description: 'Lists current Morphic SystemWindows with reusable session-scoped handles and metadata. Use the returned handle with ui_window_info/ui_window_activate/ui_window_set_state/ui_window_set_bounds/ui_window_close or ui_screenshot.'
 		parameters: {
 			'type' -> 'object'.
 			'properties' -> {
@@ -41,17 +41,11 @@ PharoCAToolUIListWindows class >> execute: args context: context [
 	windows := PharoCAUICapture windows.
 	rows := PharoCAUICapture onUIProcess: [
 		windows collectWithIndex: [ :window :index |
-			| bounds |
-			bounds := window bounds.
-			{
-				'index' -> index.
-				'handle' -> (registry add: window).
-				'title' -> ([ window labelString ] on: Error do: [ :ignored | '' ]).
-				'bounds' -> (PharoCAUICapture boundsDictionaryFor: bounds).
-				'visible' -> ([ window visible ] on: Error do: [ :ignored | true ]).
-				'collapsed' -> ([ window isCollapsed ] on: Error do: [ :ignored | false ]).
-				'modelClass' -> ([ window model ifNil: [ nil ] ifNotNil: [ :model | model class name asString ] ] on: Error do: [ :ignored | nil ])
-			} asDictionary ] ].
+			| handle row |
+			handle := registry addOrReuse: window.
+			row := PharoCAUIWindowTool windowMetadataFor: window handle: handle.
+			row at: 'index' put: index.
+			row ] ].
 	page := PharoCAToolPagination pageItems: rows arguments: args scope: 'ui_list_windows'.
 	^ {
 		'windows' -> (page at: 'items').

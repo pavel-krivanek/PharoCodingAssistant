@@ -45,6 +45,19 @@ PharoCAAgentInstructionsTest >> systemContentFromPayload: payload [
 	^ ((payload at: 'messages') detect: [ :each | (each at: 'role') = 'system' ]) at: 'content'
 ]
 
+{ #category : 'private' }
+PharoCAAgentInstructionsTest >> runtimeGuidanceContentFromPayload: payload [
+	| messages message |
+	messages := payload at: 'messages'.
+	message := messages reverse
+		detect: [ :each |
+			(each at: 'role') = 'user' and: [
+				((each at: 'content' ifAbsent: [ '' ]) ifNil: [ '' ]) includesSubstring: '[Harness runtime guidance' ] ]
+		ifNone: [ nil ].
+	message ifNil: [ ^ '' ].
+	^ message at: 'content'
+]
+
 { #category : 'tests' }
 PharoCAAgentInstructionsTest >> testRegisteredProjectInstructionIsBudgetedButNotStoredInDurableSession [
 	| provider agent session run payload system |
@@ -157,9 +170,9 @@ PharoCAAgentInstructionsTest >> testActiveSkillBodyCannotBypassContextBudget [
 	self assert: provider payloads isEmpty
 ]
 
-{ #category : 'tests-064' }
-PharoCAAgentInstructionsTest >> testConfiguredIterationBudgetAddsEphemeralNearLimitGuidanceAndTrace [
-	| provider agent run payload system event |
+{ #category : 'tests-069' }
+PharoCAAgentInstructionsTest >> testConfiguredIterationBudgetAddsEphemeralTailGuidanceAndTrace [
+	| provider agent run payload system runtime event |
 	provider := PharoCATestLLMProvider new.
 	provider queueResponse: (self completionWith: 'done').
 	agent := PharoCA new provider: provider; yourself.
@@ -167,11 +180,16 @@ PharoCAAgentInstructionsTest >> testConfiguredIterationBudgetAddsEphemeralNearLi
 	run := agent run: 'finish this'.
 	payload := provider payloads first.
 	system := self systemContentFromPayload: payload.
-	self assert: (system includesSubstring: 'Execution budget: this is model request 1 of 2').
+	runtime := self runtimeGuidanceContentFromPayload: payload.
+	self deny: (system includesSubstring: 'Execution budget:').
+	self assert: (runtime includesSubstring: 'Execution budget: this is model request 1 of 2').
+	self assert: ((payload at: 'messages') last at: 'content') equals: runtime.
 	self deny: ((run session messagesEndingAt: run session currentLeafId) anySatisfy: [ :each |
 		each textContent includesSubstring: 'Execution budget:' ]).
 	event := run events detect: [ :each | each type = #instructionsPrepared ].
 	self assert: ((event payload at: 'additionalSourceNames') includes: 'iteration-budget').
+	self assert: ((event payload at: 'runtimeSourceNames') includes: 'iteration-budget').
+	self deny: ((event payload at: 'stableAdditionalSourceNames') includes: 'iteration-budget').
 	self assert: (event payload at: 'maxIterations') equals: 2
 ]
 
@@ -187,4 +205,143 @@ PharoCAAgentInstructionsTest >> testUnlimitedDefaultDoesNotInjectIterationBudget
 	self deny: (system includesSubstring: 'Execution budget:').
 	event := run events detect: [ :each | each type = #instructionsPrepared ].
 	self assert: (event payload at: 'maxIterations') isNil
+]
+
+{ #category : 'tests-069' }
+PharoCAAgentInstructionsTest >> testThreeConsecutiveToolFailuresInjectNoProgressTailGuidanceWithoutStoppingRun [
+	| provider agent run firstSystem fourthSystem fourthRuntime |
+	provider := PharoCATestLLMProvider new.
+	provider
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"1 definitelyMissingSelector"}' id: 'e1');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"2 definitelyMissingSelector"}' id: 'e2');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"3 definitelyMissingSelector"}' id: 'e3');
+		queueResponse: (self completionWith: 'recovered').
+	agent := PharoCA new provider: provider; yourself.
+	run := agent run: 'diagnose carefully'.
+	self assert: run status equals: #completed.
+	self assert: run answer equals: 'recovered'.
+	firstSystem := self systemContentFromPayload: provider payloads first.
+	fourthSystem := self systemContentFromPayload: provider payloads fourth.
+	fourthRuntime := self runtimeGuidanceContentFromPayload: provider payloads fourth.
+	self assert: fourthSystem equals: firstSystem.
+	self deny: (fourthSystem includesSubstring: 'consecutive tool calls failed').
+	self assert: (fourthRuntime includesSubstring: 'consecutive tool calls failed').
+	self assert: (fourthRuntime includesSubstring: 'Reassess the approach')
+]
+
+{ #category : 'tests-065' }
+PharoCAAgentInstructionsTest >> testPassingRunTestsInjectsCompletionGuidanceOnNextModelRequest [
+	| agent run source result |
+	agent := PharoCA new.
+	run := PharoCARun new.
+	result := PharoCAToolResult success: {
+		'status' -> 'passed'.
+		'runCount' -> 2.
+		'failureCount' -> 0.
+		'errorCount' -> 0
+	} asDictionary.
+	run emit: #toolExecutionCompleted payload: {
+		'name' -> 'run_tests'.
+		'result' -> result
+	} asDictionary.
+	source := agent progressGuidanceInstructionSourceForRun: run.
+	self assert: source notNil.
+	self assert: source name equals: 'verification-complete'.
+	self assert: (source content includesSubstring: 'Relevant run_tests verification is passing').
+	self assert: (source content includesSubstring: 'Prefer answering now').
+	run emit: #changeRecorded payload: Dictionary new.
+	self assert: (agent progressGuidanceInstructionSourceForRun: run) isNil
+]
+
+{ #category : 'tests-067' }
+PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesInstructionsButKeepsRecommendedPacksLazy [
+	| provider agent session run system names activeSkills activePacks |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	run := agent run: 'create a Spec2 counter application' inSession: session.
+	self assert: run status equals: #completed.
+	self assert: provider requests size equals: 1.
+	system := self systemContentFromPayload: provider payloads first.
+	self assert: (system includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
+	self assert: (system includesSubstring: 'browse and ui packs are recommended but remain lazy').
+	names := (provider requests first toolDefinitions collect: #name) asSet.
+	self deny: (names includes: 'ui_list_windows').
+	self deny: (names includes: 'search_tools').
+	self assert: (names includes: 'search_classes').
+	self assert: (names includes: 'list_methods').
+	self assert: (names includes: 'tool_enable').
+	activeSkills := agent skillRegistry activeSkillNamesForSession: session.
+	self assert: (activeSkills includes: 'Smalltalk Core').
+	self assert: (activeSkills includes: 'Spec2').
+	activePacks := agent toolRegistry activePackNamesForSession: session.
+	self assert: activePacks equals: #('catalog' 'core').
+	self assert: (run events anySatisfy: [ :event | event type = #skillAutoActivated ])
+]
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testUnrelatedPromptDoesNotAutoActivateSpec2 [
+	| provider agent session |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	agent run: 'rename a plain domain class' inSession: session.
+	self deny: ((agent skillRegistry activeSkillNamesForSession: session) includes: 'Spec2').
+	self assert: (agent toolRegistry activePackNamesForSession: session) equals: #('catalog' 'core')
+]
+
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testSixReadOnlyExplorationCallsInjectImplementationDirective [
+	| agent run source result |
+	agent := PharoCA new.
+	run := PharoCARun new.
+	result := PharoCAToolResult success: { 'status' -> 'ok' } asDictionary.
+	6 timesRepeat: [
+		run emit: #toolExecutionCompleted payload: {
+			'name' -> 'get_method'.
+			'result' -> result
+		} asDictionary ].
+	source := agent progressGuidanceInstructionSourceForRun: run.
+	self assert: source notNil.
+	self assert: source name equals: 'exploration-streak'.
+	self assert: (source content includesSubstring: 'Exploration budget reached').
+	self assert: (source content includesSubstring: 'In the next response, implement the smallest known working change').
+	self assert: (source content includesSubstring: 'at most one targeted browse call')
+]
+
+
+{ #category : 'tests-066' }
+PharoCAAgentInstructionsTest >> testAutomaticSkillMatchingUsesNameBoundaries [
+	| provider agent session |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	agent run: 'diagnose a blocking process' inSession: session.
+	self deny: ((agent skillRegistry activeSkillNamesForSession: session) includes: 'Bloc')
+]
+
+{ #category : 'tests-069' }
+PharoCAAgentInstructionsTest >> testChangingRuntimeGuidanceNeverRewritesStableSystemPrefix [
+	| provider agent fourthSystem fifthSystem fourthRuntime fifthRuntime |
+	provider := PharoCATestLLMProvider new.
+	provider
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"1 definitelyMissingSelector"}' id: 'e1');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"2 definitelyMissingSelector"}' id: 'e2');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"3 definitelyMissingSelector"}' id: 'e3');
+		queueResponse: (self toolCallCompletionNamed: 'evaluate_and_print' arguments: '{"code":"4 definitelyMissingSelector"}' id: 'e4');
+		queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	agent run: 'diagnose carefully'.
+	fourthSystem := self systemContentFromPayload: provider payloads fourth.
+	fifthSystem := self systemContentFromPayload: provider payloads fifth.
+	fourthRuntime := self runtimeGuidanceContentFromPayload: provider payloads fourth.
+	fifthRuntime := self runtimeGuidanceContentFromPayload: provider payloads fifth.
+	self assert: fourthSystem equals: fifthSystem.
+	self assert: (fourthRuntime includesSubstring: '3 consecutive tool calls failed').
+	self assert: (fifthRuntime includesSubstring: '4 consecutive tool calls failed').
+	self deny: fourthRuntime equals: fifthRuntime
 ]

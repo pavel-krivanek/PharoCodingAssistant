@@ -9,10 +9,15 @@ Class {
 
 { #category : 'definition' }
 PharoCAToolListMethods class >> execute: args [
+	^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
+{ #category : 'execution' }
+PharoCAToolListMethods class >> execute: args context: context [
 	| aClass classSymbol side targetClass protocol selectors methods page scope |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
+		^ self classNotFoundResultFor: (args at: 'className') ].
 	side := args at: 'side' ifAbsent: [ 'instance' ].
 	targetClass := (side = 'class') ifTrue: [ aClass class ] ifFalse: [ aClass ].
 	protocol := args at: 'protocol' ifAbsent: [ nil ].
@@ -22,12 +27,18 @@ PharoCAToolListMethods class >> execute: args [
 		proto := targetClass protocolNamed: protocol ifAbsent: [ nil ].
 		selectors := proto ifNil: [ #() ] ifNotNil: [ proto methodSelectors ] ].
 	methods := (selectors asSortedCollection collect: [ :sel |
-		| cat |
+		| cat item provenance |
 		cat := (targetClass methodNamed: sel asSymbol) protocolName.
-		{
+		item := {
 			'selector' -> sel asString.
 			'protocol' -> (cat ifNil: [ '' ])
-		} asDictionary
+		} asDictionary.
+		provenance := self
+			sessionProvenanceForTarget: (self methodTargetForClass: aClass side: side selector: sel)
+			createdKinds: #(methodAdded)
+			context: context.
+		item addAll: provenance.
+		item
 	]) asArray.
 	scope := 'list_methods|', aClass name, '|', side, '|', (protocol ifNil: [ '' ]).
 	page := PharoCAToolPagination pageItems: methods arguments: args scope: scope.

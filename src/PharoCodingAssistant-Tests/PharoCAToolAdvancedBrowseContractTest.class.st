@@ -21,10 +21,12 @@ PharoCAToolAdvancedBrowseContractTest >> new049Tools [
 ]
 
 { #category : 'tests' }
-PharoCAToolAdvancedBrowseContractTest >> testEvery049ToolIsReadOnlyParallelAndInBrowsePack [
+PharoCAToolAdvancedBrowseContractTest >> testEvery049ToolIsReadOnlyParallelAndUsesExpectedPack [
 	self new049Tools do: [ :tool |
 		self assert: tool capability equals: #inspection.
-		self assert: tool executionMode equals: #parallelSafe.
+		self assert: tool executionMode equals: #parallelSafe ].
+	self assert: PharoCAToolSearchClasses toolPack equals: #core.
+	(self new049Tools copyWithout: PharoCAToolSearchClasses) do: [ :tool |
 		self assert: tool toolPack equals: #browse ]
 ]
 
@@ -36,7 +38,10 @@ PharoCAToolAdvancedBrowseContractTest >> testEvery049ToolIsExplicitlyRegisteredA
 	self new049Tools do: [ :tool | self assert: (registered includes: tool) ].
 	catalogNames := ((registry searchCatalog: '' pack: 'browse' arguments: { 'limit' -> 200 } asDictionary session: nil) at: 'tools')
 		collect: [ :each | each at: 'name' ].
-	self new049Tools do: [ :tool | self assert: (catalogNames includes: tool toolName asString) ]
+	(self new049Tools copyWithout: PharoCAToolSearchClasses) do: [ :tool | self assert: (catalogNames includes: tool toolName asString) ].
+	catalogNames := ((registry searchCatalog: '' pack: 'core' arguments: { 'limit' -> 200 } asDictionary session: nil) at: 'tools')
+		collect: [ :each | each at: 'name' ].
+	self assert: (catalogNames includes: PharoCAToolSearchClasses toolName asString)
 ]
 
 { #category : 'tests' }

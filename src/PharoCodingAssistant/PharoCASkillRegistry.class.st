@@ -2,11 +2,17 @@
 Class {
 	#name : 'PharoCASkillRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'skillsByName', 'skillNames', 'activeNamesBySessionId', 'mutex', 'discoveryCharacterBudget' ],
+	#instVars : [ 'skillsByName', 'skillNames', 'activeNamesBySessionId', 'mutex', 'discoveryCharacterBudget', 'builtinCatalogRevision' ],
 	#category : 'PharoCodingAssistant-Skills',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
 }
+
+
+{ #category : 'defaults' }
+PharoCASkillRegistry class >> builtinCatalogRevision [
+	^ 70
+]
 
 { #category : 'activation' }
 PharoCASkillRegistry >> activateNamed: aName session: aSession [
@@ -44,6 +50,7 @@ PharoCASkillRegistry >> clearStateForSession: aSession [
 { #category : 'activation' }
 PharoCASkillRegistry >> deactivateNamed: aName session: aSession [
 	| active removed |
+	aName asString = 'Smalltalk Core' ifTrue: [ ^ false ].
 	removed := false.
 	mutex wait.
 	[
@@ -115,12 +122,14 @@ PharoCASkillRegistry >> initialize [
 	skillNames := OrderedCollection new.
 	activeNamesBySessionId := Dictionary new.
 	mutex := Semaphore forMutualExclusion.
-	discoveryCharacterBudget := 4000
+	discoveryCharacterBudget := 4000.
+	builtinCatalogRevision := nil
 ]
 
 { #category : 'instructions' }
 PharoCASkillRegistry >> instructionSourcesForSession: aSession [
-	^ ((self activeSkillsForSession: aSession) collect: [ :each | each asInstructionSource ]) asArray
+	^ (((self activeSkillsForSession: aSession) reject: [ :each | each embeddedInSystemPrompt ])
+		collect: [ :each | each asInstructionSource ]) asArray
 ]
 
 { #category : 'registration' }
@@ -158,6 +167,25 @@ PharoCASkillRegistry >> skills [
 	^ (result asSortedCollection: [ :a :b | a name <= b name ]) asArray
 ]
 
+
+{ #category : 'registration' }
+PharoCASkillRegistry >> synchronizeBuiltinSkills: builtinSkills [
+	"Refresh built-in skill objects after an image/package upgrade while preserving session activation by name. The revision makes this a one-time repair after an upgrade."
+	builtinCatalogRevision = self class builtinCatalogRevision ifTrue: [ ^ self ].
+	mutex wait.
+	[
+		builtinCatalogRevision = self class builtinCatalogRevision ifFalse: [
+			builtinSkills do: [ :skill |
+				(skillsByName includesKey: skill name)
+					ifTrue: [ skillsByName at: skill name put: skill ]
+					ifFalse: [
+						skillsByName at: skill name put: skill.
+						skillNames add: skill name ] ].
+			builtinCatalogRevision := self class builtinCatalogRevision ]
+	] ensure: [ mutex signal ].
+	^ self
+]
+
 { #category : 'registration' }
 PharoCASkillRegistry >> unregisterNamed: aName [
 	| skill |
@@ -173,10 +201,20 @@ PharoCASkillRegistry >> unregisterNamed: aName [
 
 { #category : 'persistence' }
 PharoCASkillRegistry >> restoreActiveSkillNames: names forSession: aSession [
-	| normalized |
-	normalized := names collect: [ :each | each asString ].
-	normalized do: [ :name |
-		self skillNamed: name ifAbsent: [ Error signal: 'Cannot restore unknown active skill: ', name ] ].
+	| requested restored ignored core |
+	requested := (names collect: [ :each | each asString ]) asOrderedCollection.
+	core := self skillNamed: 'Smalltalk Core' ifAbsent: [ nil ].
+	(core notNil and: [ (requested includes: 'Smalltalk Core') not ]) ifTrue: [ requested add: 'Smalltalk Core' ].
+	restored := OrderedCollection new.
+	ignored := OrderedCollection new.
+	requested do: [ :name |
+		(self skillNamed: name ifAbsent: [ nil ])
+			ifNil: [ ignored add: name ]
+			ifNotNil: [ restored add: name ] ].
 	mutex wait.
-	[ activeNamesBySessionId at: aSession id put: normalized asSet ] ensure: [ mutex signal ]
+	[ activeNamesBySessionId at: aSession id put: restored asSet ] ensure: [ mutex signal ].
+	^ {
+		'restored' -> restored asArray.
+		'ignoredUnknown' -> ignored asArray
+	} asDictionary
 ]

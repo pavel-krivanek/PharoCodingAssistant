@@ -116,7 +116,8 @@ PharoCARunTest >> testRunInstanceVariableLayoutKeepsLegacyPrefixAndAppendsNewSlo
 		beforeFinishBlock beforeFinishDone completionClaimed telemetry).
 	names := PharoCARun instVarNames.
 	self assert: (names first: legacyPrefix size) equals: legacyPrefix.
-	self assert: names last equals: #inputMessage
+	self assert: (names at: legacyPrefix size + 1) equals: #inputMessage.
+	self assert: names last equals: #cancellationReason
 ]
 
 { #category : 'tests-033' }

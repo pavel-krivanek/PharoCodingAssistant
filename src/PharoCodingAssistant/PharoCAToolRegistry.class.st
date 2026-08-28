@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCAToolRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'toolsByName', 'toolNames', 'resultBudget', 'scheduler', 'environment', 'profile', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore', 'activePackNamesBySessionId', 'packMutex', 'objectHandleRegistriesBySessionId', 'testRunStoresBySessionId', 'transcriptBuffer', 'runtimeHandleRegistriesBySessionId' ],
+	#instVars : [ 'toolsByName', 'toolNames', 'resultBudget', 'scheduler', 'environment', 'profile', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore', 'activePackNamesBySessionId', 'packMutex', 'objectHandleRegistriesBySessionId', 'testRunStoresBySessionId', 'transcriptBuffer', 'runtimeHandleRegistriesBySessionId', 'defaultCatalogRevision' ],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
@@ -24,6 +24,12 @@ PharoCAToolRegistry class >> defaultInEnvironment: anEnvironment [
 { #category : 'defaults' }
 PharoCAToolRegistry class >> defaultActivePackNames [
 	^ #(catalog core)
+]
+
+
+{ #category : 'defaults' }
+PharoCAToolRegistry class >> defaultCatalogRevision [
+	^ 70
 ]
 
 { #category : 'defaults' }
@@ -129,9 +135,15 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolIcebergClone
 		PharoCAToolIcebergAddLocalRepository
 		PharoCAToolUIListWindows
+		PharoCAToolUIWindowInfo
+		PharoCAToolUIWindowActivate
+		PharoCAToolUIWindowSetState
+		PharoCAToolUIWindowSetBounds
+		PharoCAToolUIWindowClose
 		PharoCAToolUIScreenshot
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
+		PharoCAToolCompileMethods
 		PharoCAToolFormatCode
 		PharoCAToolQualityRules
 		PharoCAToolQualityCheck
@@ -171,22 +183,27 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 { #category : 'accessing' }
 PharoCAToolRegistry >> definitions [
 	"Compatibility projection retained for pre-016 clients. The agent uses llmDefinitions."
-	^ (self enabledTools collect: [ :tool | tool toolDefinition ]) asArray
+	^ ((self advertisedToolsForSession: nil) collect: [ :tool | tool toolDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> llmDefinitions [
-	^ (self enabledTools collect: [ :tool | tool llmDefinition ]) asArray
+	^ ((self advertisedToolsForSession: nil) collect: [ :tool | tool llmDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> llmDefinitionsForSession: aSession [
-	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
+	^ ((self advertisedToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> definitionsForSession: aSession [
-	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
+	^ ((self advertisedToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
+]
+
+{ #category : 'accessing' }
+PharoCAToolRegistry >> advertisedToolsForSession: aSession [
+	^ (self enabledToolsForSession: aSession) select: [ :tool | tool isAdvertisedToModel ]
 ]
 
 { #category : 'accessing' }
@@ -422,7 +439,7 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 				errorType: #tool_timeout
 				message: error description ]
 	] on: Error do: [ :error |
-		^ self executionErrorFor: error tool: tool ].
+		^ self executionErrorFor: error tool: tool arguments: arguments ].
 	envelope := self normalizeRawResult: raw.
 	[ serialized := STONJSON toString: envelope ]
 		on: Error
@@ -443,19 +460,151 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 ]
 
 { #category : 'private' }
-PharoCAToolRegistry >> executionErrorFor: error tool: tool [
+PharoCAToolRegistry >> executionErrorFor: error tool: tool arguments: arguments [
 	| description details |
 	description := error description.
 	details := nil.
-	(tool toolName = #compile_method and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
+	((#(compile_method compile_methods) includes: tool toolName) and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
 		details := {
 			'diagnosticType' -> 'undeclared_variable'.
 			'hint' -> 'A bare identifier in a method body is a variable reference. If you intended a unary message to the receiver, write self selector (for example self classToTest). Otherwise declare the temporary or instance variable.'
 		} asDictionary ].
+	((#(compile_method compile_methods) includes: tool toolName) and: [ description includesSubstring: 'SyntaxErrorNotice' ]) ifTrue: [
+		details := self syntaxErrorDetailsFor: description source: (arguments at: 'source' ifAbsent: [ '' ]) ].
+	(error isKindOf: MessageNotUnderstood) ifTrue: [
+		details := self messageNotUnderstoodDetailsFor: error ].
 	^ PharoCAToolResult
 		errorType: #tool_execution_error
 		message: description
 		details: details
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> commonPrefixLengthBetween: firstString and: secondString [
+	| limit index |
+	limit := firstString size min: secondString size.
+	index := 1.
+	[ index <= limit and: [ (firstString at: index) = (secondString at: index) ] ] whileTrue: [ index := index + 1 ].
+	^ index - 1
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> selectorSuggestionsFor: selector receiver: receiver limit: limit [
+	| query candidates prefix filtered sorted |
+	query := selector asString.
+	candidates := receiver class allSelectors collect: [ :each | each asString ].
+	prefix := query copyFrom: 1 to: (query size min: 3).
+	filtered := candidates select: [ :candidate |
+		(candidate beginsWith: prefix) or: [
+			(self commonPrefixLengthBetween: query and: candidate) >= 2 ] ].
+	sorted := filtered asSortedCollection: [ :a :b |
+		| aPrefix bPrefix |
+		aPrefix := self commonPrefixLengthBetween: query and: a.
+		bPrefix := self commonPrefixLengthBetween: query and: b.
+		aPrefix = bPrefix
+			ifTrue: [
+				(query size - a size) abs = (query size - b size) abs
+					ifTrue: [ a <= b ]
+					ifFalse: [ (query size - a size) abs < (query size - b size) abs ] ]
+			ifFalse: [ aPrefix > bPrefix ] ].
+	^ (sorted copyFrom: 1 to: (limit min: sorted size)) asArray
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> keywordPrefixSelectorFor: selector receiver: receiver [
+	| source firstColon secondColon prefix |
+	source := selector asString.
+	firstColon := source findString: ':' startingAt: 1.
+	firstColon = 0 ifTrue: [ ^ nil ].
+	secondColon := source findString: ':' startingAt: firstColon + 1.
+	secondColon = 0 ifTrue: [ ^ nil ].
+	prefix := (source copyFrom: 1 to: firstColon) asSymbol.
+	(receiver respondsTo: prefix) ifFalse: [ ^ nil ].
+	^ prefix
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> slotMatchingSelector: selector receiver: receiver [
+	| selectorName |
+	selector numArgs = 0 ifFalse: [ ^ nil ].
+	selectorName := selector asString.
+	^ receiver class allSlots
+		detect: [ :slot | slot name asString = selectorName ]
+		ifNone: [ nil ]
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> messageNotUnderstoodDetailsFor: error [
+	| selector receiver suggestions details slot prefixSelector |
+	selector := error message selector.
+	receiver := error receiver.
+	suggestions := self selectorSuggestionsFor: selector receiver: receiver limit: 5.
+	slot := self slotMatchingSelector: selector receiver: receiver.
+	slot ifNotNil: [
+		^ {
+			'diagnosticType' -> 'slot_without_accessor'.
+			'receiverClass' -> receiver class name asString.
+			'selector' -> selector asString.
+			'slotName' -> slot name asString.
+			'suggestions' -> suggestions.
+			'hint' -> ('The receiver class has an instance slot named #', slot name asString, ' but no accessor method #', selector asString, '. Slots are not automatically messages. Inside methods of the class use the bare slot name; for external access compile an accessor such as `', selector asString, ' ^ ', slot name asString, '`.')
+		} asDictionary ].
+	prefixSelector := self keywordPrefixSelectorFor: selector receiver: receiver.
+	prefixSelector ifNotNil: [
+		^ {
+			'diagnosticType' -> 'probable_keyword_message_chaining'.
+			'receiverClass' -> receiver class name asString.
+			'selector' -> selector asString.
+			'knownPrefixSelector' -> prefixSelector asString.
+			'suggestions' -> suggestions.
+			'hint' -> ('Smalltalk combines adjacent keyword parts into one selector. This receiver understands #', prefixSelector asString, ' but not #', selector asString, '. If you intended a second keyword message, parenthesize the first keyword expression before sending the next one.')
+		} asDictionary ].
+	details := {
+		'diagnosticType' -> 'message_not_understood'.
+		'receiverClass' -> receiver class name asString.
+		'selector' -> selector asString.
+		'suggestions' -> suggestions
+	} asDictionary.
+	suggestions isEmpty ifFalse: [
+		details at: 'hint' put: 'Nearby selectors are from the actual receiver class hierarchy; prefer them or browse the receiver before trying more reflection DoIts.' ].
+	^ details
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> syntaxErrorOffsetFrom: description [
+	| marker start index digits character |
+	marker := 'SyntaxErrorNotice('.
+	start := description findString: marker startingAt: 1.
+	start = 0 ifTrue: [ ^ nil ].
+	index := start + marker size.
+	digits := String new writeStream.
+	[ index <= description size and: [ character := description at: index. character isDigit ] ] whileTrue: [
+		digits nextPut: character.
+		index := index + 1 ].
+	digits position = 0 ifTrue: [ ^ nil ].
+	^ digits contents asInteger
+]
+
+{ #category : 'diagnostics' }
+PharoCAToolRegistry >> syntaxErrorDetailsFor: description source: source [
+	| offset line column previousNewline details lines |
+	offset := self syntaxErrorOffsetFrom: description.
+	details := { 'diagnosticType' -> 'syntax_error' } asDictionary.
+	offset ifNotNil: [
+		line := 1.
+		previousNewline := 0.
+		1 to: (offset min: source size) do: [ :index |
+			(source at: index) = Character lf ifTrue: [ line := line + 1. previousNewline := index ] ].
+		column := offset - previousNewline.
+		details
+			at: 'offset' put: offset;
+			at: 'line' put: line;
+			at: 'column' put: column.
+		lines := source lines.
+		(line between: 1 and: lines size) ifTrue: [ details at: 'sourceLine' put: (lines at: line) ] ].
+	((source includesSubstring: ' at ') and: [ source includesSubstring: 'extent:' ]) ifTrue: [
+		details at: 'hint' put: 'If you intended a Point, use x @ y (for example 260 @ 180). `at:` is collection access; `260 at 180` is not Point construction syntax.' ].
+	^ details
 ]
 
 { #category : 'private' }
@@ -520,7 +669,8 @@ PharoCAToolRegistry >> initialize [
 	runtimeHandleRegistriesBySessionId := Dictionary new.
 	transcriptBuffer := PharoCATranscriptBuffer current.
 	environment := PharoCAEnvironment currentImage.
-	scheduler := environment scheduler
+	scheduler := environment scheduler.
+	defaultCatalogRevision := nil
 ]
 
 { #category : 'validation' }
@@ -569,7 +719,27 @@ PharoCAToolRegistry >> register: aToolClass [
 { #category : 'registration' }
 PharoCAToolRegistry >> registerDefaults [
 	self class defaultToolClassNames do: [ :className |
-		self register: (Smalltalk globals at: className) ]
+		self register: (Smalltalk globals at: className) ].
+	defaultCatalogRevision := self class defaultCatalogRevision
+]
+
+
+{ #category : 'registration' }
+PharoCAToolRegistry >> synchronizeDefaultTools [
+	"Saved images may contain registries created before newer default tools existed. Refresh known defaults by tool name while preserving custom registrations and session-scoped state. The revision makes this a one-time repair after an upgrade."
+	defaultCatalogRevision = self class defaultCatalogRevision ifTrue: [ ^ self ].
+	self class defaultToolClassNames do: [ :className |
+		| toolClass name |
+		toolClass := Smalltalk globals at: className ifAbsent: [ nil ].
+		toolClass ifNotNil: [
+			name := toolClass toolName asSymbol.
+			(toolsByName includesKey: name)
+				ifTrue: [ toolsByName at: name put: toolClass ]
+				ifFalse: [
+					toolsByName at: name put: toolClass.
+					toolNames add: name ] ] ].
+	defaultCatalogRevision := self class defaultCatalogRevision.
+	^ self
 ]
 
 { #category : 'profiles' }
@@ -645,7 +815,11 @@ PharoCAToolRegistry >> scheduler: aScheduler [
 
 { #category : 'lookup' }
 PharoCAToolRegistry >> toolNamed: aName ifAbsent: aBlock [
-	^ toolsByName at: aName asSymbol ifAbsent: aBlock
+	| key |
+	key := aName asSymbol.
+	"066 compatibility: old clients may still invoke tool_search, but the alias is intentionally not advertised to models."
+	key = #tool_search ifTrue: [ key := #search_tools ].
+	^ toolsByName at: key ifAbsent: aBlock
 ]
 
 { #category : 'accessing' }
@@ -780,13 +954,18 @@ PharoCAToolRegistry >> deactivatePackNamed: aName forSession: aSession [
 
 { #category : 'tool packs' }
 PharoCAToolRegistry >> restoreActivePackNames: names forSession: aSession [
-	| normalized |
-	normalized := (names collect: [ :each | each asString asLowercase asSymbol ]) asSet.
-	normalized add: #catalog.
-	normalized do: [ :each |
-		(self packNames includes: each asString) ifFalse: [ Error signal: 'Cannot restore unknown tool pack: ', each asString ] ].
+	| requested known ignored available |
+	requested := (names collect: [ :each | each asString asLowercase asSymbol ]) asSet.
+	available := self packNames asSet.
+	known := requested select: [ :each | available includes: each asString ].
+	ignored := requested reject: [ :each | available includes: each asString ].
+	known addAll: self class defaultActivePackNames.
 	packMutex wait.
-	[ activePackNamesBySessionId at: aSession id put: normalized ] ensure: [ packMutex signal ]
+	[ activePackNamesBySessionId at: aSession id put: known ] ensure: [ packMutex signal ].
+	^ {
+		'restored' -> ((known asSortedCollection collect: [ :each | each asString ]) asArray).
+		'ignoredUnknown' -> ((ignored asSortedCollection collect: [ :each | each asString ]) asArray)
+	} asDictionary
 ]
 
 { #category : 'tool packs' }

@@ -12,7 +12,7 @@ PharoCAToolSearchClasses class >> capability [ ^ #inspection ]
 { #category : 'execution' }
 PharoCAToolSearchClasses class >> executionMode [ ^ #parallelSafe ]
 { #category : 'definition' }
-PharoCAToolSearchClasses class >> toolPack [ ^ #browse ]
+PharoCAToolSearchClasses class >> toolPack [ ^ #core ]
 { #category : 'definition' }
 PharoCAToolSearchClasses class >> toolName [ ^ #search_classes ]
 

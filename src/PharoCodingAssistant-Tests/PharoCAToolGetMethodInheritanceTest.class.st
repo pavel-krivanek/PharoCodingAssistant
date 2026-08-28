@@ -84,3 +84,16 @@ PharoCAToolGetMethodInheritanceTest >> testSourceSupportsCharacterContinuation [
 	} asDictionary.
 	self assert: (second at: 'source') size > 0
 ]
+
+
+{ #category : 'tests-065' }
+PharoCAToolGetMethodInheritanceTest >> testReportsOppositeSideInsteadOfPlainMissingSelector [
+	| result |
+	result := PharoCAToolGetMethodInheritance execute: {
+		'className' -> 'PharoCATestFixtureChild'.
+		'selector' -> 'fixtureClassInherited'
+	} asDictionary.
+	self assert: (result at: 'diagnosticType') equals: 'side_mismatch'.
+	self assert: (result at: 'foundSide') equals: 'class'.
+	self assert: ((result at: 'hint') includesSubstring: 'side: class')
+]

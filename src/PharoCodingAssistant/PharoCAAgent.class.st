@@ -103,12 +103,47 @@ PharoCAAgent >> registerInstructionSource: aSource [
 
 { #category : 'skills' }
 PharoCAAgent >> skillRegistry [
+	self synchronizeBuiltinSkills.
+	^ skillRegistry
+]
+
+{ #category : 'skills-private' }
+PharoCAAgent >> synchronizeBuiltinSkills [
+	"Saved images can contain agent instances created by older package versions. Refresh the built-in catalog lazily instead of requiring instance reinitialization after code load."
+	skillRegistry ifNil: [ skillRegistry := PharoCASkillRegistry new ].
+	skillRegistry synchronizeBuiltinSkills: PharoCABuiltinSkills all.
 	^ skillRegistry
 ]
 
 { #category : 'skills' }
 PharoCAAgent >> skillRegistry: aRegistry [
 	skillRegistry := aRegistry
+]
+
+{ #category : 'skills' }
+PharoCAAgent >> activateSkillNamed: skillName forSession: aSession [
+	| skill |
+	skill := self skillRegistry activateNamed: skillName session: aSession.
+	^ {
+		'name' -> skill name.
+		'description' -> skill description.
+		'active' -> true.
+		'recommendedToolPacks' -> skill recommendedToolPacks asArray.
+		'activatedToolPacks' -> #().
+		'toolPacksRemainLazy' -> true
+	} asDictionary
+]
+
+{ #category : 'skills' }
+PharoCAAgent >> autoActivateSkillsForPrompt: aPrompt session: aSession [
+	| active activations |
+	active := (self skillRegistry activeSkillNamesForSession: aSession) asSet.
+	activations := OrderedCollection new.
+	self skillRegistry skills do: [ :skill |
+		((active includes: skill name) not and: [ skill matchesAutomaticActivationIn: aPrompt ]) ifTrue: [
+			activations add: (self activateSkillNamed: skill name forSession: aSession).
+			active add: skill name ] ].
+	^ activations asArray
 ]
 
 { #category : 'skills' }
@@ -129,6 +164,19 @@ PharoCAAgent >> environment: anEnvironment [
 
 { #category : 'tools' }
 PharoCAAgent >> toolRegistry [
+	self synchronizeDefaultTools.
+	^ toolRegistry
+]
+
+{ #category : 'tools-private' }
+PharoCAAgent >> synchronizeDefaultTools [
+	"Refresh the default tool catalog on saved-image agent instances without replacing their session state, handles, profile or custom registrations."
+	environment ifNil: [ environment := PharoCAEnvironment currentImage ].
+	toolRegistry
+		ifNil: [ toolRegistry := environment newDefaultToolRegistry ]
+		ifNotNil: [
+			toolRegistry environment: environment.
+			toolRegistry synchronizeDefaultTools ].
 	^ toolRegistry
 ]
 
@@ -377,8 +425,97 @@ PharoCAAgent >> iterationBudgetInstructionSourceForRun: run [
 ]
 
 { #category : 'instructions-private' }
+PharoCAAgent >> isExplorationToolName: aName [
+	| name |
+	name := aName asString.
+	(#('evaluate' 'evaluate_and_print' 'evaluate_expression' 'search_tools' 'ui_list_windows' 'ui_window_info' 'ui_screenshot') includes: name) ifTrue: [ ^ true ].
+	^ #('get_' 'list_' 'search_' 'find_' 'object_') anySatisfy: [ :prefix | name beginsWith: prefix ]
+]
+
+{ #category : 'instructions-private' }
+PharoCAAgent >> progressGuidanceInstructionSourceForRun: run [
+	| events completed consecutiveErrors counting latestChangeSequence successfulTestEvent content explorationCount explorationCounting |
+	events := run events.
+	completed := events select: [ :event | event type = #toolExecutionCompleted ].
+	completed isEmpty ifTrue: [ ^ nil ].
+	latestChangeSequence := 0.
+	events do: [ :event | event type = #changeRecorded ifTrue: [ latestChangeSequence := event sequence ] ].
+	successfulTestEvent := nil.
+	completed reverseDo: [ :event |
+		| payload result inner |
+		successfulTestEvent ifNil: [
+			payload := event payload.
+			((payload at: 'name' ifAbsent: [ '' ]) asString = 'run_tests') ifTrue: [
+				result := payload at: 'result' ifAbsent: [ nil ].
+				(result isDictionary and: [ result at: 'ok' ifAbsent: [ false ] ]) ifTrue: [
+					inner := result at: 'result' ifAbsent: [ Dictionary new ].
+					(inner isDictionary and: [ (inner at: 'status' ifAbsent: [ '' ]) = 'passed' ]) ifTrue: [ successfulTestEvent := event ] ] ] ] ].
+	(successfulTestEvent notNil and: [ successfulTestEvent sequence > latestChangeSequence ]) ifTrue: [
+		content := 'Relevant run_tests verification is passing and no later code/image change was recorded. The requested change may already be complete. Prefer answering now; continue only for a specific unresolved requirement or defect, not optional review/probing.'.
+		^ (PharoCAInstructionSource named: 'verification-complete' content: content)
+			kind: #runtime;
+			priority: 1000;
+			yourself ].
+	consecutiveErrors := 0.
+	counting := true.
+	completed reverseDo: [ :event |
+		| result |
+		counting ifTrue: [
+			result := event payload at: 'result' ifAbsent: [ nil ].
+			(result isDictionary and: [ result at: 'ok' ifAbsent: [ false ] ])
+				ifTrue: [ counting := false ]
+				ifFalse: [ consecutiveErrors := consecutiveErrors + 1 ] ] ].
+	consecutiveErrors >= 3 ifTrue: [
+		content := consecutiveErrors asString, ' consecutive tool calls failed. Reassess the approach instead of trying variants of the same exploratory DoIt. Prefer structured browse/process/UI/test tools, activate the relevant pack/skill, and use diagnostic suggestions returned by the tools.'.
+		^ (PharoCAInstructionSource named: 'no-progress' content: content)
+			kind: #runtime;
+			priority: 1000;
+			yourself ].
+	explorationCount := 0.
+	explorationCounting := true.
+	completed reverseDo: [ :event |
+		| name |
+		explorationCounting ifTrue: [
+			event sequence <= latestChangeSequence
+				ifTrue: [ explorationCounting := false ]
+				ifFalse: [
+					name := event payload at: 'name' ifAbsent: [ '' ].
+					(self isExplorationToolName: name)
+						ifTrue: [ explorationCount := explorationCount + 1 ]
+						ifFalse: [ explorationCounting := false ] ] ] ].
+	explorationCount >= 6 ifTrue: [
+		content := 'Exploration budget reached: ', explorationCount asString, ' consecutive browse/evaluation calls occurred without a recorded code/image change. In the next response, implement the smallest known working change. If one specific fact genuinely blocks implementation, make at most one targeted browse call first; do not continue general API/architecture exploration.'.
+		^ (PharoCAInstructionSource named: 'exploration-streak' content: content)
+			kind: #runtime;
+			priority: 1000;
+			yourself ].
+	^ nil
+]
+
+{ #category : 'instructions-private' }
+PharoCAAgent >> runtimeInstructionMessageForSources: runtimeSources [
+	| enabled ordered stream |
+	enabled := runtimeSources select: [ :each | each enabled ].
+	enabled isEmpty ifTrue: [ ^ nil ].
+	ordered := enabled asSortedCollection: [ :a :b |
+		a priority = b priority
+			ifTrue: [ a name <= b name ]
+			ifFalse: [ a priority < b priority ] ].
+	stream := String new writeStream.
+	stream nextPutAll: '[Harness runtime guidance for the next assistant response only; this is not a new user request.]'.
+	ordered do: [ :source |
+		stream cr; cr;
+			nextPutAll: '[runtime: ';
+			nextPutAll: source name;
+			nextPutAll: ']';
+			cr;
+			nextPutAll: source content ].
+	^ PharoCALLMMessage user: stream contents
+]
+
+{ #category : 'instructions-private' }
 PharoCAAgent >> instructionAdjustedMessagesFor: baseMessages run: run model: activeModel [
-	| sources extensionSources discovery activeSkillNames messages budgetSource |
+	| sources stableSources runtimeSources extensionSources discovery activeSkillNames messages budgetSource progressSource runtimeMessage |
 	sources := OrderedCollection new.
 	extensionSources := extensionRegistry instructionSourcesForRun: run agent: self.
 	sources addAll: extensionSources.
@@ -387,22 +524,30 @@ PharoCAAgent >> instructionAdjustedMessagesFor: baseMessages run: run model: act
 	discovery ifNotNil: [ sources add: discovery ].
 	budgetSource := self iterationBudgetInstructionSourceForRun: run.
 	budgetSource ifNotNil: [ sources add: budgetSource ].
-	messages := instructionRegistry
+	progressSource := self progressGuidanceInstructionSourceForRun: run.
+	progressSource ifNotNil: [ sources add: progressSource ].
+	runtimeSources := sources select: [ :each | each kind = #runtime ].
+	stableSources := sources reject: [ :each | each kind = #runtime ].
+	messages := (instructionRegistry
 		messagesFrom: baseMessages
 		basePrompt: configuration systemPrompt
-		additionalSources: sources
-		model: activeModel.
+		additionalSources: stableSources
+		model: activeModel) asOrderedCollection.
+	runtimeMessage := self runtimeInstructionMessageForSources: runtimeSources.
+	runtimeMessage ifNotNil: [ messages add: runtimeMessage ].
 	activeSkillNames := skillRegistry activeSkillNamesForSession: run session.
 	run emit: #instructionsPrepared payload: {
 		'registeredSources' -> instructionRegistry enabledSources size.
 		'extensionSources' -> extensionSources size.
 		'additionalSourceNames' -> (sources collect: [ :each | each name ]) asArray.
+		'stableAdditionalSourceNames' -> (stableSources collect: [ :each | each name ]) asArray.
+		'runtimeSourceNames' -> (runtimeSources collect: [ :each | each name ]) asArray.
 		'activeSkills' -> activeSkillNames.
 		'skillCatalogSize' -> skillRegistry size.
 		'iteration' -> run iterations.
 		'maxIterations' -> configuration maxIterations
 	} asDictionary.
-	^ messages
+	^ messages asArray
 ]
 
 { #category : 'control-private' }
@@ -524,7 +669,7 @@ PharoCAAgent >> initialize [
 	extensionRegistry := PharoCAExtensionRegistry new.
 	instructionRegistry := PharoCAInstructionRegistry new.
 	skillRegistry := PharoCASkillRegistry new.
-	PharoCABuiltinSkills all do: [ :skill | skillRegistry register: skill ].
+	self synchronizeBuiltinSkills.
 	activeRuns := OrderedCollection new.
 	activeRunsMutex := Semaphore forMutualExclusion.
 	environment := PharoCAEnvironment currentImage.
@@ -655,12 +800,34 @@ PharoCAAgent >> start: aPrompt inSession: aSession eventsDo: anEventBlock [
 		eventsDo: anEventBlock
 ]
 
+{ #category : 'sessions-live' }
+PharoCAAgent >> recordRunTerminalEntryFor: run [
+	| reason payload entry |
+	reason := run status = #cancelled
+		ifTrue: [ run cancellationReason ifNil: [ #cancelled ] ]
+		ifFalse: [
+			run status = #iterationLimitReached
+				ifTrue: [ #iterationLimit ]
+				ifFalse: [ run status = #failed ifTrue: [ #error ] ifFalse: [ #completed ] ] ].
+	payload := {
+		'runId' -> run id.
+		'status' -> run status asString.
+		'reason' -> reason asString.
+		'iterations' -> run iterations.
+		'error' -> (run error ifNil: [ nil ] ifNotNil: [ :error | error description ])
+	} asDictionary.
+	entry := run session appendType: #runTerminal payload: payload.
+	self recordConversationEntry: entry onRun: run.
+	^ entry
+]
+
 { #category : 'sessions-031' }
 PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSession eventsDo: anEventBlock [
-	| run process conversation |
+	| run process conversation autoActivations |
 	(aUserMessage isKindOf: PharoCALLMMessage) ifFalse: [ Error signal: 'User input must be a PharoCALLMMessage' ].
 	aUserMessage role = #user ifFalse: [ Error signal: 'User input message role must be #user' ].
 	self synchronizeLegacyConfiguration.
+	autoActivations := self autoActivateSkillsForPrompt: aPrompt session: aSession.
 	conversation := aSession conversation.
 	conversation addModelSnapshot: model asDictionary.
 	conversation addConfigurationSnapshot: self sessionConfigurationSnapshot.
@@ -676,10 +843,12 @@ PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSessi
 		status: #running;
 		yourself.
 	run whenEventDo: anEventBlock.
+	autoActivations do: [ :activation | run emit: #skillAutoActivated payload: activation ].
 	run beforeFinishDo: [
 		[ extensionRegistry afterRun: run agent: self ]
 			on: Error
 			do: [ :error | run error: error; status: #failed ].
+		self recordRunTerminalEntryFor: run.
 		self unregisterActiveRun: run ].
 	self registerActiveRun: run.
 	process := [
@@ -698,7 +867,10 @@ PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSessi
 
 { #category : 'sessions' }
 PharoCAAgent >> newSession [
-	^ PharoCASession new
+	| session |
+	session := PharoCASession new.
+	self skillRegistry activateNamed: 'Smalltalk Core' session: session.
+	^ session
 ]
 
 { #category : 'sessions' }
@@ -718,7 +890,7 @@ PharoCAAgent >> sessionConfigurationSnapshot [
 		at: 'contextPolicy' put: contextBuilder policy asDictionary;
 		at: 'extensions' put: (extensionRegistry extensions collect: [ :each | each name asString ]);
 		at: 'instructionSourceNames' put: (instructionRegistry sources collect: [ :each | each name ]);
-		at: 'skillCount' put: skillRegistry size.
+		at: 'skillCount' put: self skillRegistry size.
 	^ snapshot
 ]
 

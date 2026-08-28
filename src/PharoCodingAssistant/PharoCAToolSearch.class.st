@@ -14,16 +14,19 @@ PharoCAToolSearch class >> capability [ ^ #session ]
 PharoCAToolSearch class >> executionMode [ ^ #parallelSafe ]
 
 { #category : 'definition' }
+PharoCAToolSearch class >> isAdvertisedToModel [ ^ false ]
+
+{ #category : 'definition' }
 PharoCAToolSearch class >> toolPack [ ^ #catalog ]
 
 { #category : 'definition' }
-PharoCAToolSearch class >> toolName [ ^ #tool_search ]
+PharoCAToolSearch class >> toolName [ ^ #search_tools ]
 
 { #category : 'definition' }
 PharoCAToolSearch class >> llmDefinition [
 	^ PharoCALLMToolDefinition
-		name: 'tool_search'
-		description: 'Searches only the PharoCodingAssistant TOOL CATALOG, including inactive packs. It does not search Pharo classes, selectors, methods, source code, examples, packages, or documentation. Use search_classes/search_selectors/search_method_source and other browse tools for image code. Optional task text improves tool relevance ranking. Returns name, description, pack, capability, execution mode, availability and active state. Results are cursor-paginated.'
+		name: 'search_tools'
+		description: 'Search only assistant tools, including inactive packs; never Pharo code/APIs. Use browse tools for classes/selectors/source. Optional query/pack/task; results are paginated.'
 		parameters: {
 			'type' -> 'object'.
 			'properties' -> {
@@ -39,13 +42,13 @@ PharoCAToolSearch class >> llmDefinition [
 
 { #category : 'definition' }
 PharoCAToolSearch class >> execute: args [
-	^ self error: 'tool_search requires a tool execution context'
+	^ self error: 'search_tools requires a tool execution context'
 ]
 
 { #category : 'execution' }
 PharoCAToolSearch class >> execute: args context: aContext [
 	| run registry session |
-	run := aContext run ifNil: [ Error signal: 'tool_search requires an active agent run' ].
+	run := aContext run ifNil: [ Error signal: 'search_tools requires an active agent run' ].
 	registry := run agent toolRegistry.
 	session := run session.
 	^ registry

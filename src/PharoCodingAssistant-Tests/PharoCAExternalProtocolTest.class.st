@@ -1465,3 +1465,20 @@ PharoCAExternalProtocolTest >> testMaxIterationsSlashCommandRejectsInvalidValues
 	self assert: ((response at: 'error') at: 'code') equals: 'invalid_params'.
 	self assert: harness agent configuration maxIterations isNil
 ]
+
+{ #category : 'tests-070' }
+PharoCAExternalProtocolTest >> testSkillsListReportsActiveSkillsForCurrentSession [
+	| created session response skills spec core |
+	created := protocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Skill status' } asDictionary)).
+	self assert: (created at: 'ok').
+	session := harness sessionManager currentSession.
+	harness agent skillRegistry activateNamed: 'Spec2' session: session.
+	response := protocol handleRequest: (self request: 'skills.list' params: Dictionary new).
+	self assert: (response at: 'ok').
+	skills := response at: 'result'.
+	core := skills detect: [ :each | (each at: 'name') = 'Smalltalk Core' ].
+	spec := skills detect: [ :each | (each at: 'name') = 'Spec2' ].
+	self assert: (core at: 'active').
+	self assert: (spec at: 'active').
+	self assert: (protocol methodNames includes: 'skills.list')
+]
