@@ -593,7 +593,7 @@ PharoCAExternalProtocol >> providersList [ ^ harness providerRegistry asArray
 
 { #category : 'providers' }
 PharoCAExternalProtocol >> providersRegisterOpenAICompatible: params [
-	| identifier baseUrl modelListUrl credentialName timeout |
+	| identifier baseUrl modelListUrl credentialName timeout telemetryMode |
 	identifier := self requiredString: 'providerId' from: params.
 	baseUrl := self requiredString: 'baseUrl' from: params.
 	modelListUrl := params at: 'modelListUrl' ifAbsent: [ nil ].
@@ -601,12 +601,15 @@ PharoCAExternalProtocol >> providersRegisterOpenAICompatible: params [
 	credentialName := params at: 'credentialName' ifAbsent: [ 'openai-api-key' ].
 	credentialName ifNotNil: [ credentialName isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'credentialName must be a string or null' ] ].
 	timeout := params at: 'timeout' ifAbsent: [ 3600 ].
+	telemetryMode := params at: 'serverTelemetryMode' ifAbsent: [ 'auto' ].
+	((telemetryMode isString or: [ telemetryMode isSymbol ]) and: [ #('auto' 'standard' 'llamacpp') includes: telemetryMode asString asLowercase ]) ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'serverTelemetryMode must be auto, standard, or llamacpp' ].
 	[ harness providerRegistry
 		registerOpenAICompatible: identifier
 		baseUrl: baseUrl
 		modelListUrl: modelListUrl
 		credentialName: credentialName
-		timeout: timeout ]
+		timeout: timeout
+		serverTelemetryMode: telemetryMode ]
 		on: Error
 		do: [ :error | PharoCAProtocolError code: 'invalid_params' message: error description ].
 	^ self providerDescriptorNamed: identifier

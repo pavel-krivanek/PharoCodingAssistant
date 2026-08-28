@@ -977,7 +977,7 @@ Markdown files under `instructions/` are loaded as instruction sources. `system.
 Each `skills/*.md` file becomes a named skill. The filename without `.md` is the skill name. The first non-empty Markdown line is used as the short description when possible; the complete file is the lazily activated skill body.
 
 
-The default agent registers five built-in skills adapted from/alongside ChatPharo's MIT-licensed `AI-ChatPharo-Skills`: **`Smalltalk Core`**, `Collections`, `Spec2`, `Roassal`, and `Bloc`. The compact base prompt explains what these skills are for: Smalltalk Core supplies language invariants, Collections covers idioms, Spec2 covers desktop UI, Roassal covers visualization/charts, and Bloc covers scene-graph UI. Skills are lightweight domain playbooks, **not tool packs**. `Smalltalk Core` is active for every new/restored/forked session; its embedded invariant sheet now explicitly says that slots do **not** synthesize accessor messages and gives the canonical `[ ... ] on: Error do: [ :ex | ... ]` form. The four domain skills remain lazy in ordinary sessions; exact word-bounded names in a user prompt may auto-activate the corresponding guidance before the first provider request. Recommended tool packs remain lazy under both automatic and manual skill activation and are merely reported; use `tool_enable` when the capability is actually needed. The Spec2 skill now explicitly forbids manually invoking `initializePresenters`/`connectPresenters` during normal use or verification, documents `label:` as the normal live dynamic-label API, and directs post-compile verification to focused SUnit plus lazy `ui_list_windows`/`ui_screenshot` rather than adapter/reflection DoIts. Dynamic workspace/extension skills still receive ephemeral discovery descriptions. The Bloc skill explicitly verifies availability because Bloc is not part of the supplied base image.
+The default agent registers five built-in skills adapted from/alongside ChatPharo's MIT-licensed `AI-ChatPharo-Skills`: **`Smalltalk Core`**, `Collections`, `Spec2`, `Roassal`, and `Bloc`. The compact base prompt explains what these skills are for: Smalltalk Core supplies language invariants, Collections covers idioms, Spec2 covers desktop UI, Roassal covers visualization/charts, and Bloc covers scene-graph UI. Skills are lightweight domain playbooks, **not tool packs**. `Smalltalk Core` is active for every new/restored/forked session; its embedded invariant sheet now explicitly says that slots do **not** synthesize accessor messages and gives the canonical `[ ... ] on: Error do: [ :ex | ... ]` form. The four domain skills remain lazy in ordinary sessions and are never auto-activated from prompt text. This is deliberate: the model must choose `activate_skill` when a domain playbook is relevant, which keeps unrelated tasks lean and makes skill-selection quality observable in benchmarks. Recommended tool packs remain lazy after skill activation and are merely reported; use `tool_enable` when the capability is actually needed. The Spec2 skill now explicitly forbids manually invoking `initializePresenters`/`connectPresenters` during normal use or verification, documents `label:` as the normal live dynamic-label API, and directs post-compile verification to focused SUnit plus lazy `ui_list_windows`/`ui_screenshot` rather than adapter/reflection DoIts. Dynamic workspace/extension skills still receive ephemeral discovery descriptions. The Bloc skill explicitly verifies availability because Bloc is not part of the supplied base image.
 
 In the browser/command interface:
 
@@ -1083,11 +1083,45 @@ The UI distinguishes:
 
 - estimated input/context occupancy (`~` prefix when estimated);
 - provider-reported prompt/completion/reasoning token usage when available;
-- time to first token;
-- completion tokens per second;
+- server-reported cached prompt tokens versus prompt tokens that were actually evaluated;
+- live prompt/prefill progress when the server exposes it;
+- server-computed prompt-processing (`pp`) and generation (`tg`) token rates;
+- time to first output;
 - model-call count and context-compaction/omission information.
 
-Provider-reported usage is authoritative when available. The agent does not pretend an estimate is an exact provider token count.
+Provider-reported usage and server timings are authoritative when available. The old wall-clock completion-rate estimate remains only as a fallback and is exposed in telemetry as `clientObservedTokensPerSecond`; `tokensPerSecondSource` states whether the displayed generation rate came from the server or that fallback.
+
+### llama.cpp server telemetry
+
+Current llama.cpp Chat Completions responses include a `timings` object with cache/evaluation counters and prompt/generation timing. PharoCodingAssistant maps those fields into provider-neutral run events and telemetry. In particular, `cache_n` becomes `cacheTokens`, `prompt_n` becomes `promptTokensEvaluated`, and `predicted_per_second` becomes the authoritative generation rate shown as `tg` in the browser.
+
+The OpenAI-compatible provider has three server-telemetry modes:
+
+- `auto` (default): remain fully generic initially; if a response contains the llama.cpp timing shape, subsequent requests ask for live prompt progress and per-token server timings;
+- `standard`: never send llama.cpp-specific request fields, while still consuming final timing fields if the server happens to return them;
+- `llamacpp`: request llama.cpp `return_progress` and `timings_per_token` from the first request.
+
+For a known llama.cpp endpoint you can opt into first-request live prefill tracing when registering the provider:
+
+```smalltalk
+harness providerRegistry
+    registerOpenAICompatible: 'local-llama'
+    baseUrl: 'http://127.0.0.1:8080/v1/chat/completions'
+    modelListUrl: nil
+    credentialName: 'local-api-key'
+    timeout: 3600
+    serverTelemetryMode: #llamacpp.
+```
+
+The mode is persisted in `runtime.json`. The JSON/WebSocket provider-registration API accepts the same option as `serverTelemetryMode: "llamacpp"`.
+
+When live progress is available the browser can show, before the first generated token, values such as:
+
+```text
+prefill 1.48k/2.00k (74%) · ctx 7.92k/262k · cache 5.92k (75%) · pp 27.2 t/s
+```
+
+During generation, server timing updates provide a real `tg` value instead of inferring token rate from text-delta timing. The full run telemetry retains prompt milliseconds, generation milliseconds, cache-hit ratio, and speculative-draft acceptance counters when the server supplies them.
 
 ## Changing models at runtime
 

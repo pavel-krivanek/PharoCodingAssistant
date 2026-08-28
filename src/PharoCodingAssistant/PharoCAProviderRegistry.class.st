@@ -110,21 +110,35 @@ PharoCAProviderRegistry >> registerOpenAICompatible: anIdentifier baseUrl: aBase
 
 { #category : 'registration' }
 PharoCAProviderRegistry >> registerOpenAICompatible: anIdentifier baseUrl: aBaseUrl modelListUrl: aModelListUrl credentialName: aCredentialName timeout: timeoutSeconds [
-	| key url listUrl credential timeout descriptor |
+	^ self
+		registerOpenAICompatible: anIdentifier
+		baseUrl: aBaseUrl
+		modelListUrl: aModelListUrl
+		credentialName: aCredentialName
+		timeout: timeoutSeconds
+		serverTelemetryMode: #auto
+]
+
+{ #category : 'registration' }
+PharoCAProviderRegistry >> registerOpenAICompatible: anIdentifier baseUrl: aBaseUrl modelListUrl: aModelListUrl credentialName: aCredentialName timeout: timeoutSeconds serverTelemetryMode: telemetryMode [
+	| key url listUrl credential timeout descriptor normalizedMode |
 	key := anIdentifier asString.
 	url := aBaseUrl asString.
 	listUrl := aModelListUrl ifNotNil: [ aModelListUrl asString ].
 	credential := aCredentialName ifNil: [ 'openai-api-key' ] ifNotNil: [ aCredentialName asString ].
 	timeout := timeoutSeconds ifNil: [ 3600 ].
+	normalizedMode := telemetryMode ifNil: [ 'auto' ] ifNotNil: [ telemetryMode asString asLowercase ].
 	(url beginsWith: 'http://') | (url beginsWith: 'https://') ifFalse: [ Error signal: 'Provider baseUrl must use http:// or https://' ].
 	listUrl ifNotNil: [
 		((listUrl beginsWith: 'http://') or: [ listUrl beginsWith: 'https://' ]) ifFalse: [ Error signal: 'Provider modelListUrl must use http:// or https://' ] ].
 	(timeout isNumber and: [ timeout > 0 ]) ifFalse: [ Error signal: 'Provider timeout must be positive' ].
+	(#('auto' 'standard' 'llamacpp') includes: normalizedMode) ifFalse: [ Error signal: 'serverTelemetryMode must be auto, standard, or llamacpp' ].
 	descriptor := {
 		'family' -> 'openai-compatible'.
 		'baseUrl' -> url.
 		'credentialName' -> credential.
 		'timeout' -> timeout.
+		'serverTelemetryMode' -> normalizedMode.
 		'modelDiscovery' -> true
 	} asDictionary.
 	listUrl ifNotNil: [ descriptor at: 'modelListUrl' put: listUrl ].
@@ -136,6 +150,7 @@ PharoCAProviderRegistry >> registerOpenAICompatible: anIdentifier baseUrl: aBase
 				modelListUrl: listUrl;
 				credentialName: credential;
 				timeout: timeout;
+				serverTelemetryMode: normalizedMode;
 				yourself ]
 		descriptor: descriptor
 ]

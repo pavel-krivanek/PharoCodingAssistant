@@ -131,3 +131,20 @@ PharoCAProviderRegistryTest >> testProviderRetryHelperReportsRetryScheduleWithou
 	self assert: (retries first at: 'delayMilliseconds') equals: 0.
 	self deny: (retries first includesKey: 'responseBody')
 ]
+
+{ #category : 'tests-072' }
+PharoCAProviderRegistryTest >> testOpenAIProviderTelemetryModeIsStoredAndApplied [
+	| registry descriptor provider |
+	registry := PharoCAProviderRegistry new.
+	registry
+		registerOpenAICompatible: 'llama'
+		baseUrl: 'http://localhost:8080/v1/chat/completions'
+		modelListUrl: nil
+		credentialName: nil
+		timeout: 60
+		serverTelemetryMode: #llamacpp.
+	descriptor := registry descriptorForProviderNamed: 'llama'.
+	self assert: (descriptor at: 'serverTelemetryMode') equals: 'llamacpp'.
+	provider := registry providerNamed: 'llama'.
+	self assert: provider serverTelemetryMode equals: #llamacpp
+]

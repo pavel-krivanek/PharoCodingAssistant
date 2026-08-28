@@ -169,3 +169,42 @@ PharoCARunTelemetryTest >> testTelemetryMeasuresTimeToFirstOutputAndTokensPerSec
 	self assert: (snapshot at: 'generationMilliseconds') equals: 1000.
 	self assert: (snapshot at: 'tokensPerSecond') equals: 50.0
 ]
+
+{ #category : 'tests-072' }
+PharoCARunTelemetryTest >> testServerTimingsOverrideClientObservedGenerationRate [
+	| telemetry base event snapshot call |
+	telemetry := PharoCARunTelemetry new.
+	base := DateAndTime now.
+	event := PharoCARunEvent type: #started payload: 'work'. event timestamp: base. telemetry recordEvent: event.
+	event := PharoCARunEvent type: #modelRequestStarted payload: 1. event timestamp: base. telemetry recordEvent: event.
+	event := PharoCARunEvent type: #textDelta payload: 'a'. event timestamp: base + (Duration milliSeconds: 100). telemetry recordEvent: event.
+	event := PharoCARunEvent type: #textDelta payload: 'b'. event timestamp: base + (Duration milliSeconds: 1100). telemetry recordEvent: event.
+	event := PharoCARunEvent type: #usage payload: (PharoCALLMUsage new promptTokens: 100; completionTokens: 50; totalTokens: 150; yourself). event timestamp: base + (Duration milliSeconds: 1150). telemetry recordEvent: event.
+	event := PharoCARunEvent type: #providerMetrics payload: ({
+		'cacheTokens' -> 90. 'promptTokensEvaluated' -> 10. 'promptMilliseconds' -> 500.
+		'promptTokensPerSecond' -> 20.0. 'generationTokens' -> 50. 'generationMilliseconds' -> 10000.
+		'generationTokensPerSecond' -> 5.0 } asDictionary). event timestamp: base + (Duration milliSeconds: 1160). telemetry recordEvent: event.
+	event := PharoCARunEvent type: #modelResponseCompleted payload: Dictionary new. event timestamp: base + (Duration milliSeconds: 1200). telemetry recordEvent: event.
+	snapshot := telemetry asDictionary.
+	call := (snapshot at: 'modelCalls') first.
+	self assert: (call at: 'clientObservedTokensPerSecond') equals: 50.0.
+	self assert: (call at: 'tokensPerSecond') equals: 5.0.
+	self assert: (call at: 'tokensPerSecondSource') equals: 'server'.
+	self assert: (snapshot at: 'tokensPerSecond') equals: 5.0.
+	self assert: (snapshot at: 'promptTokensPerSecond') equals: 20.0.
+	self assert: (snapshot at: 'cachedPromptTokens') equals: 90.
+	self assert: (snapshot at: 'promptTokensEvaluated') equals: 10.
+	self assert: ((snapshot at: 'promptCacheHitRatio') closeTo: 0.9)
+]
+
+{ #category : 'tests-072' }
+PharoCARunTelemetryTest >> testPromptProgressIsRetainedOnCurrentModelCall [
+	| run telemetry call |
+	run := PharoCARun new status: #running; yourself.
+	run emit: #started payload: 'work'.
+	run emit: #modelRequestStarted payload: 1.
+	run emit: #providerPromptProgress payload: ({ 'promptTokensProcessed' -> 500. 'promptTokensToProcess' -> 1000. 'promptTokensPerSecond' -> 25.0 } asDictionary).
+	telemetry := run telemetry asDictionary.
+	call := (telemetry at: 'modelCalls') first.
+	self assert: ((call at: 'promptProgress') at: 'promptTokensProcessed') equals: 500
+]

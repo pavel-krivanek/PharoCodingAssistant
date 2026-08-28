@@ -9,7 +9,9 @@ Class {
 		'timeout',
 		'credentialResolver',
 		'credentialName',
-		'modelListUrl'
+		'modelListUrl',
+		'serverTelemetryMode',
+		'extendedTelemetryDetected'
 	],
 	#category : 'PharoCodingAssistant-LLM',
 	#package : 'PharoCodingAssistant',
@@ -56,7 +58,9 @@ PharoCAOpenAIProvider >> initialize [
 	timeout := 3600.
 	credentialResolver := PharoCACredentialResolver new.
 	credentialName := 'openai-api-key'.
-	modelListUrl := nil
+	modelListUrl := nil.
+	serverTelemetryMode := #auto.
+	extendedTelemetryDetected := false
 ]
 
 { #category : 'mapping' }
@@ -110,7 +114,7 @@ PharoCAOpenAIProvider >> streamRequest: aRequest eventsDo: aBlock cancellation: 
 
 { #category : 'requesting' }
 PharoCAOpenAIProvider >> streamRequest: aRequest eventsDo: aBlock cancellation: aCancellationToken retryDo: retryBlock [
-	^ self streamWirePayload: (self wirePayloadForRequest: aRequest) eventsDo: aBlock cancellation: aCancellationToken retryDo: retryBlock
+	^ self streamWirePayload: (self wireStreamingPayloadForRequest: aRequest) eventsDo: aBlock cancellation: aCancellationToken retryDo: retryBlock
 ]
 
 { #category : 'private' }
@@ -132,8 +136,7 @@ PharoCAOpenAIProvider >> streamWirePayload: aDictionary eventsDo: aBlock cancell
 { #category : 'private' }
 PharoCAOpenAIProvider >> streamWirePayloadOnce: aDictionary eventsDo: aBlock cancellation: aCancellationToken [
 	| client payload entity stream parser line code cancellationCallback apiKey body |
-	payload := aDictionary copy.
-	payload at: 'stream' put: true.
+	payload := self preparedStreamingPayloadFrom: aDictionary.
 	client := ZnClient new.
 	parser := PharoCAOpenAIStreamParser new.
 	cancellationCallback := aCancellationToken whenCancelledDo: [ [ client close ] on: Error do: [ :error | ] ].
@@ -151,7 +154,9 @@ PharoCAOpenAIProvider >> streamWirePayloadOnce: aDictionary eventsDo: aBlock can
 		stream := ZnCharacterReadStream on: entity readStream encoding: 'utf8'.
 		[ aCancellationToken cancelled not and: [ parser done not and: [ stream atEnd not ] ] ] whileTrue: [
 			line := stream nextLine.
-			parser consumeLine: line eventDo: aBlock ].
+			parser consumeLine: line eventDo: [ :event |
+				event type = #providerMetrics ifTrue: [ self noteProviderMetrics: event payload ].
+				aBlock value: event ] ].
 		^ parser completion
 	] ensure: [
 		aCancellationToken removeCancellationCallback: cancellationCallback.
@@ -378,3 +383,59 @@ PharoCAOpenAIProvider >> positiveIntegerFromModelDescriptor: aDictionary keys: k
 	^ nil
 ]
 
+
+
+{ #category : 'telemetry' }
+PharoCAOpenAIProvider >> serverTelemetryMode [
+	^ serverTelemetryMode ifNil: [ #auto ]
+]
+
+{ #category : 'telemetry' }
+PharoCAOpenAIProvider >> serverTelemetryMode: aSymbolOrString [
+	| normalized |
+	normalized := aSymbolOrString ifNil: [ 'auto' ] ifNotNil: [ aSymbolOrString asString asLowercase ].
+	(#('auto' 'standard' 'llamacpp') includes: normalized) ifFalse: [
+		Error signal: 'serverTelemetryMode must be auto, standard, or llamacpp' ].
+	serverTelemetryMode := normalized asSymbol.
+	serverTelemetryMode = #standard ifTrue: [ extendedTelemetryDetected := false ].
+	^ self
+]
+
+{ #category : 'telemetry-private' }
+PharoCAOpenAIProvider >> noteProviderMetrics: metrics [
+	(self serverTelemetryMode = #auto
+		and: [ metrics isDictionary
+		and: [ (metrics at: 'format' ifAbsent: [ '' ]) = 'llama.cpp-timings' ] ]) ifTrue: [
+		extendedTelemetryDetected := true ]
+]
+
+{ #category : 'telemetry-private' }
+PharoCAOpenAIProvider >> shouldRequestExtendedServerTelemetry [
+	self serverTelemetryMode = #llamacpp ifTrue: [ ^ true ].
+	self serverTelemetryMode = #standard ifTrue: [ ^ false ].
+	^ extendedTelemetryDetected = true
+]
+
+{ #category : 'mapping' }
+PharoCAOpenAIProvider >> wireStreamingPayloadForRequest: aRequest [
+	| payload streamOptions |
+	payload := self wirePayloadForRequest: aRequest.
+	(aRequest model respondsTo: #supportsUsageStreaming) ifTrue: [
+		aRequest model supportsUsageStreaming ifTrue: [
+			streamOptions := (payload at: 'stream_options' ifAbsent: [ Dictionary new ]) copy.
+			streamOptions at: 'include_usage' put: true.
+			payload at: 'stream_options' put: streamOptions ] ].
+	^ payload
+]
+
+
+{ #category : 'mapping' }
+PharoCAOpenAIProvider >> preparedStreamingPayloadFrom: aDictionary [
+	| payload |
+	payload := aDictionary copy.
+	payload at: 'stream' put: true.
+	self shouldRequestExtendedServerTelemetry ifTrue: [
+		payload at: 'return_progress' ifAbsentPut: [ true ].
+		payload at: 'timings_per_token' ifAbsentPut: [ true ] ].
+	^ payload
+]

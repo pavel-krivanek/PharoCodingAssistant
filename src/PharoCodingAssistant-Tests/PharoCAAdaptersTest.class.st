@@ -77,6 +77,20 @@ PharoCAAdaptersTest >> testViewModelCanNotifyConcreteUIWithoutDependingOnMorphic
 	self assert: observed asArray equals: #(textDelta)
 ]
 
+
+
+{ #category : 'tests' }
+PharoCAAdaptersTest >> testViewModelReconcilesFinishedRunWhenFinalEventDeliveryLags [
+	| run view |
+	run := PharoCARun new.
+	view := PharoCARunViewModel new.
+	view run: run.
+	view consume: (PharoCARunEvent type: #started payload: nil).
+	self assert: view status equals: #running.
+	run finishCompletedWithAnswer: 'done'.
+	self assert: view status equals: #completed.
+	self assert: view visibleText equals: 'done'
+]
 { #category : 'tests' }
 PharoCAAdaptersTest >> testViewModelReconcilesAlreadyFinishedRunWithoutDuplicatingLateTextDelta [
 	| run view |

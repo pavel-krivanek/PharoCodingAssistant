@@ -136,14 +136,8 @@ PharoCAAgent >> activateSkillNamed: skillName forSession: aSession [
 
 { #category : 'skills' }
 PharoCAAgent >> autoActivateSkillsForPrompt: aPrompt session: aSession [
-	| active activations |
-	active := (self skillRegistry activeSkillNamesForSession: aSession) asSet.
-	activations := OrderedCollection new.
-	self skillRegistry skills do: [ :skill |
-		((active includes: skill name) not and: [ skill matchesAutomaticActivationIn: aPrompt ]) ifTrue: [
-			activations add: (self activateSkillNamed: skill name forSession: aSession).
-			active add: skill name ] ].
-	^ activations asArray
+	"Compatibility hook retained for older callers. Optional skills are intentionally model-selected; the harness never activates them from prompt text."
+	^ #()
 ]
 
 { #category : 'skills' }
@@ -823,11 +817,10 @@ PharoCAAgent >> recordRunTerminalEntryFor: run [
 
 { #category : 'sessions-031' }
 PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSession eventsDo: anEventBlock [
-	| run process conversation autoActivations |
+	| run process conversation |
 	(aUserMessage isKindOf: PharoCALLMMessage) ifFalse: [ Error signal: 'User input must be a PharoCALLMMessage' ].
 	aUserMessage role = #user ifFalse: [ Error signal: 'User input message role must be #user' ].
 	self synchronizeLegacyConfiguration.
-	autoActivations := self autoActivateSkillsForPrompt: aPrompt session: aSession.
 	conversation := aSession conversation.
 	conversation addModelSnapshot: model asDictionary.
 	conversation addConfigurationSnapshot: self sessionConfigurationSnapshot.
@@ -843,7 +836,6 @@ PharoCAAgent >> startUserMessage: aUserMessage prompt: aPrompt inSession: aSessi
 		status: #running;
 		yourself.
 	run whenEventDo: anEventBlock.
-	autoActivations do: [ :activation | run emit: #skillAutoActivated payload: activation ].
 	run beforeFinishDo: [
 		[ extensionRegistry afterRun: run agent: self ]
 			on: Error

@@ -183,3 +183,39 @@ PharoCALLMProtocolTest >> testProviderAdaptersRejectUnresolvedArtifactReferences
 	self should: [ PharoCAOpenAIProvider new wireMessageFor: message ] raise: Error.
 	self should: [ PharoCAAnthropicProvider new wireRegularMessageFor: message ] raise: Error
 ]
+
+{ #category : 'tests-072' }
+PharoCALLMProtocolTest >> testOpenAIStreamingRequestsUsageWhenModelSupportsIt [
+	| model request wire |
+	model := PharoCAModel named: 'local'.
+	model supportsUsageStreaming: true.
+	request := PharoCALLMRequest new
+		model: model;
+		messages: { PharoCALLMMessage user: 'hello' };
+		temperature: 0;
+		yourself.
+	wire := PharoCAOpenAIProvider new wireStreamingPayloadForRequest: request.
+	self assert: ((wire at: 'stream_options') at: 'include_usage')
+]
+
+{ #category : 'tests-072' }
+PharoCALLMProtocolTest >> testLlamaCppTelemetryModeRequestsProgressAndPerTokenTimings [
+	| provider wire |
+	provider := PharoCAOpenAIProvider new serverTelemetryMode: #llamacpp; yourself.
+	wire := provider preparedStreamingPayloadFrom: ({ 'model' -> 'local' } asDictionary).
+	self assert: (wire at: 'stream').
+	self assert: (wire at: 'return_progress').
+	self assert: (wire at: 'timings_per_token')
+]
+
+{ #category : 'tests-072' }
+PharoCALLMProtocolTest >> testAutoTelemetryLearnsFromLlamaCppTimingsForFollowingRequests [
+	| provider wire |
+	provider := PharoCAOpenAIProvider new.
+	wire := provider preparedStreamingPayloadFrom: Dictionary new.
+	self deny: (wire includesKey: 'return_progress').
+	provider noteProviderMetrics: ({ 'format' -> 'llama.cpp-timings' } asDictionary).
+	wire := provider preparedStreamingPayloadFrom: Dictionary new.
+	self assert: (wire at: 'return_progress').
+	self assert: (wire at: 'timings_per_token')
+]

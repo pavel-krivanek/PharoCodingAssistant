@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCARunViewModel',
 	#superclass : 'Object',
-	#instVars : [ 'run', 'status', 'visibleText', 'reasoningText', 'lastContext', 'lastUsage', 'toolStates', 'eventCount', 'mutex', 'announcer' ],
+	#instVars : [ 'run', 'status', 'visibleText', 'reasoningText', 'lastContext', 'lastUsage', 'lastProviderMetrics', 'lastPromptProgress', 'toolStates', 'eventCount', 'mutex', 'announcer' ],
 	#category : 'PharoCodingAssistant-Adapters',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Adapters'
@@ -25,10 +25,7 @@ PharoCARunViewModel >> run [ ^ run ]
 { #category : 'accessing' }
 PharoCARunViewModel >> run: aRun [
 	run := aRun.
-	aRun isFinished ifTrue: [
-		mutex critical: [
-			status := aRun status.
-			visibleText := aRun answer ] ]
+	self reconcileFinishedRun
 ]
 
 { #category : 'events' }
@@ -49,6 +46,8 @@ PharoCARunViewModel >> consumeUnlocked: anEvent [
 	type = #reasoningDelta ifTrue: [ reasoningText := reasoningText , payload ].
 	type = #contextPrepared ifTrue: [ lastContext := payload ].
 	type = #usage ifTrue: [ lastUsage := payload ].
+	type = #providerMetrics ifTrue: [ lastProviderMetrics := payload ].
+	type = #providerPromptProgress ifTrue: [ lastPromptProgress := payload ].
 	(type asString beginsWith: 'toolExecution') ifTrue: [
 		payload isDictionary ifTrue: [
 			id := payload at: 'id' ifAbsent: [ nil ].
@@ -61,16 +60,34 @@ PharoCARunViewModel >> consumeUnlocked: anEvent [
 	(#(completed cancelled failed iterationLimitReached) includes: type) ifTrue: [ status := type ]
 ]
 
+{ #category : 'private' }
+PharoCARunViewModel >> reconcileFinishedRun [
+	(run isNil or: [ run isFinished not ]) ifTrue: [ ^ self ].
+	mutex critical: [
+		status := run status.
+		visibleText := run answer ]
+]
+
 { #category : 'accessing' }
-PharoCARunViewModel >> status [ ^ status ]
+PharoCARunViewModel >> status [
+	self reconcileFinishedRun.
+	^ status
+]
 { #category : 'accessing' }
-PharoCARunViewModel >> visibleText [ ^ visibleText ]
+PharoCARunViewModel >> visibleText [
+	self reconcileFinishedRun.
+	^ visibleText
+]
 { #category : 'accessing' }
 PharoCARunViewModel >> reasoningText [ ^ reasoningText ]
 { #category : 'accessing' }
 PharoCARunViewModel >> lastContext [ ^ lastContext ]
 { #category : 'accessing' }
 PharoCARunViewModel >> lastUsage [ ^ lastUsage ]
+{ #category : 'accessing' }
+PharoCARunViewModel >> lastProviderMetrics [ ^ lastProviderMetrics ]
+{ #category : 'accessing' }
+PharoCARunViewModel >> lastPromptProgress [ ^ lastPromptProgress ]
 { #category : 'accessing' }
 PharoCARunViewModel >> eventCount [ ^ eventCount ]
 { #category : 'accessing' }

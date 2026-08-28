@@ -97,3 +97,52 @@ PharoCAOpenAIStreamParserTest >> testIgnoresBlankCommentAndUnknownSSELines [
 	parser consumeLine: 'event: message' eventDo: [ :event | events add: event ].
 	self assert: events isEmpty
 ]
+
+{ #category : 'tests-072' }
+PharoCAOpenAIStreamParserTest >> testEmitsServerTimingsWithCacheAndRealRates [
+	| parser events object metrics |
+	parser := PharoCAOpenAIStreamParser new.
+	events := OrderedCollection new.
+	object := {
+		'choices' -> { { 'delta' -> Dictionary new. 'finish_reason' -> 'stop' } asDictionary }.
+		'timings' -> ({
+			'cache_n' -> 5917.
+			'prompt_n' -> 1998.
+			'prompt_ms' -> 73957.92.
+			'prompt_per_second' -> 27.02.
+			'predicted_n' -> 219.
+			'predicted_ms' -> 46252.30.
+			'predicted_per_second' -> 4.71.
+			'draft_n' -> 100.
+			'draft_n_accepted' -> 72 } asDictionary)
+	} asDictionary.
+	self consume: object with: parser into: events.
+	metrics := (events detect: [ :event | event type = #providerMetrics ]) payload.
+	self assert: (metrics at: 'cacheTokens') equals: 5917.
+	self assert: (metrics at: 'promptTokensEvaluated') equals: 1998.
+	self assert: (metrics at: 'inputContextTokens') equals: 7915.
+	self assert: (metrics at: 'contextTokens') equals: 8134.
+	self assert: (metrics at: 'promptTokensPerSecond') equals: 27.02.
+	self assert: (metrics at: 'generationTokensPerSecond') equals: 4.71.
+	self assert: (metrics at: 'draftAcceptedTokens') equals: 72.
+	self assert: ((metrics at: 'cacheHitRatio') closeTo: 5917.0 / 7915.0)
+]
+
+{ #category : 'tests-072' }
+PharoCAOpenAIStreamParserTest >> testEmitsPromptProgressWithTimedPrefillRate [
+	| parser events object progress |
+	parser := PharoCAOpenAIStreamParser new.
+	events := OrderedCollection new.
+	object := {
+		'choices' -> #().
+		'prompt_progress' -> ({ 'total' -> 7915. 'cache' -> 5917. 'processed' -> 7399. 'time_ms' -> 54520 } asDictionary)
+	} asDictionary.
+	self consume: object with: parser into: events.
+	progress := events first payload.
+	self assert: events first type equals: #providerPromptProgress.
+	self assert: (progress at: 'cachedTokens') equals: 5917.
+	self assert: (progress at: 'promptTokensProcessed') equals: 1482.
+	self assert: (progress at: 'promptTokensToProcess') equals: 1998.
+	self assert: ((progress at: 'processingProgress') closeTo: 1482.0 / 1998.0).
+	self assert: ((progress at: 'promptTokensPerSecond') closeTo: 1482.0 * 1000.0 / 54520.0)
+]

@@ -248,3 +248,25 @@ PharoCARuntimeProfileTest >> testExplicitModelListUrlPersistsWithOpenAICompatibl
 	provider := second providerRegistry providerNamed: 'custom-list'.
 	self assert: provider modelListUrl equals: 'http://localhost:8080/catalog/models'
 ]
+
+{ #category : 'tests-072' }
+PharoCARuntimeProfileTest >> testLlamaCppTelemetryModeSurvivesRuntimeProfileRestore [
+	| first second model providerDescriptor |
+	first := self newHarness.
+	first reloadResources.
+	first providerRegistry
+		registerOpenAICompatible: 'llama-local'
+		baseUrl: 'http://localhost:8080/v1/chat/completions'
+		modelListUrl: nil
+		credentialName: nil
+		timeout: 60
+		serverTelemetryMode: #llamacpp.
+	model := PharoCAModel named: 'llama-model'.
+	first modelRegistry register: model provider: 'llama-local'.
+	first saveRuntimeProfile.
+	second := self newHarness.
+	second reloadResources.
+	providerDescriptor := second providerRegistry descriptorForProviderNamed: 'llama-local'.
+	self assert: (providerDescriptor at: 'serverTelemetryMode') equals: 'llamacpp'.
+	self assert: (second providerRegistry providerNamed: 'llama-local') serverTelemetryMode equals: #llamacpp
+]

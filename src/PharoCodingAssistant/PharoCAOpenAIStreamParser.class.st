@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCAOpenAIStreamParser',
 	#superclass : 'Object',
-	#instVars : [ 'content', 'reasoning', 'role', 'finishReason', 'toolCalls', 'usage', 'done' ],
+	#instVars : [ 'content', 'reasoning', 'role', 'finishReason', 'toolCalls', 'usage', 'done', 'lastMetricsPredictedMilliseconds' ],
 	#category : 'PharoCodingAssistant-LLM',
 	#package : 'PharoCodingAssistant',
 	#tag : 'LLM'
@@ -17,7 +17,8 @@ PharoCAOpenAIStreamParser >> initialize [
 	finishReason := nil.
 	toolCalls := Dictionary new.
 	usage := nil.
-	done := false
+	done := false.
+	lastMetricsPredictedMilliseconds := nil
 ]
 
 { #category : 'private' }
@@ -44,11 +45,17 @@ PharoCAOpenAIStreamParser >> consumeLine: aString eventDo: aBlock [
 
 { #category : 'private' }
 PharoCAOpenAIStreamParser >> consumeObject: object eventDo: aBlock [
-	| choices |
+	| choices finishing |
+	(object at: 'prompt_progress' ifAbsent: [ nil ]) ifNotNil: [ :wireProgress |
+		aBlock value: (PharoCALLMStreamEvent type: #providerPromptProgress payload: (self promptProgressFromWire: wireProgress)) ].
+	choices := object at: 'choices' ifAbsent: [ #() ].
+	finishing := choices anySatisfy: [ :choice | (choice at: 'finish_reason' ifAbsent: [ nil ]) notNil ].
+	(object at: 'timings' ifAbsent: [ nil ]) ifNotNil: [ :wireTimings |
+		(self shouldEmitMetricsFromWire: wireTimings finishing: finishing usagePresent: (object includesKey: 'usage')) ifTrue: [
+			aBlock value: (PharoCALLMStreamEvent type: #providerMetrics payload: (self providerMetricsFromWire: wireTimings)) ] ].
 	(object at: 'usage' ifAbsent: [ nil ]) ifNotNil: [ :newUsage |
 		usage := self usageFromWire: newUsage.
 		aBlock value: (PharoCALLMStreamEvent type: #usage payload: usage) ].
-	choices := object at: 'choices' ifAbsent: [ #() ].
 	choices do: [ :choice | self consumeChoice: choice eventDo: aBlock ]
 ]
 
@@ -129,3 +136,89 @@ PharoCAOpenAIStreamParser >> completion [
 
 { #category : 'testing' }
 PharoCAOpenAIStreamParser >> done [ ^ done ]
+
+
+{ #category : 'private-telemetry' }
+PharoCAOpenAIStreamParser >> nonNegativeNumberAt: key in: dictionary default: defaultValue [
+	| value |
+	value := dictionary at: key ifAbsent: [ defaultValue ].
+	(value isNumber and: [ value >= 0 ]) ifFalse: [ ^ defaultValue ].
+	^ value
+]
+
+{ #category : 'private-telemetry' }
+PharoCAOpenAIStreamParser >> providerMetricsFromWire: timings [
+	| cache prompt promptMs promptRate generated generationMs generationRate input context result draft accepted |
+	cache := self nonNegativeNumberAt: 'cache_n' in: timings default: 0.
+	prompt := self nonNegativeNumberAt: 'prompt_n' in: timings default: 0.
+	promptMs := self nonNegativeNumberAt: 'prompt_ms' in: timings default: 0.
+	promptRate := self nonNegativeNumberAt: 'prompt_per_second' in: timings default: 0.
+	generated := self nonNegativeNumberAt: 'predicted_n' in: timings default: 0.
+	generationMs := self nonNegativeNumberAt: 'predicted_ms' in: timings default: 0.
+	generationRate := self nonNegativeNumberAt: 'predicted_per_second' in: timings default: 0.
+	input := cache + prompt.
+	context := input + generated.
+	result := {
+		'source' -> 'server'.
+		'format' -> 'llama.cpp-timings'.
+		'cacheTokens' -> cache.
+		'promptTokensEvaluated' -> prompt.
+		'promptMilliseconds' -> promptMs.
+		'promptTokensPerSecond' -> promptRate.
+		'generationTokens' -> generated.
+		'generationMilliseconds' -> generationMs.
+		'generationTokensPerSecond' -> generationRate.
+		'inputContextTokens' -> input.
+		'contextTokens' -> context.
+		'cacheHitRatio' -> (input > 0 ifTrue: [ cache asFloat / input asFloat ] ifFalse: [ 0.0 ])
+	} asDictionary.
+	draft := timings at: 'draft_n' ifAbsent: [ nil ].
+	accepted := timings at: 'draft_n_accepted' ifAbsent: [ nil ].
+	(draft isNumber and: [ draft >= 0 ]) ifTrue: [
+		result at: 'draftTokens' put: draft.
+		(accepted isNumber and: [ accepted >= 0 ]) ifTrue: [
+			result at: 'draftAcceptedTokens' put: accepted.
+			result at: 'draftAcceptanceRate' put: (draft > 0 ifTrue: [ accepted asFloat / draft asFloat ] ifFalse: [ 0.0 ]) ] ].
+	^ result
+]
+
+{ #category : 'private-telemetry' }
+PharoCAOpenAIStreamParser >> promptProgressFromWire: progress [
+	| total cache processed elapsed timedProcessed timedTotal rate |
+	total := self nonNegativeNumberAt: 'total' in: progress default: 0.
+	cache := self nonNegativeNumberAt: 'cache' in: progress default: 0.
+	processed := self nonNegativeNumberAt: 'processed' in: progress default: 0.
+	elapsed := self nonNegativeNumberAt: 'time_ms' in: progress default: 0.
+	timedProcessed := (processed - cache) max: 0.
+	timedTotal := (total - cache) max: 0.
+	rate := elapsed > 0 ifTrue: [ timedProcessed asFloat * 1000.0 / elapsed asFloat ] ifFalse: [ 0.0 ].
+	^ {
+		'source' -> 'server'.
+		'format' -> 'llama.cpp-prompt-progress'.
+		'totalTokens' -> total.
+		'cachedTokens' -> cache.
+		'processedTokens' -> processed.
+		'promptTokensProcessed' -> timedProcessed.
+		'promptTokensToProcess' -> timedTotal.
+		'elapsedMilliseconds' -> elapsed.
+		'progress' -> (total > 0 ifTrue: [ processed asFloat / total asFloat ] ifFalse: [ 0.0 ]).
+		'processingProgress' -> (timedTotal > 0 ifTrue: [ timedProcessed asFloat / timedTotal asFloat ] ifFalse: [ 1.0 ]).
+		'promptTokensPerSecond' -> rate
+	} asDictionary
+]
+
+{ #category : 'private-telemetry' }
+PharoCAOpenAIStreamParser >> shouldEmitMetricsFromWire: timings finishing: finishing usagePresent: usagePresent [
+	| predictedMs |
+	(finishing or: [ usagePresent ]) ifTrue: [
+		lastMetricsPredictedMilliseconds := timings at: 'predicted_ms' ifAbsent: [ lastMetricsPredictedMilliseconds ].
+		^ true ].
+	predictedMs := timings at: 'predicted_ms' ifAbsent: [ 0 ].
+	predictedMs isNumber ifFalse: [ ^ false ].
+	lastMetricsPredictedMilliseconds ifNil: [
+		lastMetricsPredictedMilliseconds := predictedMs.
+		^ true ].
+	(predictedMs - lastMetricsPredictedMilliseconds) >= 500 ifFalse: [ ^ false ].
+	lastMetricsPredictedMilliseconds := predictedMs.
+	^ true
+]

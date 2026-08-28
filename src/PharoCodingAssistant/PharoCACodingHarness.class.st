@@ -538,7 +538,7 @@ PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
 	modelDescriptors := self runtimeProfileRequireArray: 'models' from: profile.
 	agentDescriptors := self runtimeProfileRequireArray: 'agents' from: profile.
 	providerDescriptors do: [ :descriptor |
-		| id family baseUrl modelListUrl credentialName timeout |
+		| id family baseUrl modelListUrl credentialName timeout telemetryMode |
 		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile provider entry must be an object' ].
 		id := descriptor at: 'id' ifAbsent: [ Error signal: 'Runtime profile provider has no id' ].
 		family := descriptor at: 'family' ifAbsent: [ Error signal: 'Runtime profile provider has no family' ].
@@ -548,12 +548,14 @@ PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
 			modelListUrl := descriptor at: 'modelListUrl' ifAbsent: [ nil ].
 			credentialName := descriptor at: 'credentialName' ifAbsent: [ 'openai-api-key' ].
 			timeout := descriptor at: 'timeout' ifAbsent: [ 3600 ].
+			telemetryMode := descriptor at: 'serverTelemetryMode' ifAbsent: [ 'auto' ].
 			providerRegistry
 				registerOpenAICompatible: id
 				baseUrl: baseUrl
 				modelListUrl: modelListUrl
 				credentialName: credentialName
-				timeout: timeout ] ].
+				timeout: timeout
+				serverTelemetryMode: telemetryMode ] ].
 	modelDescriptors do: [ :descriptor |
 		| id providerId model contextSize maximumOutput capabilities |
 		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile model entry must be an object' ].
@@ -669,7 +671,7 @@ PharoCACodingHarness >> validateRuntimeProfileDictionary: profile [
 	agentDescriptors := self runtimeProfileRequireArray: 'agents' from: profile.
 	providerIds := Set withAll: self runtimeProfileBuiltinProviderIds.
 	providerDescriptors do: [ :descriptor |
-		| id family baseUrl modelListUrl credentialName timeout |
+		| id family baseUrl modelListUrl credentialName timeout telemetryMode |
 		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile provider entry must be an object' ].
 		id := descriptor at: 'id' ifAbsent: [ Error signal: 'Runtime profile provider has no id' ].
 		(id isString and: [ id trimBoth isNotEmpty ]) ifFalse: [ Error signal: 'Runtime profile provider id must be a non-empty string' ].
@@ -685,6 +687,8 @@ PharoCACodingHarness >> validateRuntimeProfileDictionary: profile [
 		(credentialName isNil or: [ credentialName isString ]) ifFalse: [ Error signal: 'Runtime profile provider credentialName must be a string or null' ].
 		timeout := descriptor at: 'timeout' ifAbsent: [ 3600 ].
 		(timeout isNumber and: [ timeout > 0 ]) ifFalse: [ Error signal: 'Runtime profile provider timeout must be positive' ].
+		telemetryMode := descriptor at: 'serverTelemetryMode' ifAbsent: [ 'auto' ].
+		((telemetryMode isString or: [ telemetryMode isSymbol ]) and: [ #('auto' 'standard' 'llamacpp') includes: telemetryMode asString asLowercase ]) ifFalse: [ Error signal: 'Runtime profile provider serverTelemetryMode must be auto, standard, or llamacpp' ].
 		providerIds add: id ].
 	modelIds := Set new.
 	modelDescriptors do: [ :descriptor |

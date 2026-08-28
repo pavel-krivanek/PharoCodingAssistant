@@ -59,6 +59,8 @@ PharoCARunTelemetry >> recordEventUnlocked: anEvent [
 	type = #contextPrepared ifTrue: [ self recordContext: payload ].
 	(#(textDelta reasoningDelta) includes: type) ifTrue: [ self recordOutputAt: anEvent timestamp ].
 	type = #usage ifTrue: [ self recordUsage: payload ].
+	type = #providerPromptProgress ifTrue: [ self recordPromptProgress: payload ].
+	type = #providerMetrics ifTrue: [ self recordProviderMetrics: payload ].
 	type = #providerRetryScheduled ifTrue: [ self recordProviderRetry: payload ].
 	type = #compactionSummaryCompleted ifTrue: [ compactionSummaryCount := compactionSummaryCount + 1 ].
 	type = #contextOverflowRecoveryScheduled ifTrue: [ contextOverflowRecoveryCount := contextOverflowRecoveryCount + 1 ].
@@ -122,6 +124,24 @@ PharoCARunTelemetry >> recordUsage: aUsage [
 	call at: 'usage' put: current
 ]
 
+
+
+
+{ #category : 'private' }
+PharoCARunTelemetry >> recordPromptProgress: aDictionary [
+	| call |
+	call := self currentModelCall.
+	call ifNil: [ ^ self ].
+	aDictionary isDictionary ifTrue: [ call at: 'promptProgress' put: aDictionary copy ]
+]
+
+{ #category : 'private' }
+PharoCARunTelemetry >> recordProviderMetrics: aDictionary [
+	| call |
+	call := self currentModelCall.
+	call ifNil: [ ^ self ].
+	aDictionary isDictionary ifTrue: [ call at: 'serverMetrics' put: aDictionary copy ]
+]
 
 { #category : 'private' }
 PharoCARunTelemetry >> recordProviderRetry: aDictionary [
@@ -190,9 +210,11 @@ PharoCARunTelemetry >> millisecondsFrom: start to: finish [
 
 { #category : 'private' }
 PharoCARunTelemetry >> serializedModelCall: call [
-	| result start finish firstOutput lastOutput generationFinish generationMilliseconds completion |
+	| result start finish firstOutput lastOutput generationFinish generationMilliseconds completion clientRate serverMetrics serverRate |
 	result := call copy.
 	(result at: 'providerRetries' ifAbsent: [ nil ]) ifNotNil: [ :retries | result at: 'providerRetries' put: (retries collect: [ :each | each copy ]) asArray ].
+	(result at: 'promptProgress' ifAbsent: [ nil ]) ifNotNil: [ :progress | result at: 'promptProgress' put: progress copy ].
+	(result at: 'serverMetrics' ifAbsent: [ nil ]) ifNotNil: [ :metrics | result at: 'serverMetrics' put: metrics copy ].
 	start := result at: 'startedAt' ifAbsent: [ nil ].
 	finish := result at: 'finishedAt' ifAbsent: [ nil ].
 	firstOutput := result at: 'firstOutputAt' ifAbsent: [ nil ].
@@ -200,6 +222,9 @@ PharoCARunTelemetry >> serializedModelCall: call [
 	generationFinish := lastOutput ifNil: [ finish ].
 	generationMilliseconds := self millisecondsFrom: firstOutput to: generationFinish.
 	completion := (result at: 'usage' ifAbsent: [ Dictionary new ]) at: 'completionTokens' ifAbsent: [ 0 ].
+	clientRate := self tokensPerSecondForCompletionTokens: completion durationMilliseconds: generationMilliseconds.
+	serverMetrics := result at: 'serverMetrics' ifAbsent: [ nil ].
+	serverRate := serverMetrics ifNil: [ nil ] ifNotNil: [ serverMetrics at: 'generationTokensPerSecond' ifAbsent: [ nil ] ].
 	start ifNotNil: [ result at: 'startedAt' put: start asString ].
 	finish ifNotNil: [ result at: 'finishedAt' put: finish asString ].
 	firstOutput ifNotNil: [ result at: 'firstOutputAt' put: firstOutput asString ].
@@ -208,7 +233,9 @@ PharoCARunTelemetry >> serializedModelCall: call [
 		at: 'durationMilliseconds' put: (self millisecondsFrom: start to: finish);
 		at: 'timeToFirstOutputMilliseconds' put: (self millisecondsFrom: start to: firstOutput);
 		at: 'generationMilliseconds' put: generationMilliseconds;
-		at: 'tokensPerSecond' put: (self tokensPerSecondForCompletionTokens: completion durationMilliseconds: generationMilliseconds).
+		at: 'clientObservedTokensPerSecond' put: clientRate;
+		at: 'tokensPerSecond' put: (serverRate ifNil: [ clientRate ]);
+		at: 'tokensPerSecondSource' put: (serverRate ifNil: [ 'client-observed' ] ifNotNil: [ 'server' ]).
 	(result at: 'status' ifAbsent: [ nil ]) ifNotNil: [ :value | result at: 'status' put: value asString ].
 	^ result
 ]
@@ -231,7 +258,7 @@ PharoCARunTelemetry >> serializedToolCall: call [
 
 { #category : 'accessing' }
 PharoCARunTelemetry >> asDictionary [
-	| result start finish calls tools generationMilliseconds tokensPerSecond |
+	| result start finish calls tools generationMilliseconds tokensPerSecond serverCalls serverPromptTokens serverPromptMs serverGenerationTokens serverGenerationMs serverCacheTokens serverInputTokens serverPromptRate serverGenerationRate |
 	mutex wait.
 	[
 		start := startedAt.
@@ -240,6 +267,16 @@ PharoCARunTelemetry >> asDictionary [
 		tools := toolCallOrder collect: [ :id | self serializedToolCall: (toolCallsById at: id) ].
 		generationMilliseconds := calls sum: [ :each | (each at: 'generationMilliseconds' ifAbsent: [ nil ]) ifNil: [ 0 ] ].
 		tokensPerSecond := self tokensPerSecondForCompletionTokens: completionTokens durationMilliseconds: generationMilliseconds.
+		serverCalls := calls select: [ :each | each includesKey: 'serverMetrics' ].
+		serverPromptTokens := serverCalls sum: [ :each | (each at: 'serverMetrics') at: 'promptTokensEvaluated' ifAbsent: [ 0 ] ].
+		serverPromptMs := serverCalls sum: [ :each | (each at: 'serverMetrics') at: 'promptMilliseconds' ifAbsent: [ 0 ] ].
+		serverGenerationTokens := serverCalls sum: [ :each | (each at: 'serverMetrics') at: 'generationTokens' ifAbsent: [ 0 ] ].
+		serverGenerationMs := serverCalls sum: [ :each | (each at: 'serverMetrics') at: 'generationMilliseconds' ifAbsent: [ 0 ] ].
+		serverCacheTokens := serverCalls sum: [ :each | (each at: 'serverMetrics') at: 'cacheTokens' ifAbsent: [ 0 ] ].
+		serverInputTokens := serverCacheTokens + serverPromptTokens.
+		serverPromptRate := self tokensPerSecondForCompletionTokens: serverPromptTokens durationMilliseconds: serverPromptMs.
+		serverGenerationRate := self tokensPerSecondForCompletionTokens: serverGenerationTokens durationMilliseconds: serverGenerationMs.
+		serverGenerationRate ifNotNil: [ tokensPerSecond := serverGenerationRate ].
 		result := {
 			'runId' -> runId.
 			'agentClass' -> agentClass.
@@ -260,6 +297,14 @@ PharoCARunTelemetry >> asDictionary [
 			'reasoningTokens' -> reasoningTokens.
 			'generationMilliseconds' -> generationMilliseconds.
 			'tokensPerSecond' -> tokensPerSecond.
+			'tokensPerSecondSource' -> (serverGenerationRate ifNil: [ 'client-observed' ] ifNotNil: [ 'server' ]).
+			'serverTimingsAvailable' -> serverCalls notEmpty.
+			'promptTokensEvaluated' -> serverPromptTokens.
+			'cachedPromptTokens' -> serverCacheTokens.
+			'promptCacheHitRatio' -> (serverInputTokens > 0 ifTrue: [ serverCacheTokens asFloat / serverInputTokens asFloat ] ifFalse: [ 0.0 ]).
+			'promptTokensPerSecond' -> serverPromptRate.
+			'serverGenerationMilliseconds' -> serverGenerationMs.
+			'serverGenerationTokensPerSecond' -> serverGenerationRate.
 			'providerRetryCount' -> providerRetryCount.
 			'compactionSummaryCount' -> compactionSummaryCount.
 			'contextOverflowRecoveryCount' -> contextOverflowRecoveryCount.

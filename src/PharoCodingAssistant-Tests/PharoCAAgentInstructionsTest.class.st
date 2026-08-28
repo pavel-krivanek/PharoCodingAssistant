@@ -253,8 +253,8 @@ PharoCAAgentInstructionsTest >> testPassingRunTestsInjectsCompletionGuidanceOnNe
 	self assert: (agent progressGuidanceInstructionSourceForRun: run) isNil
 ]
 
-{ #category : 'tests-067' }
-PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesInstructionsButKeepsRecommendedPacksLazy [
+{ #category : 'tests-071' }
+PharoCAAgentInstructionsTest >> testNamedSkillInPromptRemainsInactiveUntilModelChoosesIt [
 	| provider agent session run system names activeSkills activePacks |
 	provider := PharoCATestLLMProvider new.
 	provider queueResponse: (self completionWith: 'done').
@@ -264,20 +264,40 @@ PharoCAAgentInstructionsTest >> testNamedSkillInPromptAutoActivatesInstructionsB
 	self assert: run status equals: #completed.
 	self assert: provider requests size equals: 1.
 	system := self systemContentFromPayload: provider payloads first.
-	self assert: (system includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
-	self assert: (system includesSubstring: 'browse and ui packs are recommended but remain lazy').
+	self deny: (system includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
+	self assert: (system includesSubstring: 'Spec2 (desktop UI)').
+	self assert: (system includesSubstring: 'Choose activate_skill when relevant').
 	names := (provider requests first toolDefinitions collect: #name) asSet.
+	self assert: (names includes: 'activate_skill').
+	self assert: (names includes: 'list_skills').
 	self deny: (names includes: 'ui_list_windows').
-	self deny: (names includes: 'search_tools').
-	self assert: (names includes: 'search_classes').
-	self assert: (names includes: 'list_methods').
-	self assert: (names includes: 'tool_enable').
 	activeSkills := agent skillRegistry activeSkillNamesForSession: session.
-	self assert: (activeSkills includes: 'Smalltalk Core').
-	self assert: (activeSkills includes: 'Spec2').
+	self assert: activeSkills equals: #('Smalltalk Core').
 	activePacks := agent toolRegistry activePackNamesForSession: session.
 	self assert: activePacks equals: #('catalog' 'core').
-	self assert: (run events anySatisfy: [ :event | event type = #skillAutoActivated ])
+	self deny: (run events anySatisfy: [ :event | event type = #skillAutoActivated ])
+]
+
+{ #category : 'tests-071' }
+PharoCAAgentInstructionsTest >> testModelChosenSpec2SkillAppearsOnlyAfterActivateSkillCall [
+	| provider agent session run firstSystem secondSystem activeSkills |
+	provider := PharoCATestLLMProvider new.
+	provider
+		queueResponse: (self toolCallCompletionNamed: 'activate_skill' arguments: '{"name":"Spec2"}' id: 'spec2-skill');
+		queueResponse: (self completionWith: 'done').
+	agent := PharoCA new provider: provider; yourself.
+	session := agent newSession.
+	run := agent run: 'create a Spec2 counter application' inSession: session.
+	self assert: run status equals: #completed.
+	self assert: provider payloads size equals: 2.
+	firstSystem := self systemContentFromPayload: provider payloads first.
+	secondSystem := self systemContentFromPayload: provider payloads second.
+	self deny: (firstSystem includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
+	self assert: (secondSystem includesSubstring: 'Do **not** subclass `SpWindowPresenter`').
+	activeSkills := agent skillRegistry activeSkillNamesForSession: session.
+	self assert: activeSkills asSet equals: #('Smalltalk Core' 'Spec2') asSet.
+	self assert: (run events anySatisfy: [ :event | event type = #skillActivated ]).
+	self deny: (run events anySatisfy: [ :event | event type = #skillAutoActivated ])
 ]
 
 { #category : 'tests-066' }
