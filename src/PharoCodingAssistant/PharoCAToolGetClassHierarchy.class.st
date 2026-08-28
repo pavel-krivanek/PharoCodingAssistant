@@ -12,7 +12,7 @@ PharoCAToolGetClassHierarchy class >> execute: args [
 	| aClass classSymbol relation items page |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
-		^ self classNotFoundResultFor: (args at: 'className') ].
+		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
 	relation := args at: 'relation' ifAbsent: [ 'superclasses' ].
 	items := relation = 'superclasses'
 		ifTrue: [ aClass allSuperclasses collect: [ :c | c name ] ]

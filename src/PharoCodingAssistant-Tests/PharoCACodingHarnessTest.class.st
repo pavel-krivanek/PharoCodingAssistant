@@ -46,7 +46,7 @@ PharoCACodingHarnessTest >> testReloadAppliesEffectiveSettingsAndResources [
 	self assert: harness agent contextBuilder policy safetyMarginTokens equals: 99.
 	self assert: harness agent skillRegistry discoveryCharacterBudget equals: 321.
 	self assert: harness agent instructionRegistry size equals: resources instructions size.
-	self assert: harness agent skillRegistry size equals: 6.
+	self assert: harness agent skillRegistry size equals: 5.
 	self deny: workspace trusted
 ]
 

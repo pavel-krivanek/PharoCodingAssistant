@@ -129,15 +129,9 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolIcebergClone
 		PharoCAToolIcebergAddLocalRepository
 		PharoCAToolUIListWindows
-		PharoCAToolUIWindowInfo
-		PharoCAToolUIWindowActivate
-		PharoCAToolUIWindowSetState
-		PharoCAToolUIWindowSetBounds
-		PharoCAToolUIWindowClose
 		PharoCAToolUIScreenshot
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
-		PharoCAToolCompileMethods
 		PharoCAToolFormatCode
 		PharoCAToolQualityRules
 		PharoCAToolQualityCheck
@@ -177,27 +171,22 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 { #category : 'accessing' }
 PharoCAToolRegistry >> definitions [
 	"Compatibility projection retained for pre-016 clients. The agent uses llmDefinitions."
-	^ ((self advertisedToolsForSession: nil) collect: [ :tool | tool toolDefinition ]) asArray
+	^ (self enabledTools collect: [ :tool | tool toolDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> llmDefinitions [
-	^ ((self advertisedToolsForSession: nil) collect: [ :tool | tool llmDefinition ]) asArray
+	^ (self enabledTools collect: [ :tool | tool llmDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> llmDefinitionsForSession: aSession [
-	^ ((self advertisedToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
+	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool llmDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
 PharoCAToolRegistry >> definitionsForSession: aSession [
-	^ ((self advertisedToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
-]
-
-{ #category : 'accessing' }
-PharoCAToolRegistry >> advertisedToolsForSession: aSession [
-	^ (self enabledToolsForSession: aSession) select: [ :tool | tool isAdvertisedToModel ]
+	^ ((self enabledToolsForSession: aSession) collect: [ :tool | tool toolDefinition ]) asArray
 ]
 
 { #category : 'accessing' }
@@ -433,7 +422,7 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 				errorType: #tool_timeout
 				message: error description ]
 	] on: Error do: [ :error |
-		^ self executionErrorFor: error tool: tool arguments: arguments ].
+		^ self executionErrorFor: error tool: tool ].
 	envelope := self normalizeRawResult: raw.
 	[ serialized := STONJSON toString: envelope ]
 		on: Error
@@ -454,151 +443,19 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 ]
 
 { #category : 'private' }
-PharoCAToolRegistry >> executionErrorFor: error tool: tool arguments: arguments [
+PharoCAToolRegistry >> executionErrorFor: error tool: tool [
 	| description details |
 	description := error description.
 	details := nil.
-	((#(compile_method compile_methods) includes: tool toolName) and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
+	(tool toolName = #compile_method and: [ description includesSubstring: 'Undeclared variable named' ]) ifTrue: [
 		details := {
 			'diagnosticType' -> 'undeclared_variable'.
 			'hint' -> 'A bare identifier in a method body is a variable reference. If you intended a unary message to the receiver, write self selector (for example self classToTest). Otherwise declare the temporary or instance variable.'
 		} asDictionary ].
-	((#(compile_method compile_methods) includes: tool toolName) and: [ description includesSubstring: 'SyntaxErrorNotice' ]) ifTrue: [
-		details := self syntaxErrorDetailsFor: description source: (arguments at: 'source' ifAbsent: [ '' ]) ].
-	(error isKindOf: MessageNotUnderstood) ifTrue: [
-		details := self messageNotUnderstoodDetailsFor: error ].
 	^ PharoCAToolResult
 		errorType: #tool_execution_error
 		message: description
 		details: details
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> commonPrefixLengthBetween: firstString and: secondString [
-	| limit index |
-	limit := firstString size min: secondString size.
-	index := 1.
-	[ index <= limit and: [ (firstString at: index) = (secondString at: index) ] ] whileTrue: [ index := index + 1 ].
-	^ index - 1
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> selectorSuggestionsFor: selector receiver: receiver limit: limit [
-	| query candidates prefix filtered sorted |
-	query := selector asString.
-	candidates := receiver class allSelectors collect: [ :each | each asString ].
-	prefix := query copyFrom: 1 to: (query size min: 3).
-	filtered := candidates select: [ :candidate |
-		(candidate beginsWith: prefix) or: [
-			(self commonPrefixLengthBetween: query and: candidate) >= 2 ] ].
-	sorted := filtered asSortedCollection: [ :a :b |
-		| aPrefix bPrefix |
-		aPrefix := self commonPrefixLengthBetween: query and: a.
-		bPrefix := self commonPrefixLengthBetween: query and: b.
-		aPrefix = bPrefix
-			ifTrue: [
-				(query size - a size) abs = (query size - b size) abs
-					ifTrue: [ a <= b ]
-					ifFalse: [ (query size - a size) abs < (query size - b size) abs ] ]
-			ifFalse: [ aPrefix > bPrefix ] ].
-	^ (sorted copyFrom: 1 to: (limit min: sorted size)) asArray
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> keywordPrefixSelectorFor: selector receiver: receiver [
-	| source firstColon secondColon prefix |
-	source := selector asString.
-	firstColon := source findString: ':' startingAt: 1.
-	firstColon = 0 ifTrue: [ ^ nil ].
-	secondColon := source findString: ':' startingAt: firstColon + 1.
-	secondColon = 0 ifTrue: [ ^ nil ].
-	prefix := (source copyFrom: 1 to: firstColon) asSymbol.
-	(receiver respondsTo: prefix) ifFalse: [ ^ nil ].
-	^ prefix
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> slotMatchingSelector: selector receiver: receiver [
-	| selectorName |
-	selector numArgs = 0 ifFalse: [ ^ nil ].
-	selectorName := selector asString.
-	^ receiver class allSlots
-		detect: [ :slot | slot name asString = selectorName ]
-		ifNone: [ nil ]
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> messageNotUnderstoodDetailsFor: error [
-	| selector receiver suggestions details slot prefixSelector |
-	selector := error message selector.
-	receiver := error receiver.
-	suggestions := self selectorSuggestionsFor: selector receiver: receiver limit: 5.
-	slot := self slotMatchingSelector: selector receiver: receiver.
-	slot ifNotNil: [
-		^ {
-			'diagnosticType' -> 'slot_without_accessor'.
-			'receiverClass' -> receiver class name asString.
-			'selector' -> selector asString.
-			'slotName' -> slot name asString.
-			'suggestions' -> suggestions.
-			'hint' -> ('The receiver class has an instance slot named #', slot name asString, ' but no accessor method #', selector asString, '. Slots are not automatically messages. Inside methods of the class use the bare slot name; for external access compile an accessor such as `', selector asString, ' ^ ', slot name asString, '`.')
-		} asDictionary ].
-	prefixSelector := self keywordPrefixSelectorFor: selector receiver: receiver.
-	prefixSelector ifNotNil: [
-		^ {
-			'diagnosticType' -> 'probable_keyword_message_chaining'.
-			'receiverClass' -> receiver class name asString.
-			'selector' -> selector asString.
-			'knownPrefixSelector' -> prefixSelector asString.
-			'suggestions' -> suggestions.
-			'hint' -> ('Smalltalk combines adjacent keyword parts into one selector. This receiver understands #', prefixSelector asString, ' but not #', selector asString, '. If you intended a second keyword message, parenthesize the first keyword expression before sending the next one.')
-		} asDictionary ].
-	details := {
-		'diagnosticType' -> 'message_not_understood'.
-		'receiverClass' -> receiver class name asString.
-		'selector' -> selector asString.
-		'suggestions' -> suggestions
-	} asDictionary.
-	suggestions isEmpty ifFalse: [
-		details at: 'hint' put: 'Nearby selectors are from the actual receiver class hierarchy; prefer them or browse the receiver before trying more reflection DoIts.' ].
-	^ details
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> syntaxErrorOffsetFrom: description [
-	| marker start index digits character |
-	marker := 'SyntaxErrorNotice('.
-	start := description findString: marker startingAt: 1.
-	start = 0 ifTrue: [ ^ nil ].
-	index := start + marker size.
-	digits := String new writeStream.
-	[ index <= description size and: [ character := description at: index. character isDigit ] ] whileTrue: [
-		digits nextPut: character.
-		index := index + 1 ].
-	digits position = 0 ifTrue: [ ^ nil ].
-	^ digits contents asInteger
-]
-
-{ #category : 'diagnostics' }
-PharoCAToolRegistry >> syntaxErrorDetailsFor: description source: source [
-	| offset line column previousNewline details lines |
-	offset := self syntaxErrorOffsetFrom: description.
-	details := { 'diagnosticType' -> 'syntax_error' } asDictionary.
-	offset ifNotNil: [
-		line := 1.
-		previousNewline := 0.
-		1 to: (offset min: source size) do: [ :index |
-			(source at: index) = Character lf ifTrue: [ line := line + 1. previousNewline := index ] ].
-		column := offset - previousNewline.
-		details
-			at: 'offset' put: offset;
-			at: 'line' put: line;
-			at: 'column' put: column.
-		lines := source lines.
-		(line between: 1 and: lines size) ifTrue: [ details at: 'sourceLine' put: (lines at: line) ] ].
-	((source includesSubstring: ' at ') and: [ source includesSubstring: 'extent:' ]) ifTrue: [
-		details at: 'hint' put: 'If you intended a Point, use x @ y (for example 260 @ 180). `at:` is collection access; `260 at 180` is not Point construction syntax.' ].
-	^ details
 ]
 
 { #category : 'private' }
@@ -788,11 +645,7 @@ PharoCAToolRegistry >> scheduler: aScheduler [
 
 { #category : 'lookup' }
 PharoCAToolRegistry >> toolNamed: aName ifAbsent: aBlock [
-	| key |
-	key := aName asSymbol.
-	"066 compatibility: old clients may still invoke tool_search, but the alias is intentionally not advertised to models."
-	key = #tool_search ifTrue: [ key := #search_tools ].
-	^ toolsByName at: key ifAbsent: aBlock
+	^ toolsByName at: aName asSymbol ifAbsent: aBlock
 ]
 
 { #category : 'accessing' }

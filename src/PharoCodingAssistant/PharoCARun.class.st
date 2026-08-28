@@ -35,8 +35,7 @@ Class {
 		'beforeFinishDone',
 		'completionClaimed',
 		'telemetry',
-		'inputMessage',
-		'cancellationReason'
+		'inputMessage'
 	],
 	#classVars : [ 'LayoutBindingGeneration', 'LayoutBindingMutex' ],
 	#category : 'PharoCodingAssistant-Core',
@@ -124,15 +123,9 @@ PharoCARun >> beginModelRequestCancellationToken [
 
 { #category : 'control' }
 PharoCARun >> cancel [
-	^ self cancelWithReason: #userInterrupt
-]
-
-{ #category : 'control' }
-PharoCARun >> cancelWithReason: aReason [
 	finished ifTrue: [ ^ self ].
 	cancellationToken cancelled ifTrue: [ ^ self ].
-	cancellationReason := aReason asSymbol.
-	self emit: #cancellationRequested payload: { 'reason' -> cancellationReason asString } asDictionary.
+	self emit: #cancellationRequested payload: nil.
 	cancellationToken cancel
 ]
 
@@ -144,11 +137,6 @@ PharoCARun >> cancelled [
 { #category : 'accessing' }
 PharoCARun >> cancellationToken [
 	^ cancellationToken
-]
-
-{ #category : 'accessing' }
-PharoCARun >> cancellationReason [
-	^ cancellationReason
 ]
 
 { #category : 'context' }
@@ -355,8 +343,7 @@ PharoCARun >> initialize [
 	beforeFinishBlock := [ ].
 	beforeFinishDone := false.
 	completionClaimed := false.
-	telemetry := PharoCARunTelemetry new runId: id; yourself.
-	cancellationReason := nil
+	telemetry := PharoCARunTelemetry new runId: id; yourself
 ]
 
 { #category : 'testing' }

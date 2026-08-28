@@ -133,14 +133,3 @@ PharoCAEnvironmentTest >> testEnvironmentIdentityCannotChangeAfterJournalHasEntr
 	self assert: environment identifier equals: 'original'.
 	self assert: environment changeJournal size equals: 1
 ]
-
-
-{ #category : 'tests-067' }
-PharoCAEnvironmentTest >> testArtifactStoreRepairsMissingMigratedState [
-	| environment store |
-	environment := PharoCAEnvironment named: 'artifact-repair-', UUID new asString.
-	environment artifactStore: nil.
-	store := environment artifactStore.
-	self assert: store class equals: PharoCAArtifactStore.
-	self assert: environment artifactStore identicalTo: store
-]

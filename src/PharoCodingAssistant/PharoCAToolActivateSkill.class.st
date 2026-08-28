@@ -14,12 +14,16 @@ PharoCAToolActivateSkill class >> execute: args [
 
 { #category : 'execution' }
 PharoCAToolActivateSkill class >> execute: args context: aContext [
-	| run result |
+	| run skill |
 	run := aContext run ifNil: [ Error signal: 'activate_skill requires an active agent run' ].
-	result := run agent activateSkillNamed: (args at: 'name') forSession: run session.
-	result at: 'instructionsLoadedIntoNextContext' put: true.
-	run emit: #skillActivated payload: ((run agent skillRegistry skillNamed: (args at: 'name') ifAbsent: [ self error: 'Unknown skill' ]) asMetadataDictionary).
-	^ result
+	skill := run agent skillRegistry activateNamed: (args at: 'name') session: run session.
+	run emit: #skillActivated payload: skill asMetadataDictionary.
+	^ {
+		'name' -> skill name.
+		'description' -> skill description.
+		'active' -> true.
+		'instructionsLoadedIntoNextContext' -> true
+	} asDictionary
 ]
 
 { #category : 'definition' }
@@ -32,7 +36,7 @@ PharoCAToolActivateSkill class >> executionMode [ ^ #sequential ]
 PharoCAToolActivateSkill class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'activate_skill'
-		description: 'Activates a named skill for this session. Instructions are injected into later context; recommended tool packs remain lazy and can be enabled with tool_enable.'
+		description: 'Activates a named skill for this session. The full skill instructions are not returned by the tool; they are injected into subsequent model context.'
 		parameters: { 'properties' -> { 'name' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'name' }. 'type' -> 'object' } asDictionary
 ]
 

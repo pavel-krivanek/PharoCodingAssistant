@@ -41,7 +41,7 @@ PharoCAToolGetMethod class >> llmDefinition [
 PharoCAToolGetMethod class >> execute: args [
 	| aClass side behavior selector method source page package baseClass tag scope |
 	aClass := Smalltalk globals at: (args at: 'className') asSymbol ifAbsent: [
-		^ self classNotFoundResultFor: (args at: 'className') ].
+		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
 	side := args at: 'side' ifAbsent: [ 'instance' ].
 	behavior := side = 'class' ifTrue: [ aClass class ] ifFalse: [ aClass ].
 	selector := (args at: 'selector') asSymbol.

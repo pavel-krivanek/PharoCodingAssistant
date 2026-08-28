@@ -45,9 +45,6 @@ PharoCAAgentCoreTest >> testRunCapturesConversationAndEvents [
 	self assert: run answer equals: 'answer'.
 	self assert: run iterations equals: 1.
 	self assert: run conversation size equals: 3.
-	self assert: run session entries last type equals: #runTerminal.
-	self assert: (run session entries last payload at: 'status') equals: 'completed'.
-	self assert: (run session entries last payload at: 'reason') equals: 'completed'.
 	self assert: (run events anySatisfy: [ :each | each type = #textDelta ]).
 	self assert: (run events anySatisfy: [ :each | each type = #completed ])
 ]
@@ -136,8 +133,5 @@ PharoCAAgentCoreTest >> testCancellationPropagatesToActiveProvider [
 	self assert: provider cancellationObserved.
 	self assert: run cancelled.
 	self assert: run status equals: #cancelled.
-	self assert: run error isNil.
-	self assert: run session entries last type equals: #runTerminal.
-	self assert: (run session entries last payload at: 'status') equals: 'cancelled'.
-	self assert: (run session entries last payload at: 'reason') equals: 'userInterrupt'
+	self assert: run error isNil
 ]

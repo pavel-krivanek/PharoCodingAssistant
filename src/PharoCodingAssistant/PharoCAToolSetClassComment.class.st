@@ -19,7 +19,7 @@ PharoCAToolSetClassComment class >> execute: args context: context [
 	aClass := Smalltalk at: classSymbol ifAbsent: [
 		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
 	oldComment := aClass comment.
-	newComment := self normalizedComment: (args at: 'comment').
+	newComment := args at: 'comment'.
 	aClass comment: newComment.
 	context
 		recordChangeKind: #classCommentChanged
@@ -27,18 +27,7 @@ PharoCAToolSetClassComment class >> execute: args context: context [
 		before: oldComment
 		after: newComment
 		metadata: Dictionary new.
-	^ {
-		'result' -> 'Comment set successfully'.
-		'comment' -> newComment.
-		'normalizedSmalltalkDelimiters' -> (newComment ~= (args at: 'comment'))
-	} asDictionary
-]
-
-{ #category : 'private' }
-PharoCAToolSetClassComment class >> normalizedComment: aString [
-	(aString size >= 2 and: [ aString first = $" and: [ aString last = $" ] ]) ifTrue: [
-		^ aString copyFrom: 2 to: aString size - 1 ].
-	^ aString
+	^ { 'result' -> 'Comment set successfully' } asDictionary
 ]
 
 { #category : 'definition' }

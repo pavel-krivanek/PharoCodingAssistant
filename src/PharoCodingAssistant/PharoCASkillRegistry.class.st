@@ -120,8 +120,7 @@ PharoCASkillRegistry >> initialize [
 
 { #category : 'instructions' }
 PharoCASkillRegistry >> instructionSourcesForSession: aSession [
-	^ (((self activeSkillsForSession: aSession) reject: [ :each | each embeddedInSystemPrompt ])
-		collect: [ :each | each asInstructionSource ]) asArray
+	^ ((self activeSkillsForSession: aSession) collect: [ :each | each asInstructionSource ]) asArray
 ]
 
 { #category : 'registration' }
@@ -174,10 +173,8 @@ PharoCASkillRegistry >> unregisterNamed: aName [
 
 { #category : 'persistence' }
 PharoCASkillRegistry >> restoreActiveSkillNames: names forSession: aSession [
-	| normalized core |
-	normalized := (names collect: [ :each | each asString ]) asOrderedCollection.
-	core := self skillNamed: 'Smalltalk Core' ifAbsent: [ nil ].
-	(core notNil and: [ (normalized includes: 'Smalltalk Core') not ]) ifTrue: [ normalized add: 'Smalltalk Core' ].
+	| normalized |
+	normalized := names collect: [ :each | each asString ].
 	normalized do: [ :name |
 		self skillNamed: name ifAbsent: [ Error signal: 'Cannot restore unknown active skill: ', name ] ].
 	mutex wait.

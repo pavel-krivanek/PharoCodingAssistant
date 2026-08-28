@@ -14,15 +14,14 @@ PharoCAToolCompileMethod class >> execute: args [
 
 { #category : 'execution' }
 PharoCAToolCompileMethod class >> execute: args context: context [
-	| aClass classSymbol side targetClass source protocol rawProtocol selector before after kind result |
+	| aClass classSymbol side targetClass source protocol selector before after kind |
 	classSymbol := (args at: 'className') asSymbol.
 	aClass := Smalltalk at: classSymbol ifAbsent: [
 		^ { 'error' -> ('Class not found: ', (args at: 'className')) } asDictionary ].
 	side := args at: 'side' ifAbsent: [ 'instance' ].
 	targetClass := side = 'class' ifTrue: [ aClass class ] ifFalse: [ aClass ].
 	source := args at: 'source'.
-	rawProtocol := args at: 'protocol' ifAbsent: [ 'as yet unclassified' ].
-	protocol := self normalizedProtocol: rawProtocol.
+	protocol := args at: 'protocol' ifAbsent: [ 'as yet unclassified' ].
 	selector := (targetClass compiler source: source; parse) selector.
 	before := self methodSnapshotFor: targetClass selector: selector.
 	selector := targetClass compile: source classified: protocol.
@@ -34,15 +33,12 @@ PharoCAToolCompileMethod class >> execute: args context: context [
 		before: before
 		after: after
 		metadata: { 'side' -> side. 'className' -> aClass name. 'selector' -> selector asString } asDictionary.
-	result := {
+	^ {
 		'status' -> 'ok'.
 		'className' -> aClass name.
 		'side' -> side.
-		'selector' -> selector asString.
-		'protocol' -> protocol
-	} asDictionary.
-	rawProtocol = protocol ifFalse: [ result at: 'protocolNormalizedFrom' put: rawProtocol ].
-	^ result
+		'selector' -> selector asString
+	} asDictionary
 ]
 
 { #category : 'definition' }
@@ -55,19 +51,9 @@ PharoCAToolCompileMethod class >> executionMode [ ^ #exclusiveMutation ]
 PharoCAToolCompileMethod class >> llmDefinition [
 	^ PharoCALLMToolDefinition
 		name: 'compile_method'
-		description: 'Compile exactly one method. For several methods in one class/side use compile_methods. side defaults to instance; protocol is optional.'
+		description: 'Compiles a method into a class. side: instance|class (default instance). Optional protocol. On undeclared-variable errors, remember that a bare identifier is a variable reference; use self selector for a unary message to the receiver.'
 		parameters: { 'properties' -> { 'source' -> { 'type' -> 'string' } asDictionary. 'side' -> { 'type' -> 'string' } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'protocol' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'className'. 'source' }. 'type' -> 'object' } asDictionary
 ]
 
 { #category : 'definition' }
 PharoCAToolCompileMethod class >> toolName [ ^ #compile_method ]
-
-
-{ #category : 'private' }
-PharoCAToolCompileMethod class >> normalizedProtocol: protocolName [
-	| string |
-	string := protocolName asString.
-	(string size >= 2 and: [ string first = $' and: [ string last = $' ] ]) ifTrue: [
-		^ string copyFrom: 2 to: string size - 1 ].
-	^ string
-]

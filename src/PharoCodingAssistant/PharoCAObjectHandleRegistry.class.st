@@ -57,28 +57,6 @@ PharoCAObjectHandleRegistry >> add: anObject [
 	^ handle
 ]
 
-
-{ #category : 'adding' }
-PharoCAObjectHandleRegistry >> addOrReuse: anObject [
-	| handle now existing |
-	mutex critical: [
-		now := self now.
-		self purgeExpiredLockedAt: now.
-		existing := entries associations detect: [ :association | (association value at: 'object') == anObject ] ifNone: [ nil ].
-		existing
-			ifNotNil: [
-				handle := existing key.
-				existing value at: 'expiresAt' put: now + ttlMilliseconds ]
-			ifNil: [
-				nextNumber := nextNumber + 1.
-				handle := 'obj-', nextNumber asString.
-				entries at: handle put: {
-					'object' -> anObject.
-					'expiresAt' -> (now + ttlMilliseconds)
-				} asDictionary ] ].
-	^ handle
-]
-
 { #category : 'lookup' }
 PharoCAObjectHandleRegistry >> objectAt: aHandle [
 	| entry now object |

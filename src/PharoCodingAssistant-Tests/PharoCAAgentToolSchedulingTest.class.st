@@ -166,9 +166,8 @@ PharoCAAgentToolSchedulingTest >> testConversationEntryEventsArePublishedAsEntri
 	self assert: (run waitTimeoutMilliseconds: 1000).
 	self assert: run status equals: #completed.
 	entryEvents := run events select: [ :event | event type = #conversationEntryAdded ].
-	"Assistant(tool calls), two tool results, final assistant answer, then the persisted run terminal entry."
-	self assert: entryEvents size equals: 5.
-	self assert: (entryEvents last payload at: 'entryType') equals: 'runTerminal'.
+	"Assistant(tool calls), two tool results, then the final assistant answer."
+	self assert: entryEvents size equals: 4.
 	entryIds := entryEvents collect: [ :event | event payload at: 'entryId' ].
 	sessionEntryIds := run session entries collect: #id.
 	entryIds do: [ :entryId | self assert: (sessionEntryIds includes: entryId) ]
