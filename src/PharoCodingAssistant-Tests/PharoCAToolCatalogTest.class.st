@@ -61,6 +61,8 @@ PharoCAToolCatalogTest >> testDefaultSessionExposesCatalogAndCoreButNotBrowsePac
 	self deny: (names includes: 'get_method').
 	self deny: (names includes: 'list_package_tags').
 	self deny: (names includes: 'search_method_source').
+	self deny: (names includes: 'web_search').
+	self deny: (names includes: 'web_fetch').
 	self assert: (agent toolRegistry activePackNamesForSession: session) equals: #('catalog' 'core')
 ]
 

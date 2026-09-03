@@ -29,7 +29,7 @@ PharoCAToolRegistry class >> defaultActivePackNames [
 
 { #category : 'defaults' }
 PharoCAToolRegistry class >> defaultCatalogRevision [
-	^ 70
+	^ 73
 ]
 
 { #category : 'defaults' }
@@ -141,6 +141,8 @@ PharoCAToolRegistry class >> defaultToolClassNames [
 		PharoCAToolUIWindowSetBounds
 		PharoCAToolUIWindowClose
 		PharoCAToolUIScreenshot
+		PharoCAToolWebSearch
+		PharoCAToolWebFetch
 		PharoCAToolActivateSkill
 		PharoCAToolCompileMethod
 		PharoCAToolCompileMethods

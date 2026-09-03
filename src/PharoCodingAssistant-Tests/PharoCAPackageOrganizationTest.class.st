@@ -13,7 +13,7 @@ PharoCAPackageOrganizationTest >> testProductionPackageUsesClassTags [
 	expectedTags := #(
 		Adapters Artifacts Changes Context Core Environment Extensions Instructions LLM
 		Observability Protocol Runtime Sessions Skills Tools 'Tools-Pharo'
-		'Tools-Pharo-Refactoring' 'Tools-UI' 'Tools-Workspace' UI Web Workspace).
+		'Tools-Pharo-Refactoring' 'Tools-UI' 'Tools-Web' 'Tools-Workspace' UI Web Workspace).
 
 	self assert: (package classesTaggedWith: package rootTagName) isEmpty.
 	expectedTags do: [ :tagName |
@@ -33,6 +33,7 @@ PharoCAPackageOrganizationTest >> testRepresentativeClassesAreInExpectedTags [
 	self assert: (package tagOf: PharoCAToolWorkspaceReadFile) name equals: #'Tools-Workspace'.
 	self assert: (package tagOf: PharoCAArtifactStore) name equals: #Artifacts.
 	self assert: (package tagOf: PharoCAToolUIScreenshot) name equals: #'Tools-UI'.
+	self assert: (package tagOf: PharoCAToolWebSearch) name equals: #'Tools-Web'.
 	self assert: (package tagOf: PharoCAUICapture) name equals: #UI.
 	self assert: (package tagOf: PharoCAWebServer) name equals: #Web
 ]

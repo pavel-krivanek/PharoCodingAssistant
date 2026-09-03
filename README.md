@@ -723,6 +723,17 @@ The lazy `browse` pack contains the Pharo-native browsing and structural-search 
 
 The model starts with live-image `search_classes` plus the compact core browsing/editing surface. When a domain skill or a concrete failure indicates a deeper capability, `tool_enable` activates `browse` or another lazy pack for the next model request. Harness-tool catalog search is still available to external/compatibility callers, but it no longer competes with image search for the model's attention.
 
+The lazy `web` pack vendors the dependency-light `PharoDuckDuckGo` client and exposes two bounded read-only tools without adding schemas to normal startup:
+
+```smalltalk
+tool_enable pack: "web"
+```
+
+- `web_search` searches DuckDuckGo text, news, images, or videos and normalizes results to a compact agent-facing shape. It supports region/safe-search/time/page/result bounds plus media filters.
+- `web_fetch` retrieves one HTTP(S) URL through the same client, strips HTML to lightweight plain text, and returns at most 6,000 characters by default with continuation offsets.
+
+DuckDuckGo's web-facing search endpoints are not a contractual search API and can rate-limit automated traffic. The tool intentionally runs sequentially, uses the client's 15-second HTTP timeout, returns bounded results, and does not retry aggressively. No API key is required.
+
 #### `quality` pack
 
 Iteration 058 adds a lazy read-only code-quality pack backed by the QualityAssistant/Smalllint implementation already present in the supported Pharo 14 image:

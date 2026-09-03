@@ -20,6 +20,7 @@ PharoCAConfigurationTest >> testDefaults [
 	self assert: (configuration systemPrompt includesSubstring: 'structured tools for browsing').
 	self assert: (configuration systemPrompt includesSubstring: 'search_classes searches the live image').
 	self assert: (configuration systemPrompt includesSubstring: 'tests, debugging, refactoring').
+	self assert: (configuration systemPrompt includesSubstring: 'web=internet').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://class/Class').
 	self assert: (configuration systemPrompt includesSubstring: 'pharo://method/Class/instance/selector').
 	self assert: (configuration systemPrompt includesSubstring: 'URL-encode path parts').
