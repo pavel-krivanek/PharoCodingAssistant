@@ -59,3 +59,9 @@ PharoCATestBlockingReadTool class >> llmDefinition [
 PharoCATestBlockingReadTool class >> toolName [
 	^ #test_blocking_read
 ]
+
+{ #category : 'testing' }
+PharoCATestBlockingReadTool class >> loadingStrategy [
+	"Test fixture: available only when explicitly registered by its test."
+	^ #disabled
+]

@@ -359,5 +359,5 @@ PharoCAToolCatalogTest >> testSavedImageStyleStaleAgentToolRegistrySelfHealsDefa
 	self assert: (names includes: 'compile_methods').
 	self assert: (names includes: 'ui_screenshot').
 	self assert: (names includes: 'search_classes').
-	self assert: agent toolRegistry tools size equals: PharoCAToolRegistry defaultToolClassNames size
+	self assert: agent toolRegistry tools asSet equals: PharoCAToolRegistry discoveredToolClasses asSet
 ]

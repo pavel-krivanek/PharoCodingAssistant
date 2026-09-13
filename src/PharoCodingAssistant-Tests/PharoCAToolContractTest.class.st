@@ -100,9 +100,8 @@ PharoCAToolContractTest >> testEveryToolHasAValidPackName [
 ]
 
 { #category : 'tests' }
-PharoCAToolContractTest >> testDefaultRegistryCoversEveryProductionToolSubclass [
-	| productionTools registered |
-	productionTools := PharoCATool allSubclasses select: [ :tool | tool package name = 'PharoCodingAssistant' and: [ tool isAbstract not ] ].
+PharoCAToolContractTest >> testDefaultRegistryCoversEveryDiscoveredToolSubclass [
+	| registered |
 	registered := PharoCAToolRegistry default tools.
-	self assert: registered asSet equals: productionTools asSet
+	self assert: registered asSet equals: PharoCAToolRegistry discoveredToolClasses asSet
 ]

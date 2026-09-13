@@ -8,3 +8,9 @@ Class {
 
 { #category : 'private' }
 PharoCATestWebFetchTool class >> client [ ^ PharoCATestWebClient new ]
+
+{ #category : 'testing' }
+PharoCATestWebFetchTool class >> loadingStrategy [
+	"Test fixture: available only when explicitly registered by its test."
+	^ #disabled
+]

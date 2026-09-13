@@ -57,3 +57,9 @@ PharoCATestBlockingMutationTool class >> llmDefinition [
 PharoCATestBlockingMutationTool class >> toolName [
 	^ #test_blocking_mutation
 ]
+
+{ #category : 'testing' }
+PharoCATestBlockingMutationTool class >> loadingStrategy [
+	"Test fixture: available only when explicitly registered by its test."
+	^ #disabled
+]

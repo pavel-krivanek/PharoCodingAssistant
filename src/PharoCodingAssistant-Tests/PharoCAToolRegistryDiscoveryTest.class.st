@@ -2,7 +2,8 @@ Class {
 	#name : #PharoCAToolRegistryDiscoveryTest,
 	#superclass : #TestCase,
 	#category : #'PharoCodingAssistant-Tests-Tools',
-	#package : #'PharoCodingAssistant-Tests'
+	#package : #'PharoCodingAssistant-Tests',
+	#tag : #'Tools'
 }
 
 { #category : #private }
@@ -148,4 +149,52 @@ PharoCAToolRegistryDiscoveryTest >> testMixedStrategiesInsideOnePackAreRejected 
 	] ensure: [
 		eager removeFromSystem.
 		lazy removeFromSystem ]
+]
+
+{ #category : #tests }
+PharoCAToolRegistryDiscoveryTest >> testExistingRegistryDiscoversToolLoadedLater [
+	| registry probe |
+	registry := PharoCAToolRegistry default.
+	probe := self
+		newProbeNamed: #PharoCAToolLateDiscoveryProbe
+		toolName: 'late_discovery_probe'
+		pack: 'lateDiscoveryProbe'
+		strategy: 'eager'
+		abstract: false.
+	[
+		self deny: (registry tools includes: probe).
+		registry synchronizeDefaultTools.
+		self assert: (registry tools includes: probe).
+		self assert: (PharoCAToolRegistry defaultActivePackNames includes: #lateDiscoveryProbe)
+	] ensure: [ probe removeFromSystem ]
+]
+
+{ #category : #tests }
+PharoCAToolRegistryDiscoveryTest >> testExistingSessionReceivesNewEagerPack [
+	| registry session probe |
+	registry := PharoCAToolRegistry default.
+	session := PharoCASession new.
+	registry activePackNamesForSession: session.
+	probe := self
+		newProbeNamed: #PharoCAToolLateEagerSessionProbe
+		toolName: 'late_eager_session_probe'
+		pack: 'lateEagerSessionProbe'
+		strategy: 'eager'
+		abstract: false.
+	[
+		self deny: ((registry activePackNamesForSession: session) includes: 'lateEagerSessionProbe').
+		registry synchronizeDefaultTools.
+		self assert: ((registry activePackNamesForSession: session) includes: 'lateEagerSessionProbe')
+	] ensure: [ probe removeFromSystem ]
+]
+
+{ #category : #tests }
+PharoCAToolRegistryDiscoveryTest >> testSynchronizePreservesExplicitlyDisabledEagerPack [
+	| registry session |
+	registry := PharoCAToolRegistry default.
+	session := PharoCASession new.
+	self assert: ((registry activePackNamesForSession: session) includes: 'core').
+	registry deactivatePackNamed: 'core' forSession: session.
+	registry synchronizeDefaultTools.
+	self deny: ((registry activePackNamesForSession: session) includes: 'core')
 ]

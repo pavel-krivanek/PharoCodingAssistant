@@ -1,5 +1,5 @@
 "
-Explicit registry and guarded execution boundary for assistant tools. Production discovery is intentionally explicit rather than based on PharoCATool allSubclasses.
+Dynamic registry and guarded execution boundary for assistant tools. Concrete PharoCATool subclasses are discovered from the live image; each tool class controls exposure through #loadingStrategy.
 "
 Class {
 	#name : 'PharoCAToolRegistry',
@@ -34,7 +34,8 @@ PharoCAToolRegistry class >> default [
 
 { #category : 'defaults' }
 PharoCAToolRegistry class >> defaultActivePackNames [
-	^ #(catalog core)
+	"Compatibility name used by session persistence and pack activation. The set is derived entirely from live eager tools."
+	^ self defaultActiveToolPacks
 ]
 
 { #category : 'as yet unclassified' }
@@ -56,156 +57,6 @@ PharoCAToolRegistry class >> defaultInEnvironment: anEnvironment [
 		environment: anEnvironment;
 		registerDefaults;
 		yourself
-]
-
-{ #category : 'defaults' }
-PharoCAToolRegistry class >> defaultToolClassNames [
-	^ #(
-		PharoCAToolSearch
-		PharoCAToolEnable
-		PharoCAToolDisable
-		PharoCAToolGetMethod
-		PharoCAToolGetClassSummary
-		PharoCAToolListPackageTags
-		PharoCAToolSearchClasses
-		PharoCAToolSearchSelectors
-		PharoCAToolSearchMethodSource
-		PharoCAToolFindReferences
-		PharoCAToolFindSlotAccesses
-		PharoCAToolFindPragmas
-		PharoCAToolGetPackageDependencies
-		PharoCAToolGetMethodAST
-		PharoCAToolSearchAST
-		PharoCAToolASTRewritePreview
-		PharoCAToolCheckCode
-		PharoCAToolEvaluateExpression
-		PharoCAToolObjectSummary
-		PharoCAToolObjectSlots
-		PharoCAToolObjectSend
-		PharoCAToolObjectRelease
-		PharoCAToolTestDiscover
-		PharoCAToolTestResults
-		PharoCAToolTestFailure
-		PharoCAToolTestRerun
-		PharoCAToolTestCoverage
-		PharoCAToolTranscriptStatus
-		PharoCAToolTranscriptTail
-		PharoCAToolTranscriptClear
-		PharoCAToolProfileExpression
-		PharoCAToolDebugStart
-		PharoCAToolDebugAttachProcess
-		PharoCAToolDebugStatus
-		PharoCAToolDebugStack
-		PharoCAToolDebugFrame
-		PharoCAToolDebugStep
-		PharoCAToolDebugContinue
-		PharoCAToolDebugEvaluate
-		PharoCAToolDebugRestart
-		PharoCAToolDebugResume
-		PharoCAToolDebugTerminate
-		PharoCAToolDebugPoints
-		PharoCAToolDebugSetBreakpoint
-		PharoCAToolDebugSetWatchpoint
-		PharoCAToolDebugRemovePoint
-		PharoCAToolProcessList
-		PharoCAToolProcessStack
-		PharoCAToolProcessCpuSample
-		PharoCAToolProcessSuspend
-		PharoCAToolProcessResume
-		PharoCAToolProcessSetPriority
-		PharoCAToolProcessTerminate
-		PharoCAToolProcessDebug
-		PharoCAToolRefactorRenameClass
-		PharoCAToolRefactorRenameMethod
-		PharoCAToolRefactorRenameInstanceVariable
-		PharoCAToolRefactorRenameLocal
-		PharoCAToolRefactorRenamePackage
-		PharoCAToolRefactorExtractMethod
-		PharoCAToolRefactorExtractTemporary
-		PharoCAToolRefactorInlineMethod
-		PharoCAToolRefactorMoveMethod
-		PharoCAToolRefactorPullUpMethod
-		PharoCAToolRefactorPushDownMethod
-		PharoCAToolRefactorAddParameter
-		PharoCAToolRefactorRemoveParameter
-		PharoCAToolRefactorPreviewDetails
-		PharoCAToolRefactorApply
-		PharoCAToolRefactorDiscard
-		PharoCAToolTonelParse
-		PharoCAToolTonelValidatePackage
-		PharoCAToolTonelSerializeClass
-		PharoCAToolTonelExportClass
-		PharoCAToolTonelExportPackage
-		PharoCAToolTonelImportPreview
-		PharoCAToolTonelImportApply
-		PharoCAToolIcebergListRepositories
-		PharoCAToolIcebergRepositoryInfo
-		PharoCAToolIcebergStatus
-		PharoCAToolIcebergDiff
-		PharoCAToolIcebergLog
-		PharoCAToolIcebergCommitInfo
-		PharoCAToolIcebergBranches
-		PharoCAToolIcebergRemotes
-		PharoCAToolIcebergPackages
-		PharoCAToolIcebergCommit
-		PharoCAToolIcebergFetch
-		PharoCAToolIcebergPull
-		PharoCAToolIcebergPush
-		PharoCAToolIcebergCreateBranch
-		PharoCAToolIcebergSwitch
-		PharoCAToolIcebergAddRemote
-		PharoCAToolIcebergRemoveRemote
-		PharoCAToolIcebergLoadPackage
-		PharoCAToolIcebergUnloadPackage
-		PharoCAToolIcebergDiscardChanges
-		PharoCAToolIcebergClone
-		PharoCAToolIcebergAddLocalRepository
-		PharoCAToolUIListWindows
-		PharoCAToolUIWindowInfo
-		PharoCAToolUIWindowActivate
-		PharoCAToolUIWindowSetState
-		PharoCAToolUIWindowSetBounds
-		PharoCAToolUIWindowClose
-		PharoCAToolUIScreenshot
-		PharoCAToolWebSearch
-		PharoCAToolWebFetch
-		PharoCAToolActivateSkill
-		PharoCAToolCompileMethod
-		PharoCAToolCompileMethods
-		PharoCAToolFormatCode
-		PharoCAToolQualityRules
-		PharoCAToolQualityCheck
-		PharoCAToolQualityResults
-		PharoCAToolRemoveMethod
-		PharoCAToolSetMethodProtocol
-		PharoCAToolDeactivateSkill
-		PharoCAToolDefineClass
-		PharoCAToolDoIt
-		PharoCAToolGetClassComment
-		PharoCAToolGetClassDefinition
-		PharoCAToolGetClassHierarchy
-		PharoCAToolGetMethodInheritance
-		PharoCAToolGetPackageComment
-		PharoCAToolListClassesInPackage
-		PharoCAToolListImplementors
-		PharoCAToolListMethods
-		PharoCAToolListPackages
-		PharoCAToolListSenders
-		PharoCAToolListSkills
-		PharoCAToolPrintIt
-		PharoCAToolRemoveClass
-		PharoCAToolRunTests
-		PharoCAToolSetClassComment
-		PharoCAToolWorkspaceCreateDirectory
-		PharoCAToolWorkspaceEditFile
-		PharoCAToolWorkspaceListDirectory
-		PharoCAToolWorkspaceProcessOutput
-		PharoCAToolWorkspaceReadFile
-		PharoCAToolWorkspaceRepositoryDiff
-		PharoCAToolWorkspaceRepositoryStatus
-		PharoCAToolWorkspaceRunProcess
-		PharoCAToolWorkspaceSearchText
-		PharoCAToolWorkspaceWriteFile)
 ]
 
 { #category : 'as yet unclassified' }
@@ -950,8 +801,8 @@ PharoCAToolRegistry >> register: aToolClass [
 
 { #category : 'registration' }
 PharoCAToolRegistry >> registerDefaults [
-	self class defaultToolClassNames do: [ :className |
-		self register: (Smalltalk globals at: className) ].
+	"Register the complete live catalog. There is intentionally no fixed tool list."
+	self class discoveredToolClasses do: [ :toolClass | self register: toolClass ].
 	defaultCatalogRevision := self class defaultCatalogRevision
 ]
 
@@ -1089,22 +940,35 @@ PharoCAToolRegistry >> slotMatchingSelector: selector receiver: receiver [
 
 { #category : 'registration' }
 PharoCAToolRegistry >> synchronizeDefaultTools [
-	"Saved images may contain registries created before newer default tools existed. Refresh known defaults by tool name while preserving custom registrations and session-scoped state. The revision makes this a one-time repair after an upgrade."
-	defaultCatalogRevision = self class defaultCatalogRevision ifTrue: [ ^ self ].
-	self class defaultToolClassNames do: [ :className |
-		| toolClass name |
-		toolClass := Smalltalk globals at: className ifAbsent: [ nil ].
-		toolClass ifNotNil: [
-			name := toolClass toolName asSymbol.
-			(toolsByName includesKey: name)
-				ifTrue: [ toolsByName at: name put: toolClass ]
-				ifFalse: [
-					toolsByName at: name put: toolClass.
-					toolNames add: name ] ] ].
+	"Refresh from the live PharoCATool subclass graph on every synchronization.
+	This deliberately does not use a revision gate: a separately loaded package may
+	introduce a new tool class without changing PCA itself. Existing custom
+	registrations, explicit pack disables and session state are preserved."
+	| knownPacks newlyAdded newlyEagerPacks |
+	knownPacks := self packNames asSet.
+	newlyAdded := OrderedCollection new.
+	self class discoveredToolClasses do: [ :toolClass |
+		| name |
+		name := toolClass toolName asSymbol.
+		(toolsByName includesKey: name)
+			ifTrue: [ toolsByName at: name put: toolClass ]
+			ifFalse: [
+				toolsByName at: name put: toolClass.
+				toolNames add: name.
+				newlyAdded add: toolClass ] ].
+
+	"Only a newly introduced eager pack is activated in existing sessions. An
+	explicitly disabled existing pack (for example #core) must stay disabled."
+	newlyEagerPacks := ((newlyAdded
+		select: [ :toolClass | toolClass loadingStrategy = #eager and: [ (knownPacks includes: toolClass toolPack asString) not ] ])
+		collect: [ :toolClass | toolClass toolPack ]) asSet.
+	newlyEagerPacks isEmpty ifFalse: [
+		packMutex critical: [
+			activePackNamesBySessionId valuesDo: [ :names | names addAll: newlyEagerPacks ] ] ].
+
 	defaultCatalogRevision := self class defaultCatalogRevision.
 	^ self
 ]
-
 { #category : 'diagnostics' }
 PharoCAToolRegistry >> syntaxErrorDetailsFor: description source: source [
 	| offset line column previousNewline details lines |

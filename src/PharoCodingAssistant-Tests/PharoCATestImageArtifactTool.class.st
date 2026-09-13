@@ -41,3 +41,9 @@ PharoCATestImageArtifactTool class >> execute: args context: context [
 		metadata: ({ 'kind' -> 'test-image' } asDictionary).
 	^ { 'artifact' -> artifact asDictionary } asDictionary
 ]
+
+{ #category : 'testing' }
+PharoCATestImageArtifactTool class >> loadingStrategy [
+	"Test fixture: available only when explicitly registered by its test."
+	^ #disabled
+]

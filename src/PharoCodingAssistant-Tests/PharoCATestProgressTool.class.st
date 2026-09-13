@@ -43,3 +43,9 @@ PharoCATestProgressTool class >> llmDefinition [
 PharoCATestProgressTool class >> toolName [
 	^ #test_progress
 ]
+
+{ #category : 'testing' }
+PharoCATestProgressTool class >> loadingStrategy [
+	"Test fixture: available only when explicitly registered by its test."
+	^ #disabled
+]
