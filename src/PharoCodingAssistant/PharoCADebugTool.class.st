@@ -1,4 +1,6 @@
-"Common helpers for the lazy Sindarin debugger tool pack."
+"
+Common helpers for the lazy Sindarin debugger tool pack.
+"
 Class {
 	#name : 'PharoCADebugTool',
 	#superclass : 'PharoCATool',
@@ -7,14 +9,64 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'testing' }
-PharoCADebugTool class >> isAbstract [ ^ self = PharoCADebugTool ]
+{ #category : 'private' }
+PharoCADebugTool class >> behaviorSummaryForDebugPoint: point [
+	| items condition count |
+	items := OrderedCollection new.
+	condition := [ point getBehavior: ConditionBehavior ] on: Error do: [ :error | nil ].
+	condition ifNotNil: [ items add: { 'type' -> 'condition'. 'expression' -> condition condition } asDictionary ].
+	([ point getBehavior: OnceBehavior ] on: Error do: [ :error | nil ]) ifNotNil: [ items add: { 'type' -> 'once' } asDictionary ].
+	count := [ point getBehavior: CountBehavior ] on: Error do: [ :error | nil ].
+	count ifNotNil: [ items add: { 'type' -> 'count'. 'hits' -> count count } asDictionary ].
+	^ items asArray
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> boundedSourceForNode: node method: method [
+	| source start stop text |
+	(node isNil or: [ method isNil ]) ifTrue: [ ^ '' ].
+	source := [ method sourceCode ] on: Error do: [ :error | ^ '' ].
+	start := [ node start ] on: Error do: [ :error | nil ].
+	stop := [ node stop ] on: Error do: [ :error | nil ].
+	(start isNil or: [ stop isNil or: [ start < 1 or: [ stop < start or: [ start > source size ] ] ] ]) ifTrue: [ ^ '' ].
+	stop := stop min: source size.
+	text := source copyFrom: start to: stop.
+	text size > 240 ifTrue: [ text := (text first: 237), '...' ].
+	^ text
+]
+
 { #category : 'definition' }
-PharoCADebugTool class >> toolPack [ ^ #debug ]
-{ #category : 'definition' }
-PharoCADebugTool class >> capability [ ^ #debugging ]
-{ #category : 'execution' }
-PharoCADebugTool class >> executionMode [ ^ #exclusiveMutation ]
+PharoCADebugTool class >> capability [ ^ #debugging
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> collectNode: node into: collection [
+	collection add: node.
+	node children do: [ :child | self collectNode: child into: collection ]
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> configureDebugPoint: point fromArguments: args [
+	| condition once countHits |
+	condition := args at: 'condition' ifAbsent: [ nil ].
+	condition ifNotNil: [
+		condition isEmpty ifTrue: [ Error signal: 'Debug-point condition must not be empty' ].
+		point addBehavior: (ConditionBehavior new condition: condition; yourself) ].
+	once := args at: 'once' ifAbsent: [ false ].
+	once ifTrue: [ point addBehavior: OnceBehavior new ].
+	countHits := args at: 'countHits' ifAbsent: [ false ].
+	countHits ifTrue: [ point addBehavior: CountBehavior new ].
+	^ point
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> contextAtFrameIndex: index debugger: debugger [
+	| contexts |
+	(index isInteger and: [ index >= 1 ]) ifFalse: [ Error signal: 'frameIndex must be a positive integer' ].
+	contexts := self stackContextsFor: debugger.
+	index > contexts size ifTrue: [ Error signal: 'frameIndex is outside the current debugger stack' ].
+	^ contexts at: index
+]
 
 { #category : 'private' }
 PharoCADebugTool class >> debuggerAt: handle context: context [
@@ -22,8 +74,56 @@ PharoCADebugTool class >> debuggerAt: handle context: context [
 ]
 
 { #category : 'private' }
+PharoCADebugTool class >> enrichDebugPointSummary: summary point: point [
+	| behaviors history |
+	behaviors := self behaviorSummaryForDebugPoint: point.
+	behaviors isEmpty ifFalse: [ summary at: 'behaviors' put: behaviors ].
+	(point isKindOf: WatchDebugPoint) ifTrue: [
+		summary at: 'historyLimit' put: point limit.
+		history := point history.
+		summary at: 'historyCount' put: history size.
+		history isEmpty ifFalse: [
+			summary at: 'history' put: ((history first: (history size min: 5)) collect: [ :value | PharoCAObjectPresenter previewOf: value ]) asArray ] ].
+	^ summary
+]
+
+{ #category : 'execution' }
+PharoCADebugTool class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> frameSummaryFor: aContext index: index [
+	| method dictionary |
+	method := [ aContext method ] on: Error do: [ :error | nil ].
+	dictionary := {
+		'frameIndex' -> index.
+		'className' -> ([ aContext receiver class name asString ] on: Error do: [ :error | '' ]).
+		'selector' -> ([ aContext selector asString ] on: Error do: [ :error | '' ]).
+		'pc' -> ([ aContext pc ] on: Error do: [ :error | nil ])
+	} asDictionary.
+	method ifNotNil: [
+		(method respondsTo: #methodClass) ifTrue: [ dictionary at: 'methodClass' put: method methodClass name asString ].
+		(method respondsTo: #protocolName) ifTrue: [ dictionary at: 'protocol' put: method protocolName asString ] ].
+	^ dictionary
+]
+
+{ #category : 'testing' }
+PharoCADebugTool class >> isAbstract [ ^ self = PharoCADebugTool
+]
+
+{ #category : 'private' }
 PharoCADebugTool class >> metadataAt: handle context: context [
 	^ context requireRuntimeHandleRegistry metadataAt: handle kind: #debugger
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> nodeAtPreorderIndex: index inMethod: method [
+	| nodes |
+	(index isInteger and: [ index >= 1 ]) ifFalse: [ Error signal: 'nodeIndex must be a positive integer' ].
+	nodes := OrderedCollection new.
+	self collectNode: method sourceNode into: nodes.
+	index > nodes size ifTrue: [ Error signal: 'nodeIndex is outside the method AST' ].
+	^ nodes at: index
 ]
 
 { #category : 'private' }
@@ -33,6 +133,15 @@ PharoCADebugTool class >> processHandleFor: process context: context [
 		kind: #process
 		metadata: Dictionary new
 		cleanup: nil
+]
+
+{ #category : 'private' }
+PharoCADebugTool class >> registerDebugPoint: point context: context [
+	^ context requireRuntimeHandleRegistry
+		add: point
+		kind: #debugPoint
+		metadata: { 'managed' -> true } asDictionary
+		cleanup: [ :debugPoint :metadata | [ debugPoint remove ] on: Error do: [ :error | ] ]
 ]
 
 { #category : 'private' }
@@ -56,17 +165,8 @@ PharoCADebugTool class >> registerDebugger: debugger owned: owned originallySusp
 ]
 
 { #category : 'private' }
-PharoCADebugTool class >> boundedSourceForNode: node method: method [
-	| source start stop text |
-	(node isNil or: [ method isNil ]) ifTrue: [ ^ '' ].
-	source := [ method sourceCode ] on: Error do: [ :error | ^ '' ].
-	start := [ node start ] on: Error do: [ :error | nil ].
-	stop := [ node stop ] on: Error do: [ :error | nil ].
-	(start isNil or: [ stop isNil or: [ start < 1 or: [ stop < start or: [ start > source size ] ] ] ]) ifTrue: [ ^ '' ].
-	stop := stop min: source size.
-	text := source copyFrom: start to: stop.
-	text size > 240 ifTrue: [ text := (text first: 237), '...' ].
-	^ text
+PharoCADebugTool class >> stackContextsFor: debugger [
+	^ [ debugger stack asArray ] on: Error do: [ :error | #() ]
 ]
 
 { #category : 'private' }
@@ -97,33 +197,18 @@ PharoCADebugTool class >> statusFor: debugger handle: handle context: context [
 ]
 
 { #category : 'private' }
-PharoCADebugTool class >> stackContextsFor: debugger [
-	^ [ debugger stack asArray ] on: Error do: [ :error | #() ]
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> frameSummaryFor: aContext index: index [
-	| method dictionary |
-	method := [ aContext method ] on: Error do: [ :error | nil ].
-	dictionary := {
-		'frameIndex' -> index.
-		'className' -> ([ aContext receiver class name asString ] on: Error do: [ :error | '' ]).
-		'selector' -> ([ aContext selector asString ] on: Error do: [ :error | '' ]).
-		'pc' -> ([ aContext pc ] on: Error do: [ :error | nil ])
-	} asDictionary.
-	method ifNotNil: [
-		(method respondsTo: #methodClass) ifTrue: [ dictionary at: 'methodClass' put: method methodClass name asString ].
-		(method respondsTo: #protocolName) ifTrue: [ dictionary at: 'protocol' put: method protocolName asString ] ].
-	^ dictionary
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> contextAtFrameIndex: index debugger: debugger [
-	| contexts |
-	(index isInteger and: [ index >= 1 ]) ifFalse: [ Error signal: 'frameIndex must be a positive integer' ].
-	contexts := self stackContextsFor: debugger.
-	index > contexts size ifTrue: [ Error signal: 'frameIndex is outside the current debugger stack' ].
-	^ contexts at: index
+PharoCADebugTool class >> summaryForDebugPoint: point context: context [
+	| handle |
+	handle := context requireRuntimeHandleRegistry handleForExisting: point kind: #debugPoint.
+	^ self enrichDebugPointSummary: ({
+		'handle' -> handle.
+		'type' -> ([ point type asString ] on: Error do: [ :error | point class name asString ]).
+		'name' -> ([ point name asString ] on: Error do: [ :error | '' ]).
+		'target' -> ([ point targetString ] on: Error do: [ :error | '' ]).
+		'scope' -> ([ point scopeString ] on: Error do: [ :error | '' ]).
+		'enabled' -> ([ point enabled ] on: Error do: [ :error | false ]).
+		'managed' -> handle notNil
+	} asDictionary) point: point
 ]
 
 { #category : 'private' }
@@ -142,82 +227,6 @@ PharoCADebugTool class >> temporaryValuesFor: aContext [
 	^ items asArray
 ]
 
-{ #category : 'private' }
-PharoCADebugTool class >> collectNode: node into: collection [
-	collection add: node.
-	node children do: [ :child | self collectNode: child into: collection ]
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> nodeAtPreorderIndex: index inMethod: method [
-	| nodes |
-	(index isInteger and: [ index >= 1 ]) ifFalse: [ Error signal: 'nodeIndex must be a positive integer' ].
-	nodes := OrderedCollection new.
-	self collectNode: method sourceNode into: nodes.
-	index > nodes size ifTrue: [ Error signal: 'nodeIndex is outside the method AST' ].
-	^ nodes at: index
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> summaryForDebugPoint: point context: context [
-	| handle |
-	handle := context requireRuntimeHandleRegistry handleForExisting: point kind: #debugPoint.
-	^ self enrichDebugPointSummary: ({
-		'handle' -> handle.
-		'type' -> ([ point type asString ] on: Error do: [ :error | point class name asString ]).
-		'name' -> ([ point name asString ] on: Error do: [ :error | '' ]).
-		'target' -> ([ point targetString ] on: Error do: [ :error | '' ]).
-		'scope' -> ([ point scopeString ] on: Error do: [ :error | '' ]).
-		'enabled' -> ([ point enabled ] on: Error do: [ :error | false ]).
-		'managed' -> handle notNil
-	} asDictionary) point: point
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> registerDebugPoint: point context: context [
-	^ context requireRuntimeHandleRegistry
-		add: point
-		kind: #debugPoint
-		metadata: { 'managed' -> true } asDictionary
-		cleanup: [ :debugPoint :metadata | [ debugPoint remove ] on: Error do: [ :error | ] ]
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> configureDebugPoint: point fromArguments: args [
-	| condition once countHits |
-	condition := args at: 'condition' ifAbsent: [ nil ].
-	condition ifNotNil: [
-		condition isEmpty ifTrue: [ Error signal: 'Debug-point condition must not be empty' ].
-		point addBehavior: (ConditionBehavior new condition: condition; yourself) ].
-	once := args at: 'once' ifAbsent: [ false ].
-	once ifTrue: [ point addBehavior: OnceBehavior new ].
-	countHits := args at: 'countHits' ifAbsent: [ false ].
-	countHits ifTrue: [ point addBehavior: CountBehavior new ].
-	^ point
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> behaviorSummaryForDebugPoint: point [
-	| items condition count |
-	items := OrderedCollection new.
-	condition := [ point getBehavior: ConditionBehavior ] on: Error do: [ :error | nil ].
-	condition ifNotNil: [ items add: { 'type' -> 'condition'. 'expression' -> condition condition } asDictionary ].
-	([ point getBehavior: OnceBehavior ] on: Error do: [ :error | nil ]) ifNotNil: [ items add: { 'type' -> 'once' } asDictionary ].
-	count := [ point getBehavior: CountBehavior ] on: Error do: [ :error | nil ].
-	count ifNotNil: [ items add: { 'type' -> 'count'. 'hits' -> count count } asDictionary ].
-	^ items asArray
-]
-
-{ #category : 'private' }
-PharoCADebugTool class >> enrichDebugPointSummary: summary point: point [
-	| behaviors history |
-	behaviors := self behaviorSummaryForDebugPoint: point.
-	behaviors isEmpty ifFalse: [ summary at: 'behaviors' put: behaviors ].
-	(point isKindOf: WatchDebugPoint) ifTrue: [
-		summary at: 'historyLimit' put: point limit.
-		history := point history.
-		summary at: 'historyCount' put: history size.
-		history isEmpty ifFalse: [
-			summary at: 'history' put: ((history first: (history size min: 5)) collect: [ :value | PharoCAObjectPresenter previewOf: value ]) asArray ] ].
-	^ summary
+{ #category : 'definition' }
+PharoCADebugTool class >> toolPack [ ^ #debug
 ]

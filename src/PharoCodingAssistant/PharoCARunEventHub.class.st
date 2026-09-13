@@ -1,4 +1,6 @@
-"Bounded, transport-neutral run event hub. It owns monotonic sequencing, bounded replay retention and non-blocking fan-out to independent subscriber mailboxes."
+"
+Bounded, transport-neutral run event hub. It owns monotonic sequencing, bounded replay retention and non-blocking fan-out to independent subscriber mailboxes.
+"
 Class {
 	#name : 'PharoCARunEventHub',
 	#superclass : 'Object',
@@ -27,6 +29,37 @@ PharoCARunEventHub class >> defaultMaxRetainedEvents [
 	^ 2048
 ]
 
+{ #category : 'replay' }
+PharoCARunEventHub >> canReplayAfterSequence: anInteger [
+	| earliest |
+	mutex wait.
+	[ earliest := self earliestRetainedSequenceUnlocked ] ensure: [ mutex signal ].
+	^ anInteger >= (earliest - 1)
+]
+
+{ #category : 'replay' }
+PharoCARunEventHub >> earliestRetainedSequence [
+	| value |
+	mutex wait.
+	[ value := self earliestRetainedSequenceUnlocked ] ensure: [ mutex signal ].
+	^ value
+]
+
+{ #category : 'private' }
+PharoCARunEventHub >> earliestRetainedSequenceUnlocked [
+	^ replayEvents
+		ifEmpty: [ lastSequence + 1 ]
+		ifNotEmpty: [ replayEvents first sequence ]
+]
+
+{ #category : 'replay' }
+PharoCARunEventHub >> eventsAfterSequence: anInteger [
+	| snapshot |
+	mutex wait.
+	[ snapshot := (replayEvents select: [ :event | event sequence > anInteger ]) asArray ] ensure: [ mutex signal ].
+	^ snapshot
+]
+
 { #category : 'initialization' }
 PharoCARunEventHub >> initialize [
 	super initialize.
@@ -38,37 +71,6 @@ PharoCARunEventHub >> initialize [
 	maxRetainedBytes := self class defaultMaxRetainedBytes.
 	lastSequence := 0.
 	subscriptions := IdentitySet new
-]
-
-{ #category : 'replay' }
-PharoCARunEventHub >> canReplayAfterSequence: anInteger [
-	| earliest |
-	mutex wait.
-	[ earliest := self earliestRetainedSequenceUnlocked ] ensure: [ mutex signal ].
-	^ anInteger >= (earliest - 1)
-]
-
-{ #category : 'private' }
-PharoCARunEventHub >> earliestRetainedSequenceUnlocked [
-	^ replayEvents
-		ifEmpty: [ lastSequence + 1 ]
-		ifNotEmpty: [ replayEvents first sequence ]
-]
-
-{ #category : 'replay' }
-PharoCARunEventHub >> earliestRetainedSequence [
-	| value |
-	mutex wait.
-	[ value := self earliestRetainedSequenceUnlocked ] ensure: [ mutex signal ].
-	^ value
-]
-
-{ #category : 'replay' }
-PharoCARunEventHub >> eventsAfterSequence: anInteger [
-	| snapshot |
-	mutex wait.
-	[ snapshot := (replayEvents select: [ :event | event sequence > anInteger ]) asArray ] ensure: [ mutex signal ].
-	^ snapshot
 ]
 
 { #category : 'accessing' }
@@ -188,6 +190,21 @@ PharoCARunEventHub >> registerSubscription: aSubscription afterSequence: request
 ]
 
 { #category : 'replay' }
+PharoCARunEventHub >> replaySnapshotAfterSequence: anInteger [
+	| earliest result |
+	mutex wait.
+	[
+		earliest := self earliestRetainedSequenceUnlocked.
+		anInteger < (earliest - 1)
+			ifTrue: [ result := nil ]
+			ifFalse: [
+				result := self retentionDictionaryUnlocked.
+				result at: 'events' put: ((replayEvents select: [ :event | event sequence > anInteger ]) asArray) ]
+	] ensure: [ mutex signal ].
+	^ result
+]
+
+{ #category : 'replay' }
 PharoCARunEventHub >> retainedApproxBytes [
 	| value |
 	mutex wait.
@@ -223,21 +240,6 @@ PharoCARunEventHub >> retentionDictionaryUnlocked [
 		'maxRetainedEvents' -> maxRetainedEvents.
 		'maxRetainedBytes' -> maxRetainedBytes
 	} asDictionary
-]
-
-{ #category : 'replay' }
-PharoCARunEventHub >> replaySnapshotAfterSequence: anInteger [
-	| earliest result |
-	mutex wait.
-	[
-		earliest := self earliestRetainedSequenceUnlocked.
-		anInteger < (earliest - 1)
-			ifTrue: [ result := nil ]
-			ifFalse: [
-				result := self retentionDictionaryUnlocked.
-				result at: 'events' put: ((replayEvents select: [ :event | event sequence > anInteger ]) asArray) ]
-	] ensure: [ mutex signal ].
-	^ result
 ]
 
 { #category : 'private' }

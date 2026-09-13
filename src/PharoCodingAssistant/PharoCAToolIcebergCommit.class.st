@@ -1,11 +1,19 @@
-Class { #name : 'PharoCAToolIcebergCommit', #superclass : 'PharoCAIcebergTool', #category : 'PharoCodingAssistant-Tools-Pharo', #package : 'PharoCodingAssistant', #tag : 'Tools-Pharo' }
-{ #category : 'definition' } PharoCAToolIcebergCommit class >> toolName [ ^ #iceberg_commit ]
-{ #category : 'definition' } PharoCAToolIcebergCommit class >> capability [ ^ #coding ]
-{ #category : 'execution' } PharoCAToolIcebergCommit class >> executionMode [ ^ #exclusiveMutation ]
+Class {
+	#name : 'PharoCAToolIcebergCommit',
+	#superclass : 'PharoCAIcebergTool',
+	#category : 'PharoCodingAssistant-Tools-Pharo',
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools-Pharo'
+}
+
 { #category : 'definition' }
-PharoCAToolIcebergCommit class >> llmDefinition [
- ^ PharoCALLMToolDefinition name:'iceberg_commit' description:'Commits the current Iceberg-managed live package changes with the supplied message. Live packages are serialized with native TonelWriter and Git is executed out of process to avoid Pharo 14/libgit same-thread FFI stack hazards. Fails when there are no changes.' parameters:{'type'->'object'.'properties'->{'repository'->{ 'type'->'string'.'minLength'->1 } asDictionary.'message'->{ 'type'->'string'.'minLength'->1.'maxLength'->4000 } asDictionary} asDictionary.'required'->#('repository' 'message')} asDictionary ]
-{ #category : 'execution' } PharoCAToolIcebergCommit class >> execute: args [ ^ self execute:args context:PharoCAToolExecutionContext unlimited ]
+PharoCAToolIcebergCommit class >> capability [ ^ #coding
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergCommit class >> execute: args [ ^ self execute:args context:PharoCAToolExecutionContext unlimited
+]
+
 { #category : 'execution' }
 PharoCAToolIcebergCommit class >> execute: args context: context [
  | repository before packageNames status after commitSummary record |
@@ -36,4 +44,17 @@ PharoCAToolIcebergCommit class >> execute: args context: context [
   'serializedPackages' -> packageNames.
   'changeId' -> (record ifNil: [ nil ] ifNotNil: [ record id ])
  } asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergCommit class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergCommit class >> llmDefinition [
+ ^ PharoCALLMToolDefinition name:'iceberg_commit' description:'Commits the current Iceberg-managed live package changes with the supplied message. Live packages are serialized with native TonelWriter and Git is executed out of process to avoid Pharo 14/libgit same-thread FFI stack hazards. Fails when there are no changes.' parameters:{'type'->'object'.'properties'->{'repository'->{ 'type'->'string'.'minLength'->1 } asDictionary.'message'->{ 'type'->'string'.'minLength'->1.'maxLength'->4000 } asDictionary} asDictionary.'required'->#('repository' 'message')} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergCommit class >> toolName [ ^ #iceberg_commit
 ]

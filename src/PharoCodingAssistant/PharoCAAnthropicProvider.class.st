@@ -48,6 +48,33 @@ PharoCAAnthropicProvider >> credentialResolver [ ^ credentialResolver
 PharoCAAnthropicProvider >> credentialResolver: aResolver [ credentialResolver := aResolver
 ]
 
+{ #category : 'model-discovery' }
+PharoCAAnthropicProvider >> discoverModels [
+	^ self modelsFromWireList: self fetchModelListDictionary
+]
+
+{ #category : 'model-discovery-private' }
+PharoCAAnthropicProvider >> fetchModelListDictionary [
+	| client code apiKey body object |
+	apiKey := credentialResolver require: credentialName.
+	client := ZnClient new.
+	[
+		client timeout: timeout; url: self modelListUrl.
+		client headerAt: 'x-api-key' put: apiKey.
+		client headerAt: 'anthropic-version' put: apiVersion.
+		client get.
+		code := client response code.
+		body := [ client response entity contents ] on: Error do: [ :error | '' ].
+		(code between: 200 and: 299) ifFalse: [
+			PharoCALLMHTTPError statusCode: code responseBody: body ].
+		object := [ STONJSON fromString: body ]
+			on: Error
+			do: [ :error | Error signal: 'Invalid Anthropic model-list JSON: ', error description ].
+		object isDictionary ifFalse: [ Error signal: 'Anthropic model-list response must be a JSON object' ].
+		^ object
+	] ensure: [ [ client close ] on: Error do: [ :error | ] ]
+]
+
 { #category : 'initialization' }
 PharoCAAnthropicProvider >> initialize [
 	super initialize.
@@ -56,6 +83,44 @@ PharoCAAnthropicProvider >> initialize [
 	apiVersion := '2023-06-01'.
 	credentialResolver := PharoCACredentialResolver new.
 	credentialName := 'anthropic-api-key'
+]
+
+{ #category : 'model-discovery-mapping' }
+PharoCAAnthropicProvider >> modelFromWireDescriptor: aDictionary [
+	| id model context maximum |
+	aDictionary isDictionary ifFalse: [ Error signal: 'Anthropic model descriptor must be an object' ].
+	id := aDictionary at: 'id' ifAbsent: [ Error signal: 'Anthropic model descriptor has no id' ].
+	(id isString and: [ id trimBoth isNotEmpty ]) ifFalse: [ Error signal: 'Anthropic model descriptor id must be a non-empty string' ].
+	model := PharoCAModel named: id.
+	context := aDictionary at: 'max_input_tokens' ifAbsent: [ nil ].
+	maximum := aDictionary at: 'max_tokens' ifAbsent: [ nil ].
+	(context isInteger and: [ context > 0 ]) ifFalse: [ context := nil ].
+	(maximum isInteger and: [ maximum > 0 ]) ifFalse: [ maximum := nil ].
+	model
+		contextSize: context;
+		maximumOutputTokens: maximum;
+		supportsReasoning: false;
+		supportsReasoningStreaming: false.
+	^ model
+]
+
+{ #category : 'model-discovery' }
+PharoCAAnthropicProvider >> modelListUrl [
+	| marker index |
+	marker := '/messages'.
+	index := baseUrl findString: marker startingAt: 1.
+	index > 0 ifTrue: [ ^ (baseUrl copyFrom: 1 to: index - 1), '/models?limit=1000' ].
+	(baseUrl endsWith: '/') ifTrue: [ ^ baseUrl, 'models?limit=1000' ].
+	^ baseUrl, '/models?limit=1000'
+]
+
+{ #category : 'model-discovery-mapping' }
+PharoCAAnthropicProvider >> modelsFromWireList: aDictionary [
+	| data |
+	aDictionary isDictionary ifFalse: [ Error signal: 'Anthropic model-list response must be an object' ].
+	data := aDictionary at: 'data' ifAbsent: [ Error signal: 'Anthropic model-list response has no data array' ].
+	(data isArray or: [ data isKindOf: SequenceableCollection ]) ifFalse: [ Error signal: 'Anthropic model-list data must be an array' ].
+	^ (data collect: [ :wire | self modelFromWireDescriptor: wire ]) asArray
 ]
 
 { #category : 'accessing' }
@@ -103,6 +168,11 @@ PharoCAAnthropicProvider >> streamWirePayloadOnce: aDictionary eventsDo: aBlock 
 	] ensure: [
 		aCancellationToken removeCancellationCallback: cancellationCallback.
 		[ client close ] on: Error do: [ :error | ] ]
+]
+
+{ #category : 'model-discovery' }
+PharoCAAnthropicProvider >> supportsModelDiscovery [
+	^ true
 ]
 
 { #category : 'mapping' }
@@ -229,74 +299,3 @@ PharoCAAnthropicProvider >> wireToolUseFor: call [
 	input := call argumentsJSON isEmpty ifTrue: [ Dictionary new ] ifFalse: [ STONJSON fromString: call argumentsJSON ].
 	^ { 'type' -> 'tool_use'. 'id' -> call id. 'name' -> call name. 'input' -> input } asDictionary
 ]
-
-{ #category : 'model-discovery' }
-PharoCAAnthropicProvider >> supportsModelDiscovery [
-	^ true
-]
-
-{ #category : 'model-discovery' }
-PharoCAAnthropicProvider >> modelListUrl [
-	| marker index |
-	marker := '/messages'.
-	index := baseUrl findString: marker startingAt: 1.
-	index > 0 ifTrue: [ ^ (baseUrl copyFrom: 1 to: index - 1), '/models?limit=1000' ].
-	(baseUrl endsWith: '/') ifTrue: [ ^ baseUrl, 'models?limit=1000' ].
-	^ baseUrl, '/models?limit=1000'
-]
-
-{ #category : 'model-discovery' }
-PharoCAAnthropicProvider >> discoverModels [
-	^ self modelsFromWireList: self fetchModelListDictionary
-]
-
-{ #category : 'model-discovery-private' }
-PharoCAAnthropicProvider >> fetchModelListDictionary [
-	| client code apiKey body object |
-	apiKey := credentialResolver require: credentialName.
-	client := ZnClient new.
-	[
-		client timeout: timeout; url: self modelListUrl.
-		client headerAt: 'x-api-key' put: apiKey.
-		client headerAt: 'anthropic-version' put: apiVersion.
-		client get.
-		code := client response code.
-		body := [ client response entity contents ] on: Error do: [ :error | '' ].
-		(code between: 200 and: 299) ifFalse: [
-			PharoCALLMHTTPError statusCode: code responseBody: body ].
-		object := [ STONJSON fromString: body ]
-			on: Error
-			do: [ :error | Error signal: 'Invalid Anthropic model-list JSON: ', error description ].
-		object isDictionary ifFalse: [ Error signal: 'Anthropic model-list response must be a JSON object' ].
-		^ object
-	] ensure: [ [ client close ] on: Error do: [ :error | ] ]
-]
-
-{ #category : 'model-discovery-mapping' }
-PharoCAAnthropicProvider >> modelsFromWireList: aDictionary [
-	| data |
-	aDictionary isDictionary ifFalse: [ Error signal: 'Anthropic model-list response must be an object' ].
-	data := aDictionary at: 'data' ifAbsent: [ Error signal: 'Anthropic model-list response has no data array' ].
-	(data isArray or: [ data isKindOf: SequenceableCollection ]) ifFalse: [ Error signal: 'Anthropic model-list data must be an array' ].
-	^ (data collect: [ :wire | self modelFromWireDescriptor: wire ]) asArray
-]
-
-{ #category : 'model-discovery-mapping' }
-PharoCAAnthropicProvider >> modelFromWireDescriptor: aDictionary [
-	| id model context maximum |
-	aDictionary isDictionary ifFalse: [ Error signal: 'Anthropic model descriptor must be an object' ].
-	id := aDictionary at: 'id' ifAbsent: [ Error signal: 'Anthropic model descriptor has no id' ].
-	(id isString and: [ id trimBoth isNotEmpty ]) ifFalse: [ Error signal: 'Anthropic model descriptor id must be a non-empty string' ].
-	model := PharoCAModel named: id.
-	context := aDictionary at: 'max_input_tokens' ifAbsent: [ nil ].
-	maximum := aDictionary at: 'max_tokens' ifAbsent: [ nil ].
-	(context isInteger and: [ context > 0 ]) ifFalse: [ context := nil ].
-	(maximum isInteger and: [ maximum > 0 ]) ifFalse: [ maximum := nil ].
-	model
-		contextSize: context;
-		maximumOutputTokens: maximum;
-		supportsReasoning: false;
-		supportsReasoningStreaming: false.
-	^ model
-]
-

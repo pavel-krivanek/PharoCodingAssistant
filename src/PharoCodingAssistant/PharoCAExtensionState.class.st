@@ -1,8 +1,13 @@
-"Thread-safe private state owned by one extension within one durable session."
+"
+Thread-safe private state owned by one extension within one durable session.
+"
 Class {
 	#name : 'PharoCAExtensionState',
 	#superclass : 'Object',
-	#instVars : [ 'values', 'mutex' ],
+	#instVars : [
+		'values',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-Extensions',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Extensions'

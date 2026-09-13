@@ -1,4 +1,6 @@
-"Shared native Tonel helpers. Concrete tools use the Tonel parser/writer installed in the supported Pharo image rather than reimplementing the format."
+"
+Shared native Tonel helpers. Concrete tools use the Tonel parser/writer installed in the supported Pharo image rather than reimplementing the format.
+"
 Class {
 	#name : 'PharoCATonelTool',
 	#superclass : 'PharoCATool',
@@ -7,19 +9,27 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'testing' }
-PharoCATonelTool class >> isAbstract [
-	^ self = PharoCATonelTool
-]
-
-{ #category : 'definition' }
-PharoCATonelTool class >> toolPack [
-	^ #tonel
-]
-
 { #category : 'definition' }
 PharoCATonelTool class >> capability [
 	^ #inspection
+]
+
+{ #category : 'private' }
+PharoCATonelTool class >> currentSnapshotForPackageName: packageName [
+	^ [ (MCPackage named: packageName) snapshot ]
+		on: Error
+		do: [ :error | MCSnapshot empty ]
+]
+
+{ #category : 'private' }
+PharoCATonelTool class >> definitionKeyFor: definition [
+	((definition respondsTo: #isMethodDefinition) and: [ definition isMethodDefinition ]) ifTrue: [
+		^ 'method|', definition className asString, '|',
+			((definition respondsTo: #classIsMeta) ifTrue: [ definition classIsMeta asString ] ifFalse: [ 'false' ]), '|',
+			definition selector asString ].
+	((definition respondsTo: #isClassDefinition) and: [ definition isClassDefinition ]) ifTrue: [
+		^ 'class|', definition className asString ].
+	^ definition class name, '|', definition printString
 ]
 
 { #category : 'execution' }
@@ -27,36 +37,9 @@ PharoCATonelTool class >> executionMode [
 	^ #parallelSafe
 ]
 
-{ #category : 'private' }
-PharoCATonelTool class >> sourceHash: aString [
-	^ (SHA256 hashMessage: aString) hex
-]
-
-{ #category : 'private' }
-PharoCATonelTool class >> summaryForDefinition: definition [
-	| result |
-	result := OrderedDictionary new.
-	result at: 'definitionClass' put: definition class name.
-	(definition respondsTo: #isClassDefinition) ifTrue: [
-		definition isClassDefinition ifTrue: [ result at: 'kind' put: 'class' ] ].
-	(definition respondsTo: #isMethodDefinition) ifTrue: [
-		definition isMethodDefinition ifTrue: [ result at: 'kind' put: 'method' ] ].
-	(result includesKey: 'kind') ifFalse: [ result at: 'kind' put: 'definition' ].
-	(definition respondsTo: #name) ifTrue: [ result at: 'name' put: definition name asString ].
-	(definition respondsTo: #className) ifTrue: [ result at: 'className' put: definition className asString ].
-	(definition respondsTo: #superclassName) ifTrue: [
-		definition superclassName ifNotNil: [ :name | result at: 'superclassName' put: name asString ] ].
-	(definition respondsTo: #packageName) ifTrue: [
-		definition packageName ifNotNil: [ :name | result at: 'package' put: name asString ] ].
-	(definition respondsTo: #tagName) ifTrue: [
-		definition tagName ifNotNil: [ :name | result at: 'tag' put: name asString ] ].
-	(definition respondsTo: #selector) ifTrue: [ result at: 'selector' put: definition selector asString ].
-	(definition respondsTo: #protocol) ifTrue: [
-		definition protocol ifNotNil: [ :protocol | result at: 'protocol' put: protocol asString ] ].
-	(definition respondsTo: #classIsMeta) ifTrue: [
-		result at: 'side' put: (definition classIsMeta ifTrue: [ 'class' ] ifFalse: [ 'instance' ]) ].
-	(definition respondsTo: #isExtensionMethod) ifTrue: [ result at: 'extension' put: definition isExtensionMethod ].
-	^ result asDictionary
+{ #category : 'testing' }
+PharoCATonelTool class >> isAbstract [
+	^ self = PharoCATonelTool
 ]
 
 { #category : 'private' }
@@ -88,25 +71,8 @@ PharoCATonelTool class >> normalizedFilesFrom: filePayloads [
 ]
 
 { #category : 'private' }
-PharoCATonelTool class >> validatePackageMetadataSource: source packageName: packageName [
-	| prefix metadata |
-	prefix := 'Package '.
-	(source beginsWith: prefix) ifFalse: [ Error signal: 'package.st must begin with Package ' ].
-	metadata := STON fromString: (source copyFrom: prefix size + 1 to: source size).
-	metadata isDictionary ifFalse: [ Error signal: 'package.st metadata must be a dictionary' ].
-	(metadata at: #name ifAbsent: [ metadata at: 'name' ifAbsent: [ nil ] ]) asString = packageName
-		ifFalse: [ Error signal: 'package.st package name does not match ', packageName ]
-]
-
-{ #category : 'private' }
-PharoCATonelTool class >> definitionKeyFor: definition [
-	((definition respondsTo: #isMethodDefinition) and: [ definition isMethodDefinition ]) ifTrue: [
-		^ 'method|', definition className asString, '|',
-			((definition respondsTo: #classIsMeta) ifTrue: [ definition classIsMeta asString ] ifFalse: [ 'false' ]), '|',
-			definition selector asString ].
-	((definition respondsTo: #isClassDefinition) and: [ definition isClassDefinition ]) ifTrue: [
-		^ 'class|', definition className asString ].
-	^ definition class name, '|', definition printString
+PharoCATonelTool class >> packageExistsNamed: packageName [
+	^ (PackageOrganizer default packageNamed: packageName ifAbsent: [ nil ]) notNil
 ]
 
 { #category : 'private' }
@@ -174,6 +140,23 @@ PharoCATonelTool class >> packagePayloadForName: packageName files: filePayloads
 ]
 
 { #category : 'private' }
+PharoCATonelTool class >> patchPlanFromCurrentPackageNamed: packageName toSnapshot: targetSnapshot context: context [
+	| current patch plan |
+	current := self currentSnapshotForPackageName: packageName.
+	patch := targetSnapshot patchRelativeToBase: current.
+	plan := OrderedCollection new.
+	patch operations doWithIndex: [ :operation :index |
+		(index \\ 100 = 0) ifTrue: [ context checkActive ].
+		plan add: (self summaryForPatchOperation: operation) ].
+	^ plan asArray
+]
+
+{ #category : 'private' }
+PharoCATonelTool class >> planSignature: plan currentSignature: currentSignature targetSignature: targetSignature [
+	^ (SHA256 hashMessage: currentSignature, '|', targetSignature, '|', (STONJSON toString: plan)) hex
+]
+
+{ #category : 'private' }
 PharoCATonelTool class >> snapshotSignature: snapshot [
 	| records text |
 	records := snapshot definitions collect: [ :definition |
@@ -186,15 +169,35 @@ PharoCATonelTool class >> snapshotSignature: snapshot [
 ]
 
 { #category : 'private' }
-PharoCATonelTool class >> currentSnapshotForPackageName: packageName [
-	^ [ (MCPackage named: packageName) snapshot ]
-		on: Error
-		do: [ :error | MCSnapshot empty ]
+PharoCATonelTool class >> sourceHash: aString [
+	^ (SHA256 hashMessage: aString) hex
 ]
 
 { #category : 'private' }
-PharoCATonelTool class >> packageExistsNamed: packageName [
-	^ (PackageOrganizer default packageNamed: packageName ifAbsent: [ nil ]) notNil
+PharoCATonelTool class >> summaryForDefinition: definition [
+	| result |
+	result := OrderedDictionary new.
+	result at: 'definitionClass' put: definition class name.
+	(definition respondsTo: #isClassDefinition) ifTrue: [
+		definition isClassDefinition ifTrue: [ result at: 'kind' put: 'class' ] ].
+	(definition respondsTo: #isMethodDefinition) ifTrue: [
+		definition isMethodDefinition ifTrue: [ result at: 'kind' put: 'method' ] ].
+	(result includesKey: 'kind') ifFalse: [ result at: 'kind' put: 'definition' ].
+	(definition respondsTo: #name) ifTrue: [ result at: 'name' put: definition name asString ].
+	(definition respondsTo: #className) ifTrue: [ result at: 'className' put: definition className asString ].
+	(definition respondsTo: #superclassName) ifTrue: [
+		definition superclassName ifNotNil: [ :name | result at: 'superclassName' put: name asString ] ].
+	(definition respondsTo: #packageName) ifTrue: [
+		definition packageName ifNotNil: [ :name | result at: 'package' put: name asString ] ].
+	(definition respondsTo: #tagName) ifTrue: [
+		definition tagName ifNotNil: [ :name | result at: 'tag' put: name asString ] ].
+	(definition respondsTo: #selector) ifTrue: [ result at: 'selector' put: definition selector asString ].
+	(definition respondsTo: #protocol) ifTrue: [
+		definition protocol ifNotNil: [ :protocol | result at: 'protocol' put: protocol asString ] ].
+	(definition respondsTo: #classIsMeta) ifTrue: [
+		result at: 'side' put: (definition classIsMeta ifTrue: [ 'class' ] ifFalse: [ 'instance' ]) ].
+	(definition respondsTo: #isExtensionMethod) ifTrue: [ result at: 'extension' put: definition isExtensionMethod ].
+	^ result asDictionary
 ]
 
 { #category : 'private' }
@@ -218,19 +221,18 @@ PharoCATonelTool class >> summaryForPatchOperation: operation [
 	^ result asDictionary
 ]
 
-{ #category : 'private' }
-PharoCATonelTool class >> patchPlanFromCurrentPackageNamed: packageName toSnapshot: targetSnapshot context: context [
-	| current patch plan |
-	current := self currentSnapshotForPackageName: packageName.
-	patch := targetSnapshot patchRelativeToBase: current.
-	plan := OrderedCollection new.
-	patch operations doWithIndex: [ :operation :index |
-		(index \\ 100 = 0) ifTrue: [ context checkActive ].
-		plan add: (self summaryForPatchOperation: operation) ].
-	^ plan asArray
+{ #category : 'definition' }
+PharoCATonelTool class >> toolPack [
+	^ #tonel
 ]
 
 { #category : 'private' }
-PharoCATonelTool class >> planSignature: plan currentSignature: currentSignature targetSignature: targetSignature [
-	^ (SHA256 hashMessage: currentSignature, '|', targetSignature, '|', (STONJSON toString: plan)) hex
+PharoCATonelTool class >> validatePackageMetadataSource: source packageName: packageName [
+	| prefix metadata |
+	prefix := 'Package '.
+	(source beginsWith: prefix) ifFalse: [ Error signal: 'package.st must begin with Package ' ].
+	metadata := STON fromString: (source copyFrom: prefix size + 1 to: source size).
+	metadata isDictionary ifFalse: [ Error signal: 'package.st metadata must be a dictionary' ].
+	(metadata at: #name ifAbsent: [ metadata at: 'name' ifAbsent: [ nil ] ]) asString = packageName
+		ifFalse: [ Error signal: 'package.st package name does not match ', packageName ]
 ]

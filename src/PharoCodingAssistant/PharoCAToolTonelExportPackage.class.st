@@ -1,4 +1,6 @@
-"Exports a live package through native TonelWriter into a private temporary directory, returning bounded metadata or one paginated file."
+"
+Exports a live package through native TonelWriter into a private temporary directory, returning bounded metadata or one paginated file.
+"
 Class {
 	#name : 'PharoCAToolTonelExportPackage',
 	#superclass : 'PharoCATonelTool',
@@ -8,31 +10,8 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolTonelExportPackage class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolTonelExportPackage class >> toolName [ ^ #tonel_export_package ]
-
-{ #category : 'definition' }
-PharoCAToolTonelExportPackage class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tonel_export_package'
-		description: 'Exports a live package with Pharo''s native TonelWriter. Without fileName it lists paginated exported file metadata; with fileName it returns that file with character pagination. Temporary export files are always deleted.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'packageName' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'fileName' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
-				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('packageName')
-		} asDictionary
+PharoCAToolTonelExportPackage class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
 ]
-
-{ #category : 'execution' }
-PharoCAToolTonelExportPackage class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
 
 { #category : 'execution' }
 PharoCAToolTonelExportPackage class >> execute: args context: context [
@@ -85,4 +64,30 @@ PharoCAToolTonelExportPackage class >> execute: args context: context [
 			'range' -> (page at: 'range')
 		} asDictionary
 	] ensure: [ root exists ifTrue: [ root ensureDeleteAll ] ]
+]
+
+{ #category : 'execution' }
+PharoCAToolTonelExportPackage class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelExportPackage class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tonel_export_package'
+		description: 'Exports a live package with Pharo''s native TonelWriter. Without fileName it lists paginated exported file metadata; with fileName it returns that file with character pagination. Temporary export files are always deleted.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'packageName' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'fileName' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
+				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('packageName')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelExportPackage class >> toolName [ ^ #tonel_export_package
 ]

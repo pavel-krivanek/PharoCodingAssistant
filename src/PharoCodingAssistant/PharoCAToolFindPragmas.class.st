@@ -1,16 +1,18 @@
-"Finds installed occurrences of one exact pragma keyword using Pragma's cache-backed live-image query."
-Class { #name : 'PharoCAToolFindPragmas', #superclass : 'PharoCATool', #category : 'PharoCodingAssistant-Tools-Pharo', #package : 'PharoCodingAssistant', #tag : 'Tools-Pharo' }
-{ #category : 'definition' } PharoCAToolFindPragmas class >> capability [ ^ #inspection ]
-{ #category : 'execution' } PharoCAToolFindPragmas class >> executionMode [ ^ #parallelSafe ]
-{ #category : 'definition' } PharoCAToolFindPragmas class >> toolPack [ ^ #browse ]
-{ #category : 'definition' } PharoCAToolFindPragmas class >> toolName [ ^ #find_pragmas ]
+"
+Finds installed occurrences of one exact pragma keyword using Pragma's cache-backed live-image query.
+"
+Class {
+	#name : 'PharoCAToolFindPragmas',
+	#superclass : 'PharoCATool',
+	#category : 'PharoCodingAssistant-Tools-Pharo',
+	#package : 'PharoCodingAssistant',
+	#tag : 'Tools-Pharo'
+}
+
 { #category : 'definition' }
-PharoCAToolFindPragmas class >> llmDefinition [
- ^ PharoCALLMToolDefinition name:'find_pragmas' description:'Finds installed occurrences of one exact pragma keyword, including arguments rendered compactly. Optional package/tag/class filters; cursor-paginated.' parameters:{
- 'type'->'object'. 'properties'->{
- 'pragma'->{ 'type'->'string' } asDictionary. 'package'->{ 'type'->'string' } asDictionary. 'tag'->{ 'type'->'string' } asDictionary. 'className'->{ 'type'->'string' } asDictionary.
- 'limit'->{ 'type'->'integer'. 'minimum'->1. 'maximum'->200 } asDictionary. 'cursor'->{ 'type'->'string' } asDictionary } asDictionary.
- 'required'->#('pragma') } asDictionary ]
+PharoCAToolFindPragmas class >> capability [ ^ #inspection
+]
+
 { #category : 'execution' }
 PharoCAToolFindPragmas class >> execute: args [
  | pragmaName packageName tagName className occurrences items page scope |
@@ -23,4 +25,26 @@ PharoCAToolFindPragmas class >> execute: args [
  items := (items asSortedCollection:[:a :b| (a at:'className')=(b at:'className') ifTrue:[(a at:'selector')<=(b at:'selector')] ifFalse:[(a at:'className')<=(b at:'className')]]) asArray.
  scope := 'find_pragmas|',pragmaName,'|',(packageName ifNil:['']),'|',(tagName ifNil:['']),'|',(className ifNil:['']).
  page := PharoCAToolPagination pageItems:items arguments:args scope:scope.
- ^ {'pragma'->pragmaName. 'occurrences'->(page at:'items'). 'page'->(page at:'page')} asDictionary ]
+ ^ {'pragma'->pragmaName. 'occurrences'->(page at:'items'). 'page'->(page at:'page')} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolFindPragmas class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolFindPragmas class >> llmDefinition [
+ ^ PharoCALLMToolDefinition name:'find_pragmas' description:'Finds installed occurrences of one exact pragma keyword, including arguments rendered compactly. Optional package/tag/class filters; cursor-paginated.' parameters:{
+ 'type'->'object'. 'properties'->{
+ 'pragma'->{ 'type'->'string' } asDictionary. 'package'->{ 'type'->'string' } asDictionary. 'tag'->{ 'type'->'string' } asDictionary. 'className'->{ 'type'->'string' } asDictionary.
+ 'limit'->{ 'type'->'integer'. 'minimum'->1. 'maximum'->200 } asDictionary. 'cursor'->{ 'type'->'string' } asDictionary } asDictionary.
+ 'required'->#('pragma') } asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolFindPragmas class >> toolName [ ^ #find_pragmas
+]
+
+{ #category : 'definition' }
+PharoCAToolFindPragmas class >> toolPack [ ^ #browse
+]

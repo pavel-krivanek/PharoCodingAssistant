@@ -1,4 +1,6 @@
-"Lists local methods of a class, optionally filtered by protocol, using deterministic cursor pagination."
+"
+Lists local methods of a class, optionally filtered by protocol, using deterministic cursor pagination.
+"
 Class {
 	#name : 'PharoCAToolListMethods',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolListMethods class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolListMethods class >> execute: args [
@@ -49,10 +55,6 @@ PharoCAToolListMethods class >> execute: args context: context [
 		'page' -> (page at: 'page')
 	} asDictionary
 ]
-
-
-{ #category : 'definition' }
-PharoCAToolListMethods class >> capability [ ^ #inspection ]
 
 { #category : 'execution' }
 PharoCAToolListMethods class >> executionMode [

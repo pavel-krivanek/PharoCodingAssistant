@@ -1,4 +1,6 @@
-"Revalidates and applies a stored native refactoring preview."
+"
+Revalidates and applies a stored native refactoring preview.
+"
 Class {
 	#name : 'PharoCAToolRefactorApply',
 	#superclass : 'PharoCATool',
@@ -10,26 +12,6 @@ Class {
 { #category : 'definition' }
 PharoCAToolRefactorApply class >> capability [
 	^ #refactoring
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorApply class >> toolPack [
-	^ #refactoring
-]
-
-{ #category : 'execution' }
-PharoCAToolRefactorApply class >> executionMode [
-	^ #exclusiveMutation
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorApply class >> toolName [
-	^ #refactor_apply
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorApply class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'refactor_apply' description: 'Rebuilds and revalidates a native refactoring preview, rejects stale previews, then applies the generated Pharo changes.' parameters: { 'type' -> 'object'. 'properties' -> { 'refactorHandle' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> #('refactorHandle') } asDictionary
 ]
 
 { #category : 'execution' }
@@ -56,3 +38,22 @@ PharoCAToolRefactorApply class >> execute: args context: context [
 	^ { 'status' -> 'applied'. 'refactorHandle' -> h. 'tool' -> (descriptor at: 'toolName'). 'target' -> (descriptor at: 'target'). 'changeCount' -> freshPlan size. 'changeId' -> (record ifNil: [ nil ] ifNotNil: [ record id ]). 'warnings' -> warnings asArray } asDictionary
 ]
 
+{ #category : 'execution' }
+PharoCAToolRefactorApply class >> executionMode [
+	^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolRefactorApply class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'refactor_apply' description: 'Rebuilds and revalidates a native refactoring preview, rejects stale previews, then applies the generated Pharo changes.' parameters: { 'type' -> 'object'. 'properties' -> { 'refactorHandle' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> #('refactorHandle') } asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolRefactorApply class >> toolName [
+	^ #refactor_apply
+]
+
+{ #category : 'definition' }
+PharoCAToolRefactorApply class >> toolPack [
+	^ #refactoring
+]

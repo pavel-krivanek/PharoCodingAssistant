@@ -99,6 +99,83 @@ PharoCACodingHarness >> applyResourcesTo: anAgent [
 	loadedExtensions := resources extensions
 ]
 
+{ #category : 'runtime-profile-private' }
+PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
+	| providerDescriptors modelDescriptors agentDescriptors mappings defaultId |
+	self validateRuntimeProfileDictionary: profile.
+	providerDescriptors := self runtimeProfileRequireArray: 'providers' from: profile.
+	modelDescriptors := self runtimeProfileRequireArray: 'models' from: profile.
+	agentDescriptors := self runtimeProfileRequireArray: 'agents' from: profile.
+	providerDescriptors do: [ :descriptor |
+		| id family baseUrl modelListUrl credentialName timeout telemetryMode |
+		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile provider entry must be an object' ].
+		id := descriptor at: 'id' ifAbsent: [ Error signal: 'Runtime profile provider has no id' ].
+		family := descriptor at: 'family' ifAbsent: [ Error signal: 'Runtime profile provider has no family' ].
+		family = 'openai-compatible' ifFalse: [ Error signal: 'Unsupported persisted provider family: ', family asString ].
+		(providerRegistry includesProviderNamed: id) ifFalse: [
+			baseUrl := descriptor at: 'baseUrl' ifAbsent: [ Error signal: 'Runtime profile provider has no baseUrl' ].
+			modelListUrl := descriptor at: 'modelListUrl' ifAbsent: [ nil ].
+			credentialName := descriptor at: 'credentialName' ifAbsent: [ 'openai-api-key' ].
+			timeout := descriptor at: 'timeout' ifAbsent: [ 3600 ].
+			telemetryMode := descriptor at: 'serverTelemetryMode' ifAbsent: [ 'auto' ].
+			providerRegistry
+				registerOpenAICompatible: id
+				baseUrl: baseUrl
+				modelListUrl: modelListUrl
+				credentialName: credentialName
+				timeout: timeout
+				serverTelemetryMode: telemetryMode ] ].
+	modelDescriptors do: [ :descriptor |
+		| id providerId model contextSize maximumOutput capabilities |
+		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile model entry must be an object' ].
+		id := descriptor at: 'modelId' ifAbsent: [ Error signal: 'Runtime profile model has no modelId' ].
+		providerId := descriptor at: 'providerId' ifAbsent: [ Error signal: 'Runtime profile model has no providerId' ].
+		(providerRegistry includesProviderNamed: providerId) ifFalse: [ Error signal: 'Runtime profile model references unknown provider: ', providerId asString ].
+		(modelRegistry includesModelNamed: id) ifFalse: [
+			model := PharoCAModel named: id.
+			contextSize := descriptor at: 'contextSize' ifAbsent: [ nil ].
+			maximumOutput := descriptor at: 'maximumOutputTokens' ifAbsent: [ nil ].
+			(contextSize isNil or: [ contextSize isInteger and: [ contextSize > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile contextSize must be a positive integer or null' ].
+			(maximumOutput isNil or: [ maximumOutput isInteger and: [ maximumOutput > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile maximumOutputTokens must be a positive integer or null' ].
+			model contextSize: contextSize; maximumOutputTokens: maximumOutput.
+			capabilities := descriptor at: 'capabilities' ifAbsent: [ Dictionary new ].
+			self runtimeProfileApplyCapabilities: capabilities to: model.
+			modelRegistry register: model provider: providerId ] ].
+	agentDescriptors do: [ :descriptor |
+		| id name modelId reasoningEffort registration |
+		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile agent entry must be an object' ].
+		id := descriptor at: 'agentId' ifAbsent: [ Error signal: 'Runtime profile agent has no agentId' ].
+		name := descriptor at: 'name' ifAbsent: [ nil ].
+		modelId := descriptor at: 'modelId' ifAbsent: [ nil ].
+		reasoningEffort := descriptor at: 'reasoningEffort' ifAbsent: [ 'high' ].
+		reasoningEffort ifNotNil: [ reasoningEffort := reasoningEffort asSymbol ].
+		(id = 'default')
+			ifTrue: [
+				registration := self agentManager registrationNamed: 'default'.
+				registration name: name.
+				modelId ifNotNil: [
+					(modelRegistry includesModelNamed: modelId) ifFalse: [ Error signal: 'Runtime profile agent references unknown model: ', modelId asString ].
+					self setModelNamed: modelId forAgentId: 'default' ] ]
+			ifFalse: [
+				(self agentManager registrations anySatisfy: [ :each | each identifier = id ])
+					ifTrue: [
+						registration := self agentManager registrationNamed: id.
+						registration name: name.
+						modelId ifNotNil: [ self setModelNamed: modelId forAgentId: id ] ]
+					ifFalse: [
+						modelId ifNil: [ Error signal: 'Runtime profile non-default agent requires modelId' ].
+						(modelRegistry includesModelNamed: modelId) ifFalse: [ Error signal: 'Runtime profile agent references unknown model: ', modelId asString ].
+						self newAgentIdentifiedBy: id named: name modelNamed: modelId ] ].
+		(self agentManager agentNamed: id) reasoningEffort: reasoningEffort ].
+	mappings := profile at: 'credentialEnvironmentMappings' ifAbsent: [ Dictionary new ].
+	mappings isDictionary ifFalse: [ Error signal: 'Runtime profile credentialEnvironmentMappings must be an object' ].
+	mappings keysAndValuesDo: [ :credentialName :environmentName |
+		(credentialName isString and: [ environmentName isString ]) ifFalse: [ Error signal: 'Runtime profile credential environment mappings must contain strings' ].
+		providerRegistry credentialResolver map: credentialName toEnvironmentVariable: environmentName ].
+	defaultId := profile at: 'defaultAgentId' ifAbsent: [ 'default' ].
+	self agentManager defaultAgentId: defaultId
+]
+
 { #category : 'private-settings' }
 PharoCACodingHarness >> applySetting: key from: settings do: aBlock [
 	| sentinel value validationError |
@@ -154,6 +231,34 @@ PharoCACodingHarness >> diagnoseUnknownSettings: settings [
 				message: 'Unknown setting: ', key
 				path: nil
 				scope: (settings sourceForKey: key)) ] ]
+]
+
+{ #category : 'models' }
+PharoCACodingHarness >> discoverModelsFromProviderNamed: providerIdentifier [
+	| discovered |
+	discovered := providerRegistry discoverModelsForProviderNamed: providerIdentifier.
+	^ modelRegistry registerDiscoveredModels: discovered provider: providerIdentifier
+]
+
+{ #category : 'models' }
+PharoCACodingHarness >> discoverModelsFromProvidersNamed: providerIdentifiers [
+	^ (providerIdentifiers collect: [ :providerIdentifier | self discoverModelsFromProviderNamed: providerIdentifier ]) asArray
+]
+
+{ #category : 'runtime-profile' }
+PharoCACodingHarness >> ensureRuntimeProfileLoaded [
+	runtimeProfileLoaded ifTrue: [ ^ false ].
+	^ runtimeProfileMutex critical: [
+		| file profile loaded |
+		runtimeProfileLoaded ifTrue: [ ^ false ].
+		file := self runtimeProfileFile.
+		loaded := false.
+		(file notNil and: [ file exists ]) ifTrue: [
+			profile := runtimeProfilePersistence loadProfileFrom: file.
+			self applyRuntimeProfileDictionary: profile.
+			loaded := true ].
+		runtimeProfileLoaded := true.
+		loaded ]
 ]
 
 { #category : 'protocol' }
@@ -310,127 +415,27 @@ PharoCACodingHarness >> run: aPrompt [ ^ self sessionManager run: aPrompt
 PharoCACodingHarness >> runtime [ ^ runtime
 ]
 
-{ #category : 'sessions' }
-PharoCACodingHarness >> sessionManager [
-	sessionManager := self sessionManagerForAgentId: runtime defaultAgentId.
-	^ sessionManager
+{ #category : 'runtime-profile-private' }
+PharoCACodingHarness >> runtimeProfileApplyCapabilities: capabilities to: model [
+	| mappings |
+	capabilities isDictionary ifFalse: [ Error signal: 'Runtime profile model capabilities must be an object' ].
+	mappings := #(
+		('tools' 'supportsTools:')
+		('parallelToolCalls' 'supportsParallelToolCalls:')
+		('reasoning' 'supportsReasoning:')
+		('reasoningStreaming' 'supportsReasoningStreaming:')
+		('usageStreaming' 'supportsUsageStreaming:')
+		('images' 'supportsImages:')
+		('systemMessages' 'supportsSystemMessages:')
+	).
+	mappings do: [ :mapping |
+		| key value |
+		key := mapping first.
+		(capabilities includesKey: key) ifTrue: [
+			value := capabilities at: key.
+			(value = true or: [ value = false ]) ifFalse: [ Error signal: 'Runtime profile capability ', key, ' must be boolean' ].
+			model perform: mapping second asSymbol with: value ] ]
 ]
-
-{ #category : 'sessions' }
-PharoCACodingHarness >> sessionManagerForAgentId: anIdentifier [
-	| key selectedAgent |
-	key := anIdentifier asString.
-	selectedAgent := runtime agentNamed: key.
-	^ sessionManagers at: key ifAbsentPut: [
-		PharoCASessionManager new
-			agent: selectedAgent;
-			workspace: workspace;
-			repository: self sessionRepository;
-			yourself ]
-]
-
-{ #category : 'sessions' }
-PharoCACodingHarness >> sessionRepository [
-	| base |
-	sessionRepository ifNil: [
-		base := resourceLoader globalRoot.
-		base ifNil: [ base := FileLocator home asFileReference / '.pharo-ca' ].
-		sessionRepository := PharoCASessionRepository rootedAt: base / 'sessions' ].
-	^ sessionRepository
-]
-
-{ #category : 'sessions' }
-PharoCACodingHarness >> sessionRepository: aRepository [
-	sessionRepository := aRepository.
-	sessionManagers valuesDo: [ :manager | manager repository: aRepository ]
-]
-
-{ #category : 'sessions' }
-PharoCACodingHarness >> sessions [ ^ self sessionManager sessions
-]
-
-{ #category : 'sessions' }
-PharoCACodingHarness >> sessionsIncludingArchived [ ^ self sessionManager sessionsIncludingArchived
-]
-
-
-{ #category : 'agents' }
-PharoCACodingHarness >> setModelNamed: modelIdentifier forAgentId: agentIdentifier [
-	| selectedAgent baseline |
-	selectedAgent := self agentNamed: agentIdentifier.
-	selectedAgent useModelNamed: modelIdentifier providerRegistry: providerRegistry modelRegistry: modelRegistry.
-	baseline := agentBaselines at: selectedAgent ifAbsent: [
-		self rememberBaselineFor: selectedAgent.
-		agentBaselines at: selectedAgent ].
-	baseline at: 1 put: selectedAgent model; at: 2 put: selectedAgent provider.
-	^ selectedAgent
-]
-
-{ #category : 'settings' }
-PharoCACodingHarness >> settingOverrideAt: aKey put: aValue [ settingsOverrides at: aKey asString put: aValue
-]
-
-{ #category : 'accessing' }
-PharoCACodingHarness >> settings [ ^ resources ifNil: [ nil ] ifNotNil: [ resources settings ]
-]
-
-{ #category : 'accessing' }
-PharoCACodingHarness >> settingsOverrides [ ^ settingsOverrides copy
-]
-
-{ #category : 'running' }
-PharoCACodingHarness >> start: aPrompt [ ^ self sessionManager start: aPrompt
-]
-
-{ #category : 'running' }
-PharoCACodingHarness >> start: aPrompt agentId: agentIdentifier inSessionId: aSessionId eventsDo: anEventBlock [
-	| manager |
-	manager := self sessionManagerForAgentId: agentIdentifier.
-	^ aSessionId
-		ifNil: [ manager start: aPrompt eventsDo: anEventBlock ]
-		ifNotNil: [ manager start: aPrompt inSessionId: aSessionId eventsDo: anEventBlock ]
-]
-
-{ #category : 'running' }
-PharoCACodingHarness >> start: aPrompt eventsDo: anEventBlock [
-	^ self sessionManager start: aPrompt eventsDo: anEventBlock
-]
-
-{ #category : 'running' }
-PharoCACodingHarness >> start: aPrompt inSessionId: aSessionId eventsDo: anEventBlock [
-	^ self sessionManager start: aPrompt inSessionId: aSessionId eventsDo: anEventBlock
-]
-
-{ #category : 'trust' }
-PharoCACodingHarness >> trustWorkspace [ workspace trust. ^ self reloadResources
-]
-
-{ #category : 'private-loading' }
-PharoCACodingHarness >> unloadPreviouslyLoadedResources [
-	runtime agentManager agents do: [ :each |
-		loadedInstructionNames do: [ :name | each instructionRegistry unregisterNamed: name ].
-		loadedSkillNames do: [ :name | each skillRegistry unregisterNamed: name ].
-		loadedExtensions do: [ :extension | each extensionRegistry unregister: extension ] ].
-	loadedInstructionNames := #().
-	loadedSkillNames := #().
-	loadedExtensions := #()
-]
-
-{ #category : 'trust' }
-PharoCACodingHarness >> untrustWorkspace [ workspace untrust. ^ self reloadResources
-]
-
-{ #category : 'accessing' }
-PharoCACodingHarness >> workspace [ ^ workspace
-]
-
-{ #category : 'accessing' }
-PharoCACodingHarness >> workspace: aWorkspace [
-	workspace := aWorkspace.
-	runtime agentManager agents do: [ :each | each toolRegistry workspace: aWorkspace ].
-	sessionManagers valuesDo: [ :manager | manager workspace: aWorkspace ]
-]
-
 
 { #category : 'runtime-profile-private' }
 PharoCACodingHarness >> runtimeProfileBuiltinProviderIds [
@@ -500,113 +505,6 @@ PharoCACodingHarness >> runtimeProfileDictionary [
 	} asDictionary
 ]
 
-{ #category : 'runtime-profile-private' }
-PharoCACodingHarness >> runtimeProfileRequireArray: key from: profile [
-	| value |
-	value := profile at: key ifAbsent: [ #() ].
-	value isArray ifFalse: [ Error signal: 'Runtime profile ', key, ' must be an array' ].
-	^ value
-]
-
-{ #category : 'runtime-profile-private' }
-PharoCACodingHarness >> runtimeProfileApplyCapabilities: capabilities to: model [
-	| mappings |
-	capabilities isDictionary ifFalse: [ Error signal: 'Runtime profile model capabilities must be an object' ].
-	mappings := #(
-		('tools' 'supportsTools:')
-		('parallelToolCalls' 'supportsParallelToolCalls:')
-		('reasoning' 'supportsReasoning:')
-		('reasoningStreaming' 'supportsReasoningStreaming:')
-		('usageStreaming' 'supportsUsageStreaming:')
-		('images' 'supportsImages:')
-		('systemMessages' 'supportsSystemMessages:')
-	).
-	mappings do: [ :mapping |
-		| key value |
-		key := mapping first.
-		(capabilities includesKey: key) ifTrue: [
-			value := capabilities at: key.
-			(value = true or: [ value = false ]) ifFalse: [ Error signal: 'Runtime profile capability ', key, ' must be boolean' ].
-			model perform: mapping second asSymbol with: value ] ]
-]
-
-{ #category : 'runtime-profile-private' }
-PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
-	| providerDescriptors modelDescriptors agentDescriptors mappings defaultId |
-	self validateRuntimeProfileDictionary: profile.
-	providerDescriptors := self runtimeProfileRequireArray: 'providers' from: profile.
-	modelDescriptors := self runtimeProfileRequireArray: 'models' from: profile.
-	agentDescriptors := self runtimeProfileRequireArray: 'agents' from: profile.
-	providerDescriptors do: [ :descriptor |
-		| id family baseUrl modelListUrl credentialName timeout telemetryMode |
-		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile provider entry must be an object' ].
-		id := descriptor at: 'id' ifAbsent: [ Error signal: 'Runtime profile provider has no id' ].
-		family := descriptor at: 'family' ifAbsent: [ Error signal: 'Runtime profile provider has no family' ].
-		family = 'openai-compatible' ifFalse: [ Error signal: 'Unsupported persisted provider family: ', family asString ].
-		(providerRegistry includesProviderNamed: id) ifFalse: [
-			baseUrl := descriptor at: 'baseUrl' ifAbsent: [ Error signal: 'Runtime profile provider has no baseUrl' ].
-			modelListUrl := descriptor at: 'modelListUrl' ifAbsent: [ nil ].
-			credentialName := descriptor at: 'credentialName' ifAbsent: [ 'openai-api-key' ].
-			timeout := descriptor at: 'timeout' ifAbsent: [ 3600 ].
-			telemetryMode := descriptor at: 'serverTelemetryMode' ifAbsent: [ 'auto' ].
-			providerRegistry
-				registerOpenAICompatible: id
-				baseUrl: baseUrl
-				modelListUrl: modelListUrl
-				credentialName: credentialName
-				timeout: timeout
-				serverTelemetryMode: telemetryMode ] ].
-	modelDescriptors do: [ :descriptor |
-		| id providerId model contextSize maximumOutput capabilities |
-		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile model entry must be an object' ].
-		id := descriptor at: 'modelId' ifAbsent: [ Error signal: 'Runtime profile model has no modelId' ].
-		providerId := descriptor at: 'providerId' ifAbsent: [ Error signal: 'Runtime profile model has no providerId' ].
-		(providerRegistry includesProviderNamed: providerId) ifFalse: [ Error signal: 'Runtime profile model references unknown provider: ', providerId asString ].
-		(modelRegistry includesModelNamed: id) ifFalse: [
-			model := PharoCAModel named: id.
-			contextSize := descriptor at: 'contextSize' ifAbsent: [ nil ].
-			maximumOutput := descriptor at: 'maximumOutputTokens' ifAbsent: [ nil ].
-			(contextSize isNil or: [ contextSize isInteger and: [ contextSize > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile contextSize must be a positive integer or null' ].
-			(maximumOutput isNil or: [ maximumOutput isInteger and: [ maximumOutput > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile maximumOutputTokens must be a positive integer or null' ].
-			model contextSize: contextSize; maximumOutputTokens: maximumOutput.
-			capabilities := descriptor at: 'capabilities' ifAbsent: [ Dictionary new ].
-			self runtimeProfileApplyCapabilities: capabilities to: model.
-			modelRegistry register: model provider: providerId ] ].
-	agentDescriptors do: [ :descriptor |
-		| id name modelId reasoningEffort registration |
-		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile agent entry must be an object' ].
-		id := descriptor at: 'agentId' ifAbsent: [ Error signal: 'Runtime profile agent has no agentId' ].
-		name := descriptor at: 'name' ifAbsent: [ nil ].
-		modelId := descriptor at: 'modelId' ifAbsent: [ nil ].
-		reasoningEffort := descriptor at: 'reasoningEffort' ifAbsent: [ 'high' ].
-		reasoningEffort ifNotNil: [ reasoningEffort := reasoningEffort asSymbol ].
-		(id = 'default')
-			ifTrue: [
-				registration := self agentManager registrationNamed: 'default'.
-				registration name: name.
-				modelId ifNotNil: [
-					(modelRegistry includesModelNamed: modelId) ifFalse: [ Error signal: 'Runtime profile agent references unknown model: ', modelId asString ].
-					self setModelNamed: modelId forAgentId: 'default' ] ]
-			ifFalse: [
-				(self agentManager registrations anySatisfy: [ :each | each identifier = id ])
-					ifTrue: [
-						registration := self agentManager registrationNamed: id.
-						registration name: name.
-						modelId ifNotNil: [ self setModelNamed: modelId forAgentId: id ] ]
-					ifFalse: [
-						modelId ifNil: [ Error signal: 'Runtime profile non-default agent requires modelId' ].
-						(modelRegistry includesModelNamed: modelId) ifFalse: [ Error signal: 'Runtime profile agent references unknown model: ', modelId asString ].
-						self newAgentIdentifiedBy: id named: name modelNamed: modelId ] ].
-		(self agentManager agentNamed: id) reasoningEffort: reasoningEffort ].
-	mappings := profile at: 'credentialEnvironmentMappings' ifAbsent: [ Dictionary new ].
-	mappings isDictionary ifFalse: [ Error signal: 'Runtime profile credentialEnvironmentMappings must be an object' ].
-	mappings keysAndValuesDo: [ :credentialName :environmentName |
-		(credentialName isString and: [ environmentName isString ]) ifFalse: [ Error signal: 'Runtime profile credential environment mappings must contain strings' ].
-		providerRegistry credentialResolver map: credentialName toEnvironmentVariable: environmentName ].
-	defaultId := profile at: 'defaultAgentId' ifAbsent: [ 'default' ].
-	self agentManager defaultAgentId: defaultId
-]
-
 { #category : 'runtime-profile' }
 PharoCACodingHarness >> runtimeProfileFile [
 	| root |
@@ -615,29 +513,12 @@ PharoCACodingHarness >> runtimeProfileFile [
 	^ root / 'runtime.json'
 ]
 
-{ #category : 'runtime-profile' }
-PharoCACodingHarness >> ensureRuntimeProfileLoaded [
-	runtimeProfileLoaded ifTrue: [ ^ false ].
-	^ runtimeProfileMutex critical: [
-		| file profile loaded |
-		runtimeProfileLoaded ifTrue: [ ^ false ].
-		file := self runtimeProfileFile.
-		loaded := false.
-		(file notNil and: [ file exists ]) ifTrue: [
-			profile := runtimeProfilePersistence loadProfileFrom: file.
-			self applyRuntimeProfileDictionary: profile.
-			loaded := true ].
-		runtimeProfileLoaded := true.
-		loaded ]
-]
-
-{ #category : 'runtime-profile' }
-PharoCACodingHarness >> saveRuntimeProfile [
-	| file |
-	file := self runtimeProfileFile.
-	file ifNil: [ Error signal: 'Runtime profile requires a configured global resource root' ].
-	runtimeProfileMutex critical: [ runtimeProfilePersistence saveProfileDictionary: self runtimeProfileDictionary to: file ].
-	^ file
+{ #category : 'runtime-profile-private' }
+PharoCACodingHarness >> runtimeProfileRequireArray: key from: profile [
+	| value |
+	value := profile at: key ifAbsent: [ #() ].
+	value isArray ifFalse: [ Error signal: 'Runtime profile ', key, ' must be an array' ].
+	^ value
 ]
 
 { #category : 'runtime-profile' }
@@ -660,6 +541,124 @@ PharoCACodingHarness >> runtimeProfileValidateCapabilities: capabilities [
 	capabilities keysAndValuesDo: [ :key :value |
 		(known includes: key asString) ifFalse: [ Error signal: 'Unknown runtime profile model capability: ', key asString ].
 		(value = true or: [ value = false ]) ifFalse: [ Error signal: 'Runtime profile capability ', key asString, ' must be boolean' ] ]
+]
+
+{ #category : 'runtime-profile' }
+PharoCACodingHarness >> saveRuntimeProfile [
+	| file |
+	file := self runtimeProfileFile.
+	file ifNil: [ Error signal: 'Runtime profile requires a configured global resource root' ].
+	runtimeProfileMutex critical: [ runtimeProfilePersistence saveProfileDictionary: self runtimeProfileDictionary to: file ].
+	^ file
+]
+
+{ #category : 'sessions' }
+PharoCACodingHarness >> sessionManager [
+	sessionManager := self sessionManagerForAgentId: runtime defaultAgentId.
+	^ sessionManager
+]
+
+{ #category : 'sessions' }
+PharoCACodingHarness >> sessionManagerForAgentId: anIdentifier [
+	| key selectedAgent |
+	key := anIdentifier asString.
+	selectedAgent := runtime agentNamed: key.
+	^ sessionManagers at: key ifAbsentPut: [
+		PharoCASessionManager new
+			agent: selectedAgent;
+			workspace: workspace;
+			repository: self sessionRepository;
+			yourself ]
+]
+
+{ #category : 'sessions' }
+PharoCACodingHarness >> sessionRepository [
+	| base |
+	sessionRepository ifNil: [
+		base := resourceLoader globalRoot.
+		base ifNil: [ base := FileLocator home asFileReference / '.pharo-ca' ].
+		sessionRepository := PharoCASessionRepository rootedAt: base / 'sessions' ].
+	^ sessionRepository
+]
+
+{ #category : 'sessions' }
+PharoCACodingHarness >> sessionRepository: aRepository [
+	sessionRepository := aRepository.
+	sessionManagers valuesDo: [ :manager | manager repository: aRepository ]
+]
+
+{ #category : 'sessions' }
+PharoCACodingHarness >> sessions [ ^ self sessionManager sessions
+]
+
+{ #category : 'sessions' }
+PharoCACodingHarness >> sessionsIncludingArchived [ ^ self sessionManager sessionsIncludingArchived
+]
+
+{ #category : 'agents' }
+PharoCACodingHarness >> setModelNamed: modelIdentifier forAgentId: agentIdentifier [
+	| selectedAgent baseline |
+	selectedAgent := self agentNamed: agentIdentifier.
+	selectedAgent useModelNamed: modelIdentifier providerRegistry: providerRegistry modelRegistry: modelRegistry.
+	baseline := agentBaselines at: selectedAgent ifAbsent: [
+		self rememberBaselineFor: selectedAgent.
+		agentBaselines at: selectedAgent ].
+	baseline at: 1 put: selectedAgent model; at: 2 put: selectedAgent provider.
+	^ selectedAgent
+]
+
+{ #category : 'settings' }
+PharoCACodingHarness >> settingOverrideAt: aKey put: aValue [ settingsOverrides at: aKey asString put: aValue
+]
+
+{ #category : 'accessing' }
+PharoCACodingHarness >> settings [ ^ resources ifNil: [ nil ] ifNotNil: [ resources settings ]
+]
+
+{ #category : 'accessing' }
+PharoCACodingHarness >> settingsOverrides [ ^ settingsOverrides copy
+]
+
+{ #category : 'running' }
+PharoCACodingHarness >> start: aPrompt [ ^ self sessionManager start: aPrompt
+]
+
+{ #category : 'running' }
+PharoCACodingHarness >> start: aPrompt agentId: agentIdentifier inSessionId: aSessionId eventsDo: anEventBlock [
+	| manager |
+	manager := self sessionManagerForAgentId: agentIdentifier.
+	^ aSessionId
+		ifNil: [ manager start: aPrompt eventsDo: anEventBlock ]
+		ifNotNil: [ manager start: aPrompt inSessionId: aSessionId eventsDo: anEventBlock ]
+]
+
+{ #category : 'running' }
+PharoCACodingHarness >> start: aPrompt eventsDo: anEventBlock [
+	^ self sessionManager start: aPrompt eventsDo: anEventBlock
+]
+
+{ #category : 'running' }
+PharoCACodingHarness >> start: aPrompt inSessionId: aSessionId eventsDo: anEventBlock [
+	^ self sessionManager start: aPrompt inSessionId: aSessionId eventsDo: anEventBlock
+]
+
+{ #category : 'trust' }
+PharoCACodingHarness >> trustWorkspace [ workspace trust. ^ self reloadResources
+]
+
+{ #category : 'private-loading' }
+PharoCACodingHarness >> unloadPreviouslyLoadedResources [
+	runtime agentManager agents do: [ :each |
+		loadedInstructionNames do: [ :name | each instructionRegistry unregisterNamed: name ].
+		loadedSkillNames do: [ :name | each skillRegistry unregisterNamed: name ].
+		loadedExtensions do: [ :extension | each extensionRegistry unregister: extension ] ].
+	loadedInstructionNames := #().
+	loadedSkillNames := #().
+	loadedExtensions := #()
+]
+
+{ #category : 'trust' }
+PharoCACodingHarness >> untrustWorkspace [ workspace untrust. ^ self reloadResources
 ]
 
 { #category : 'runtime-profile-private' }
@@ -731,15 +730,13 @@ PharoCACodingHarness >> validateRuntimeProfileDictionary: profile [
 			ifFalse: [ Error signal: 'Runtime profile credential environment mappings must contain non-empty strings' ] ]
 ]
 
-{ #category : 'models' }
-PharoCACodingHarness >> discoverModelsFromProviderNamed: providerIdentifier [
-	| discovered |
-	discovered := providerRegistry discoverModelsForProviderNamed: providerIdentifier.
-	^ modelRegistry registerDiscoveredModels: discovered provider: providerIdentifier
+{ #category : 'accessing' }
+PharoCACodingHarness >> workspace [ ^ workspace
 ]
 
-{ #category : 'models' }
-PharoCACodingHarness >> discoverModelsFromProvidersNamed: providerIdentifiers [
-	^ (providerIdentifiers collect: [ :providerIdentifier | self discoverModelsFromProviderNamed: providerIdentifier ]) asArray
+{ #category : 'accessing' }
+PharoCACodingHarness >> workspace: aWorkspace [
+	workspace := aWorkspace.
+	runtime agentManager agents do: [ :each | each toolRegistry workspace: aWorkspace ].
+	sessionManagers valuesDo: [ :manager | manager workspace: aWorkspace ]
 ]
-

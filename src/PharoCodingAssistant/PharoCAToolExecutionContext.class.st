@@ -1,8 +1,25 @@
-"Per-tool cooperative execution context. Cancellation and deadlines are checked only at safe checkpoints; arbitrary Pharo processes are never forcefully terminated."
+"
+Per-tool cooperative execution context. Cancellation and deadlines are checked only at safe checkpoints; arbitrary Pharo processes are never forcefully terminated.
+"
 Class {
 	#name : 'PharoCAToolExecutionContext',
 	#superclass : 'Object',
-	#instVars : [ 'cancellationToken', 'deadlineMilliseconds', 'progressBlock', 'startedBlock', 'environment', 'run', 'invocation', 'workspace', 'workspaceCommandRunner', 'workspaceOutputStore', 'objectHandleRegistry', 'testRunStore', 'transcriptBuffer', 'runtimeHandleRegistry' ],
+	#instVars : [
+		'cancellationToken',
+		'deadlineMilliseconds',
+		'progressBlock',
+		'startedBlock',
+		'environment',
+		'run',
+		'invocation',
+		'workspace',
+		'workspaceCommandRunner',
+		'workspaceOutputStore',
+		'objectHandleRegistry',
+		'testRunStore',
+		'transcriptBuffer',
+		'runtimeHandleRegistry'
+	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
@@ -53,6 +70,14 @@ PharoCAToolExecutionContext >> deadlineMilliseconds [
 	^ deadlineMilliseconds
 ]
 
+{ #category : 'provenance' }
+PharoCAToolExecutionContext >> environment [ ^ environment
+]
+
+{ #category : 'provenance' }
+PharoCAToolExecutionContext >> environment: anEnvironment [ environment := anEnvironment
+]
+
 { #category : 'initialization' }
 PharoCAToolExecutionContext >> initialize [
 	super initialize.
@@ -62,29 +87,26 @@ PharoCAToolExecutionContext >> initialize [
 	startedBlock := [ ]
 ]
 
+{ #category : 'provenance' }
+PharoCAToolExecutionContext >> invocation [ ^ invocation
+]
+
+{ #category : 'provenance' }
+PharoCAToolExecutionContext >> invocation: anInvocation [ invocation := anInvocation
+]
+
+{ #category : 'objects' }
+PharoCAToolExecutionContext >> objectHandleRegistry [ ^ objectHandleRegistry
+]
+
+{ #category : 'objects' }
+PharoCAToolExecutionContext >> objectHandleRegistry: aRegistry [ objectHandleRegistry := aRegistry
+]
+
 { #category : 'accessing' }
 PharoCAToolExecutionContext >> progressBlock: aBlock [
 	progressBlock := aBlock
 ]
-
-
-{ #category : 'provenance' }
-PharoCAToolExecutionContext >> environment [ ^ environment ]
-
-{ #category : 'provenance' }
-PharoCAToolExecutionContext >> environment: anEnvironment [ environment := anEnvironment ]
-
-{ #category : 'provenance' }
-PharoCAToolExecutionContext >> invocation [ ^ invocation ]
-
-{ #category : 'provenance' }
-PharoCAToolExecutionContext >> invocation: anInvocation [ invocation := anInvocation ]
-
-{ #category : 'provenance' }
-PharoCAToolExecutionContext >> run [ ^ run ]
-
-{ #category : 'provenance' }
-PharoCAToolExecutionContext >> run: aRun [ run := aRun ]
 
 { #category : 'changes' }
 PharoCAToolExecutionContext >> recordChangeKind: kind target: target before: before after: after metadata: metadata [
@@ -113,6 +135,52 @@ PharoCAToolExecutionContext >> reportProgressCurrent: current total: total messa
 	} asDictionary
 ]
 
+{ #category : 'objects' }
+PharoCAToolExecutionContext >> requireObjectHandleRegistry [
+	objectHandleRegistry ifNil: [ objectHandleRegistry := PharoCAObjectHandleRegistry new ].
+	^ objectHandleRegistry
+]
+
+{ #category : 'runtime-handles' }
+PharoCAToolExecutionContext >> requireRuntimeHandleRegistry [
+	runtimeHandleRegistry ifNil: [ runtimeHandleRegistry := PharoCARuntimeHandleRegistry new ].
+	^ runtimeHandleRegistry
+]
+
+{ #category : 'testing-tools' }
+PharoCAToolExecutionContext >> requireTestRunStore [
+	testRunStore ifNil: [ testRunStore := PharoCATestRunStore new ].
+	^ testRunStore
+]
+
+{ #category : 'transcript' }
+PharoCAToolExecutionContext >> requireTranscriptBuffer [
+	transcriptBuffer ifNil: [ transcriptBuffer := PharoCATranscriptBuffer new ].
+	^ transcriptBuffer
+]
+
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> requireWorkspace [
+	workspace ifNil: [ Error signal: 'No workspace is configured for this tool execution' ].
+	^ workspace
+]
+
+{ #category : 'provenance' }
+PharoCAToolExecutionContext >> run [ ^ run
+]
+
+{ #category : 'provenance' }
+PharoCAToolExecutionContext >> run: aRun [ run := aRun
+]
+
+{ #category : 'runtime-handles' }
+PharoCAToolExecutionContext >> runtimeHandleRegistry [ ^ runtimeHandleRegistry
+]
+
+{ #category : 'runtime-handles' }
+PharoCAToolExecutionContext >> runtimeHandleRegistry: aRegistry [ runtimeHandleRegistry := aRegistry
+]
+
 { #category : 'lifecycle' }
 PharoCAToolExecutionContext >> signalStarted [
 	startedBlock value
@@ -121,6 +189,14 @@ PharoCAToolExecutionContext >> signalStarted [
 { #category : 'accessing' }
 PharoCAToolExecutionContext >> startedBlock: aBlock [
 	startedBlock := aBlock
+]
+
+{ #category : 'testing-tools' }
+PharoCAToolExecutionContext >> testRunStore [ ^ testRunStore
+]
+
+{ #category : 'testing-tools' }
+PharoCAToolExecutionContext >> testRunStore: aStore [ testRunStore := aStore
 ]
 
 { #category : 'testing' }
@@ -137,73 +213,34 @@ PharoCAToolExecutionContext >> timeoutMilliseconds: milliseconds [
 	deadlineMilliseconds := Time millisecondClockValue + milliseconds
 ]
 
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> workspace [ ^ workspace ]
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> workspace: aWorkspace [ workspace := aWorkspace ]
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> requireWorkspace [
-	workspace ifNil: [ Error signal: 'No workspace is configured for this tool execution' ].
-	^ workspace
-]
-
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> workspaceCommandRunner [ ^ workspaceCommandRunner ]
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> workspaceCommandRunner: aRunner [ workspaceCommandRunner := aRunner ]
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> workspaceOutputStore [ ^ workspaceOutputStore ]
-
-{ #category : 'workspace' }
-PharoCAToolExecutionContext >> workspaceOutputStore: aStore [ workspaceOutputStore := aStore ]
-
-
-{ #category : 'objects' }
-PharoCAToolExecutionContext >> objectHandleRegistry [ ^ objectHandleRegistry ]
-
-{ #category : 'objects' }
-PharoCAToolExecutionContext >> objectHandleRegistry: aRegistry [ objectHandleRegistry := aRegistry ]
-
-{ #category : 'objects' }
-PharoCAToolExecutionContext >> requireObjectHandleRegistry [
-	objectHandleRegistry ifNil: [ objectHandleRegistry := PharoCAObjectHandleRegistry new ].
-	^ objectHandleRegistry
-]
-
-
-{ #category : 'testing-tools' }
-PharoCAToolExecutionContext >> testRunStore [ ^ testRunStore ]
-{ #category : 'testing-tools' }
-PharoCAToolExecutionContext >> testRunStore: aStore [ testRunStore := aStore ]
-{ #category : 'testing-tools' }
-PharoCAToolExecutionContext >> requireTestRunStore [
-	testRunStore ifNil: [ testRunStore := PharoCATestRunStore new ].
-	^ testRunStore
+{ #category : 'transcript' }
+PharoCAToolExecutionContext >> transcriptBuffer [ ^ transcriptBuffer
 ]
 
 { #category : 'transcript' }
-PharoCAToolExecutionContext >> transcriptBuffer [ ^ transcriptBuffer ]
-{ #category : 'transcript' }
-PharoCAToolExecutionContext >> transcriptBuffer: aBuffer [ transcriptBuffer := aBuffer ]
-{ #category : 'transcript' }
-PharoCAToolExecutionContext >> requireTranscriptBuffer [
-	transcriptBuffer ifNil: [ transcriptBuffer := PharoCATranscriptBuffer new ].
-	^ transcriptBuffer
+PharoCAToolExecutionContext >> transcriptBuffer: aBuffer [ transcriptBuffer := aBuffer
 ]
 
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> workspace [ ^ workspace
+]
 
-{ #category : 'runtime-handles' }
-PharoCAToolExecutionContext >> runtimeHandleRegistry [ ^ runtimeHandleRegistry ]
-{ #category : 'runtime-handles' }
-PharoCAToolExecutionContext >> runtimeHandleRegistry: aRegistry [ runtimeHandleRegistry := aRegistry ]
-{ #category : 'runtime-handles' }
-PharoCAToolExecutionContext >> requireRuntimeHandleRegistry [
-	runtimeHandleRegistry ifNil: [ runtimeHandleRegistry := PharoCARuntimeHandleRegistry new ].
-	^ runtimeHandleRegistry
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> workspace: aWorkspace [ workspace := aWorkspace
+]
+
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> workspaceCommandRunner [ ^ workspaceCommandRunner
+]
+
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> workspaceCommandRunner: aRunner [ workspaceCommandRunner := aRunner
+]
+
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> workspaceOutputStore [ ^ workspaceOutputStore
+]
+
+{ #category : 'workspace' }
+PharoCAToolExecutionContext >> workspaceOutputStore: aStore [ workspaceOutputStore := aStore
 ]

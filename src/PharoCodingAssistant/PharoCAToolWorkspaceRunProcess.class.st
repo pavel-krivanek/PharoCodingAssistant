@@ -1,4 +1,6 @@
-"Runs one executable with an argument vector inside a trusted workspace. This is intentionally a full-profile capability and never accepts a shell command string."
+"
+Runs one executable with an argument vector inside a trusted workspace. This is intentionally a full-profile capability and never accepts a shell command string.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceRunProcess',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,11 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceRunProcess class >> toolName [ ^ #workspace_run_process ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceRunProcess class >> capability [ ^ #process ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceRunProcess class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolWorkspaceRunProcess class >> capability [ ^ #process
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceRunProcess class >> execute: args context: context [
@@ -62,6 +61,10 @@ PharoCAToolWorkspaceRunProcess class >> execute: args context: context [
 	^ page
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceRunProcess class >> executionMode [ ^ #exclusiveMutation
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceRunProcess class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -78,4 +81,8 @@ PharoCAToolWorkspaceRunProcess class >> llmDefinition [
 			} asDictionary.
 			'required' -> { 'executable' }
 		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceRunProcess class >> toolName [ ^ #workspace_run_process
 ]

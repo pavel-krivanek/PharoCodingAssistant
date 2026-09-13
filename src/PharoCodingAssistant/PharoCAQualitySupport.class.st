@@ -1,4 +1,6 @@
-"Shared native QualityAssistant/Smalllint adaptation used by the lazy quality tool pack."
+"
+Shared native QualityAssistant/Smalllint adaptation used by the lazy quality tool pack.
+"
 Class {
 	#name : 'PharoCAQualitySupport',
 	#superclass : 'Object',
@@ -6,46 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
-
-{ #category : 'private' }
-PharoCAQualitySupport class >> boundedString: anObject limit: limit [
-	| text |
-	text := anObject ifNil: [ '' ] ifNotNil: [ anObject asString ].
-	text size <= limit ifTrue: [ ^ text ].
-	^ (text copyFrom: 1 to: limit), '…'
-]
-
-{ #category : 'entities' }
-PharoCAQualitySupport class >> classNamed: className [
-	| cls |
-	cls := Smalltalk globals at: className asSymbol ifAbsent: [ Error signal: 'Class not found: ', className ].
-	(cls isBehavior) ifFalse: [ Error signal: 'Global is not a class: ', className ].
-	^ cls
-]
-
-{ #category : 'entities' }
-PharoCAQualitySupport class >> entryEntity: entity descriptor: descriptor [
-	^ {
-		'entity' -> entity.
-		'descriptor' -> descriptor
-	} asDictionary
-]
-
-{ #category : 'entities' }
-PharoCAQualitySupport class >> methodEntryForClass: cls side: side selector: selector [
-	| target method |
-	target := side = 'class' ifTrue: [ cls class ] ifFalse: [ cls ].
-	method := target compiledMethodAt: selector asSymbol ifAbsent: [
-		Error signal: 'Method not found: ', cls name, ' ', side, '>>', selector ].
-	^ self
-		entryEntity: method
-		descriptor: {
-			'kind' -> 'method'.
-			'className' -> cls name.
-			'side' -> side.
-			'selector' -> selector asString
-		} asDictionary
-]
 
 { #category : 'entities' }
 PharoCAQualitySupport class >> appendClass: cls includeClassSide: includeClassSide to: addEntry [
@@ -67,6 +29,22 @@ PharoCAQualitySupport class >> appendClass: cls includeClassSide: includeClassSi
 				'side' -> 'class'.
 				'selector' -> selector asString
 			} asDictionary ] ]
+]
+
+{ #category : 'private' }
+PharoCAQualitySupport class >> boundedString: anObject limit: limit [
+	| text |
+	text := anObject ifNil: [ '' ] ifNotNil: [ anObject asString ].
+	text size <= limit ifTrue: [ ^ text ].
+	^ (text copyFrom: 1 to: limit), '…'
+]
+
+{ #category : 'entities' }
+PharoCAQualitySupport class >> classNamed: className [
+	| cls |
+	cls := Smalltalk globals at: className asSymbol ifAbsent: [ Error signal: 'Class not found: ', className ].
+	(cls isBehavior) ifFalse: [ Error signal: 'Global is not a class: ', className ].
+	^ cls
 ]
 
 { #category : 'entities' }
@@ -107,6 +85,24 @@ PharoCAQualitySupport class >> entriesForArguments: args maxEntities: maxEntitie
 	Error signal: 'Unsupported quality scope: ', scope
 ]
 
+{ #category : 'entities' }
+PharoCAQualitySupport class >> entryEntity: entity descriptor: descriptor [
+	^ {
+		'entity' -> entity.
+		'descriptor' -> descriptor
+	} asDictionary
+]
+
+{ #category : 'filtering' }
+PharoCAQualitySupport class >> finding: finding matchesArguments: args [
+	| severity ruleClass |
+	severity := args at: 'severity' ifAbsent: [ 'all' ].
+	(severity = 'all' or: [ (finding at: 'severity') = severity ]) ifFalse: [ ^ false ].
+	ruleClass := args at: 'ruleClass' ifAbsent: [ '' ].
+	(ruleClass isEmpty or: [ (finding at: 'ruleClass') = ruleClass ]) ifFalse: [ ^ false ].
+	^ true
+]
+
 { #category : 'critiques' }
 PharoCAQualitySupport class >> findingForCritique: critique descriptor: descriptor [
 	| rule anchor interval result description |
@@ -134,14 +130,20 @@ PharoCAQualitySupport class >> findingForCritique: critique descriptor: descript
 	^ result
 ]
 
-{ #category : 'filtering' }
-PharoCAQualitySupport class >> finding: finding matchesArguments: args [
-	| severity ruleClass |
-	severity := args at: 'severity' ifAbsent: [ 'all' ].
-	(severity = 'all' or: [ (finding at: 'severity') = severity ]) ifFalse: [ ^ false ].
-	ruleClass := args at: 'ruleClass' ifAbsent: [ '' ].
-	(ruleClass isEmpty or: [ (finding at: 'ruleClass') = ruleClass ]) ifFalse: [ ^ false ].
-	^ true
+{ #category : 'entities' }
+PharoCAQualitySupport class >> methodEntryForClass: cls side: side selector: selector [
+	| target method |
+	target := side = 'class' ifTrue: [ cls class ] ifFalse: [ cls ].
+	method := target compiledMethodAt: selector asSymbol ifAbsent: [
+		Error signal: 'Method not found: ', cls name, ' ', side, '>>', selector ].
+	^ self
+		entryEntity: method
+		descriptor: {
+			'kind' -> 'method'.
+			'className' -> cls name.
+			'side' -> side.
+			'selector' -> selector asString
+		} asDictionary
 ]
 
 { #category : 'rules' }

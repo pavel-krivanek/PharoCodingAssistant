@@ -1,4 +1,6 @@
-"Shared validation and metadata for Morphic SystemWindow tools."
+"
+Shared validation and metadata for Morphic SystemWindow tools.
+"
 Class {
 	#name : 'PharoCAUIWindowTool',
 	#superclass : 'PharoCATool',
@@ -10,6 +12,20 @@ Class {
 { #category : 'testing' }
 PharoCAUIWindowTool class >> isAbstract [
 	^ self = PharoCAUIWindowTool
+]
+
+{ #category : 'private' }
+PharoCAUIWindowTool class >> recordRuntimeChange: kind window: window handle: handle before: before after: after context: context [
+	^ context
+		recordChangeKind: kind
+		target: ((before ifNil: [ after ]) at: 'title' ifAbsent: [ handle ])
+		before: before
+		after: after
+		metadata: {
+			'handle' -> handle.
+			'windowClass' -> window class name asString.
+			'runtimeOnly' -> true
+		} asDictionary
 ]
 
 { #category : 'private' }
@@ -44,18 +60,4 @@ PharoCAUIWindowTool class >> windowMetadataFor: window handle: handle [
 			'modelClass' -> (model ifNil: [ nil ] ifNotNil: [ model class name asString ]).
 			'presenterClass' -> (presenter ifNil: [ nil ] ifNotNil: [ presenter class name asString ])
 		} asDictionary ]
-]
-
-{ #category : 'private' }
-PharoCAUIWindowTool class >> recordRuntimeChange: kind window: window handle: handle before: before after: after context: context [
-	^ context
-		recordChangeKind: kind
-		target: ((before ifNil: [ after ]) at: 'title' ifAbsent: [ handle ])
-		before: before
-		after: after
-		metadata: {
-			'handle' -> handle.
-			'windowClass' -> window class name asString.
-			'runtimeOnly' -> true
-		} asDictionary
 ]

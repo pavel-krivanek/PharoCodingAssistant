@@ -1,4 +1,6 @@
-"Previews one OCParseTreeRewriter transformation on a freshly parsed copy of an installed method. It never mutates or recompiles the live method."
+"
+Previews one OCParseTreeRewriter transformation on a freshly parsed copy of an installed method. It never mutates or recompiles the live method.
+"
 Class {
 	#name : 'PharoCAToolASTRewritePreview',
 	#superclass : 'PharoCATool',
@@ -8,36 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolASTRewritePreview class >> toolName [ ^ #ast_rewrite_preview ]
-{ #category : 'definition' }
-PharoCAToolASTRewritePreview class >> toolPack [ ^ #browse ]
-{ #category : 'definition' }
-PharoCAToolASTRewritePreview class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolASTRewritePreview class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolASTRewritePreview class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'ast_rewrite_preview'
-		description: 'Previews a native OCParseTreeRewriter pattern replacement on a freshly parsed copy of one installed method. Returns rewritten source and hashes but never recompiles or mutates the live method.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'className' -> { 'type' -> 'string' } asDictionary.
-				'selector' -> { 'type' -> 'string' } asDictionary.
-				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
-				'pattern' -> { 'type' -> 'string'. 'minLength' -> 1. 'maxLength' -> 10000 } asDictionary.
-				'replacement' -> { 'type' -> 'string'. 'minLength' -> 1. 'maxLength' -> 10000 } asDictionary.
-				'methodPattern' -> { 'type' -> 'boolean' } asDictionary
-			} asDictionary.
-			'required' -> #('className' 'selector' 'pattern' 'replacement')
-		} asDictionary
-]
-
-{ #category : 'private' }
-PharoCAToolASTRewritePreview class >> hashOf: text [
-	^ (SHA256 hashMessage: text) hex
+PharoCAToolASTRewritePreview class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
@@ -84,4 +57,40 @@ PharoCAToolASTRewritePreview class >> execute: args context: context [
 		'rewrittenSha256' -> (self hashOf: rewritten).
 		'rewrittenSource' -> rewritten
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolASTRewritePreview class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'private' }
+PharoCAToolASTRewritePreview class >> hashOf: text [
+	^ (SHA256 hashMessage: text) hex
+]
+
+{ #category : 'definition' }
+PharoCAToolASTRewritePreview class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'ast_rewrite_preview'
+		description: 'Previews a native OCParseTreeRewriter pattern replacement on a freshly parsed copy of one installed method. Returns rewritten source and hashes but never recompiles or mutates the live method.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'className' -> { 'type' -> 'string' } asDictionary.
+				'selector' -> { 'type' -> 'string' } asDictionary.
+				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
+				'pattern' -> { 'type' -> 'string'. 'minLength' -> 1. 'maxLength' -> 10000 } asDictionary.
+				'replacement' -> { 'type' -> 'string'. 'minLength' -> 1. 'maxLength' -> 10000 } asDictionary.
+				'methodPattern' -> { 'type' -> 'boolean' } asDictionary
+			} asDictionary.
+			'required' -> #('className' 'selector' 'pattern' 'replacement')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolASTRewritePreview class >> toolName [ ^ #ast_rewrite_preview
+]
+
+{ #category : 'definition' }
+PharoCAToolASTRewritePreview class >> toolPack [ ^ #browse
 ]

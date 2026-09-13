@@ -1,8 +1,14 @@
-"Ordered agent extension pipeline. Hook failures are isolated by default and reported as run events. Private extension state is retained per durable session."
+"
+Ordered agent extension pipeline. Hook failures are isolated by default and reported as run events. Private extension state is retained per durable session.
+"
 Class {
 	#name : 'PharoCAExtensionRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'extensions', 'statesBySessionId', 'mutex' ],
+	#instVars : [
+		'extensions',
+		'statesBySessionId',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-Extensions',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Extensions'
@@ -101,6 +107,24 @@ PharoCAExtensionRegistry >> beforeToolInvocation: anInvocation run: aRun agent: 
 	^ PharoCAExtensionToolDecision allow: current
 ]
 
+{ #category : 'state' }
+PharoCAExtensionRegistry >> clearStateForSession: aSession [
+	mutex wait.
+	[ statesBySessionId removeKey: aSession id ifAbsent: [ ] ] ensure: [ mutex signal ]
+]
+
+{ #category : 'private' }
+PharoCAExtensionRegistry >> contextFor: extension run: aRun agent: anAgent [
+	^ PharoCAExtensionContext new
+		agent: anAgent;
+		run: aRun;
+		session: aRun session;
+		environment: aRun environment;
+		extension: extension;
+		state: (self stateFor: extension session: aRun session);
+		yourself
+]
+
 { #category : 'context' }
 PharoCAExtensionRegistry >> contextMessages: messages run: aRun agent: anAgent [
 	| current |
@@ -115,6 +139,18 @@ PharoCAExtensionRegistry >> contextMessages: messages run: aRun agent: anAgent [
 			do: [ :context | extension contextMessages: current context: context ].
 		current ifNil: [ current := #() ] ].
 	^ current asArray
+]
+
+{ #category : 'accessing' }
+PharoCAExtensionRegistry >> extensions [ ^ extensions asArray
+]
+
+{ #category : 'initialization' }
+PharoCAExtensionRegistry >> initialize [
+	super initialize.
+	extensions := OrderedCollection new.
+	statesBySessionId := Dictionary new.
+	mutex := Semaphore forMutualExclusion
 ]
 
 { #category : 'instructions' }
@@ -141,38 +177,6 @@ PharoCAExtensionRegistry >> instructionSourcesForRun: aRun agent: anAgent [
 	^ result asArray
 ]
 
-{ #category : 'accessing' }
-PharoCAExtensionRegistry >> extensions [ ^ extensions asArray ]
-
-{ #category : 'state' }
-PharoCAExtensionRegistry >> clearStateForSession: aSession [
-	mutex wait.
-	[ statesBySessionId removeKey: aSession id ifAbsent: [ ] ] ensure: [ mutex signal ]
-]
-
-{ #category : 'accessing' }
-PharoCAExtensionRegistry >> size [ ^ extensions size ]
-
-{ #category : 'initialization' }
-PharoCAExtensionRegistry >> initialize [
-	super initialize.
-	extensions := OrderedCollection new.
-	statesBySessionId := Dictionary new.
-	mutex := Semaphore forMutualExclusion
-]
-
-{ #category : 'private' }
-PharoCAExtensionRegistry >> contextFor: extension run: aRun agent: anAgent [
-	^ PharoCAExtensionContext new
-		agent: anAgent;
-		run: aRun;
-		session: aRun session;
-		environment: aRun environment;
-		extension: extension;
-		state: (self stateFor: extension session: aRun session);
-		yourself
-]
-
 { #category : 'private' }
 PharoCAExtensionRegistry >> invoke: extension hook: hookName run: aRun agent: anAgent default: defaultValue do: aBlock [
 	| context |
@@ -187,11 +191,38 @@ PharoCAExtensionRegistry >> invoke: extension hook: hookName run: aRun agent: an
 		defaultValue ]
 ]
 
+{ #category : 'persistence' }
+PharoCAExtensionRegistry >> persistentStateForSession: aSession [
+	| result state persisted |
+	result := Dictionary new.
+	extensions do: [ :extension |
+		extension statePersistencePolicy = #persistent ifTrue: [
+			state := self stateFor: extension session: aSession.
+			persisted := extension persistentStateFrom: state.
+			[ STONJSON toString: persisted ]
+				on: Error
+				do: [ :error | Error signal: 'Persistent extension state is not JSON-safe for ', extension persistenceKey, ': ', error description ].
+			result at: extension persistenceKey put: persisted ] ].
+	^ result
+]
+
 { #category : 'registration' }
 PharoCAExtensionRegistry >> register: anExtension [
 	(extensions identityIncludes: anExtension) ifTrue: [ Error signal: 'Extension is already registered' ].
 	extensions add: anExtension.
 	^ anExtension
+]
+
+{ #category : 'persistence' }
+PharoCAExtensionRegistry >> restorePersistentState: aDictionary forSession: aSession [
+	extensions do: [ :extension |
+		extension statePersistencePolicy = #persistent ifTrue: [
+			(aDictionary at: extension persistenceKey ifAbsent: [ nil ]) ifNotNil: [ :persisted |
+				extension restorePersistentState: persisted into: (self stateFor: extension session: aSession) ] ] ]
+]
+
+{ #category : 'accessing' }
+PharoCAExtensionRegistry >> size [ ^ extensions size
 ]
 
 { #category : 'state' }
@@ -209,28 +240,4 @@ PharoCAExtensionRegistry >> stateFor: extension session: aSession [
 PharoCAExtensionRegistry >> unregister: anExtension [
 	extensions remove: anExtension ifAbsent: [ ^ false ].
 	^ true
-]
-
-
-{ #category : 'persistence' }
-PharoCAExtensionRegistry >> persistentStateForSession: aSession [
-	| result state persisted |
-	result := Dictionary new.
-	extensions do: [ :extension |
-		extension statePersistencePolicy = #persistent ifTrue: [
-			state := self stateFor: extension session: aSession.
-			persisted := extension persistentStateFrom: state.
-			[ STONJSON toString: persisted ]
-				on: Error
-				do: [ :error | Error signal: 'Persistent extension state is not JSON-safe for ', extension persistenceKey, ': ', error description ].
-			result at: extension persistenceKey put: persisted ] ].
-	^ result
-]
-
-{ #category : 'persistence' }
-PharoCAExtensionRegistry >> restorePersistentState: aDictionary forSession: aSession [
-	extensions do: [ :extension |
-		extension statePersistencePolicy = #persistent ifTrue: [
-			(aDictionary at: extension persistenceKey ifAbsent: [ nil ]) ifNotNil: [ :persisted |
-				extension restorePersistentState: persisted into: (self stateFor: extension session: aSession) ] ] ]
 ]

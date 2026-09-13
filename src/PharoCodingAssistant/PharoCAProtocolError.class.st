@@ -1,8 +1,13 @@
-"Structured external-protocol error. It is converted to a stable JSON error envelope at the transport-neutral protocol boundary."
+"
+Structured external-protocol error. It is converted to a stable JSON error envelope at the transport-neutral protocol boundary.
+"
 Class {
 	#name : 'PharoCAProtocolError',
 	#superclass : 'Error',
-	#instVars : [ 'code', 'details' ],
+	#instVars : [
+		'code',
+		'details'
+	],
 	#category : 'PharoCodingAssistant-Protocol',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Protocol'
@@ -22,10 +27,17 @@ PharoCAProtocolError class >> code: aCode message: aString details: anObject [
 ]
 
 { #category : 'accessing' }
-PharoCAProtocolError >> code [ ^ code ]
+PharoCAProtocolError >> code [ ^ code
+]
+
 { #category : 'accessing' }
-PharoCAProtocolError >> code: anObject [ code := anObject asString ]
+PharoCAProtocolError >> code: anObject [ code := anObject asString
+]
+
 { #category : 'accessing' }
-PharoCAProtocolError >> details [ ^ details ]
+PharoCAProtocolError >> details [ ^ details
+]
+
 { #category : 'accessing' }
-PharoCAProtocolError >> details: anObject [ details := anObject ]
+PharoCAProtocolError >> details: anObject [ details := anObject
+]

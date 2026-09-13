@@ -1,4 +1,6 @@
-"Pages the bounded result of a prior quality_check without rerunning native critique rules."
+"
+Pages the bounded result of a prior quality_check without rerunning native critique rules.
+"
 Class {
 	#name : 'PharoCAToolQualityResults',
 	#superclass : 'PharoCATool',
@@ -8,31 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolQualityResults class >> toolName [ ^ #quality_results ]
-
-{ #category : 'definition' }
-PharoCAToolQualityResults class >> toolPack [ ^ #quality ]
-
-{ #category : 'definition' }
-PharoCAToolQualityResults class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolQualityResults class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolQualityResults class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'quality_results'
-		description: 'Continues a paginated quality_check result from its short-lived analysisHandle without rerunning QualityAssistant.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'analysisHandle' -> { 'type' -> 'string' } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('analysisHandle')
-		} asDictionary
+PharoCAToolQualityResults class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
@@ -57,4 +35,32 @@ PharoCAToolQualityResults class >> execute: args context: context [
 		at: 'findings' put: (page at: 'items');
 		at: 'page' put: (page at: 'page').
 	^ result
+]
+
+{ #category : 'execution' }
+PharoCAToolQualityResults class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityResults class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'quality_results'
+		description: 'Continues a paginated quality_check result from its short-lived analysisHandle without rerunning QualityAssistant.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'analysisHandle' -> { 'type' -> 'string' } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('analysisHandle')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityResults class >> toolName [ ^ #quality_results
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityResults class >> toolPack [ ^ #quality
 ]

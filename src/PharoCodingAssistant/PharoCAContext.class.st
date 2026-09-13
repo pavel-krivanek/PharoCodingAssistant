@@ -1,11 +1,21 @@
-"Immutable-by-convention description of the exact provider context and its budget accounting. Omitted messages are transient input to optional summarization and are not serialized."
+"
+Immutable-by-convention description of the exact provider context and its budget accounting. Omitted messages are transient input to optional summarization and are not serialized.
+"
 Class {
 	#name : 'PharoCAContext',
 	#superclass : 'Object',
 	#instVars : [
-		'messages', 'estimatedMessageTokens', 'toolTokens', 'inputBudgetTokens',
-		'reservedOutputTokens', 'safetyMarginTokens', 'contextSize',
-		'omittedMessageCount', 'omittedMessages', 'compacted', 'compactionSummaryUsed'
+		'messages',
+		'estimatedMessageTokens',
+		'toolTokens',
+		'inputBudgetTokens',
+		'reservedOutputTokens',
+		'safetyMarginTokens',
+		'contextSize',
+		'omittedMessageCount',
+		'omittedMessages',
+		'compacted',
+		'compactionSummaryUsed'
 	],
 	#category : 'PharoCodingAssistant-Context',
 	#package : 'PharoCodingAssistant',
@@ -30,25 +40,44 @@ PharoCAContext >> asDictionary [
 ]
 
 { #category : 'accessing' }
-PharoCAContext >> compacted [ ^ compacted ]
+PharoCAContext >> compacted [ ^ compacted
+]
+
 { #category : 'accessing' }
-PharoCAContext >> compacted: aBoolean [ compacted := aBoolean ]
+PharoCAContext >> compacted: aBoolean [ compacted := aBoolean
+]
+
 { #category : 'accessing' }
-PharoCAContext >> compactionSummaryUsed [ ^ compactionSummaryUsed ]
+PharoCAContext >> compactionSummaryUsed [ ^ compactionSummaryUsed
+]
+
 { #category : 'accessing' }
-PharoCAContext >> compactionSummaryUsed: aBoolean [ compactionSummaryUsed := aBoolean ]
+PharoCAContext >> compactionSummaryUsed: aBoolean [ compactionSummaryUsed := aBoolean
+]
+
 { #category : 'accessing' }
-PharoCAContext >> contextSize [ ^ contextSize ]
+PharoCAContext >> contextSize [ ^ contextSize
+]
+
 { #category : 'accessing' }
-PharoCAContext >> contextSize: anIntegerOrNil [ contextSize := anIntegerOrNil ]
+PharoCAContext >> contextSize: anIntegerOrNil [ contextSize := anIntegerOrNil
+]
+
 { #category : 'accessing' }
-PharoCAContext >> estimatedInputTokens [ ^ estimatedMessageTokens + toolTokens ]
+PharoCAContext >> estimatedInputTokens [ ^ estimatedMessageTokens + toolTokens
+]
+
 { #category : 'accessing' }
-PharoCAContext >> estimatedMessageTokens [ ^ estimatedMessageTokens ]
+PharoCAContext >> estimatedMessageTokens [ ^ estimatedMessageTokens
+]
+
 { #category : 'accessing' }
-PharoCAContext >> estimatedMessageTokens: anInteger [ estimatedMessageTokens := anInteger ]
+PharoCAContext >> estimatedMessageTokens: anInteger [ estimatedMessageTokens := anInteger
+]
+
 { #category : 'testing' }
-PharoCAContext >> fits [ inputBudgetTokens ifNil: [ ^ true ]. ^ self estimatedInputTokens <= inputBudgetTokens ]
+PharoCAContext >> fits [ inputBudgetTokens ifNil: [ ^ true ]. ^ self estimatedInputTokens <= inputBudgetTokens
+]
 
 { #category : 'initialization' }
 PharoCAContext >> initialize [
@@ -60,30 +89,57 @@ PharoCAContext >> initialize [
 ]
 
 { #category : 'accessing' }
-PharoCAContext >> inputBudgetTokens [ ^ inputBudgetTokens ]
+PharoCAContext >> inputBudgetTokens [ ^ inputBudgetTokens
+]
+
 { #category : 'accessing' }
-PharoCAContext >> inputBudgetTokens: anIntegerOrNil [ inputBudgetTokens := anIntegerOrNil ]
+PharoCAContext >> inputBudgetTokens: anIntegerOrNil [ inputBudgetTokens := anIntegerOrNil
+]
+
 { #category : 'accessing' }
-PharoCAContext >> messages [ ^ messages ]
+PharoCAContext >> messages [ ^ messages
+]
+
 { #category : 'accessing' }
-PharoCAContext >> messages: aCollection [ messages := aCollection asArray ]
+PharoCAContext >> messages: aCollection [ messages := aCollection asArray
+]
+
 { #category : 'accessing' }
-PharoCAContext >> omittedMessageCount [ ^ omittedMessageCount ]
+PharoCAContext >> omittedMessageCount [ ^ omittedMessageCount
+]
+
 { #category : 'accessing' }
-PharoCAContext >> omittedMessageCount: anInteger [ omittedMessageCount := anInteger ]
+PharoCAContext >> omittedMessageCount: anInteger [ omittedMessageCount := anInteger
+]
+
 { #category : 'accessing' }
-PharoCAContext >> omittedMessages [ ^ omittedMessages ]
+PharoCAContext >> omittedMessages [ ^ omittedMessages
+]
+
 { #category : 'accessing' }
-PharoCAContext >> omittedMessages: aCollection [ omittedMessages := aCollection asArray ]
+PharoCAContext >> omittedMessages: aCollection [ omittedMessages := aCollection asArray
+]
+
 { #category : 'accessing' }
-PharoCAContext >> reservedOutputTokens [ ^ reservedOutputTokens ]
+PharoCAContext >> reservedOutputTokens [ ^ reservedOutputTokens
+]
+
 { #category : 'accessing' }
-PharoCAContext >> reservedOutputTokens: anInteger [ reservedOutputTokens := anInteger ]
+PharoCAContext >> reservedOutputTokens: anInteger [ reservedOutputTokens := anInteger
+]
+
 { #category : 'accessing' }
-PharoCAContext >> safetyMarginTokens [ ^ safetyMarginTokens ]
+PharoCAContext >> safetyMarginTokens [ ^ safetyMarginTokens
+]
+
 { #category : 'accessing' }
-PharoCAContext >> safetyMarginTokens: anInteger [ safetyMarginTokens := anInteger ]
+PharoCAContext >> safetyMarginTokens: anInteger [ safetyMarginTokens := anInteger
+]
+
 { #category : 'accessing' }
-PharoCAContext >> toolTokens [ ^ toolTokens ]
+PharoCAContext >> toolTokens [ ^ toolTokens
+]
+
 { #category : 'accessing' }
-PharoCAContext >> toolTokens: anInteger [ toolTokens := anInteger ]
+PharoCAContext >> toolTokens: anInteger [ toolTokens := anInteger
+]

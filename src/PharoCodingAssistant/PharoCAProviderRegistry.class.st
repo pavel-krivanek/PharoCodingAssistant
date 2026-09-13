@@ -41,6 +41,19 @@ PharoCAProviderRegistry >> descriptorForProviderNamed: anIdentifier [
 	^ descriptor copy
 ]
 
+{ #category : 'model-discovery' }
+PharoCAProviderRegistry >> discoverModelsForProviderNamed: anIdentifier [
+	| provider |
+	provider := self providerNamed: anIdentifier.
+	provider supportsModelDiscovery ifFalse: [ Error signal: 'Provider does not support model discovery: ', anIdentifier asString ].
+	^ provider discoverModels
+]
+
+{ #category : 'testing' }
+PharoCAProviderRegistry >> includesProviderNamed: anIdentifier [
+	^ factories includesKey: anIdentifier asString
+]
+
 { #category : 'initialization' }
 PharoCAProviderRegistry >> initialize [
 	super initialize.
@@ -64,6 +77,11 @@ PharoCAProviderRegistry >> providerNamed: anIdentifier [
 	(provider respondsTo: #credentialResolver:) ifTrue: [ provider credentialResolver: credentialResolver ].
 	(provider respondsTo: #retryPolicy:) ifTrue: [ provider retryPolicy: retryPolicy ].
 	^ provider
+]
+
+{ #category : 'model-discovery' }
+PharoCAProviderRegistry >> providerSupportsModelDiscoveryNamed: anIdentifier [
+	^ (self providerNamed: anIdentifier) supportsModelDiscovery
 ]
 
 { #category : 'registration' }
@@ -162,23 +180,3 @@ PharoCAProviderRegistry >> retryPolicy [ ^ retryPolicy
 { #category : 'accessing' }
 PharoCAProviderRegistry >> retryPolicy: aPolicy [ retryPolicy := aPolicy
 ]
-
-
-{ #category : 'testing' }
-PharoCAProviderRegistry >> includesProviderNamed: anIdentifier [
-	^ factories includesKey: anIdentifier asString
-]
-
-{ #category : 'model-discovery' }
-PharoCAProviderRegistry >> discoverModelsForProviderNamed: anIdentifier [
-	| provider |
-	provider := self providerNamed: anIdentifier.
-	provider supportsModelDiscovery ifFalse: [ Error signal: 'Provider does not support model discovery: ', anIdentifier asString ].
-	^ provider discoverModels
-]
-
-{ #category : 'model-discovery' }
-PharoCAProviderRegistry >> providerSupportsModelDiscoveryNamed: anIdentifier [
-	^ (self providerNamed: anIdentifier) supportsModelDiscovery
-]
-

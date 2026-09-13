@@ -1,4 +1,6 @@
-"Lists package names available in the system, optionally filtered by a substring. Results are cursor-paginated and deterministically sorted."
+"
+Lists package names available in the system, optionally filtered by a substring. Results are cursor-paginated and deterministically sorted.
+"
 Class {
 	#name : 'PharoCAToolListPackages',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolListPackages class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolListPackages class >> execute: args [
@@ -21,10 +27,6 @@ PharoCAToolListPackages class >> execute: args [
 		'page' -> (page at: 'page')
 	} asDictionary
 ]
-
-
-{ #category : 'definition' }
-PharoCAToolListPackages class >> capability [ ^ #inspection ]
 
 { #category : 'execution' }
 PharoCAToolListPackages class >> executionMode [

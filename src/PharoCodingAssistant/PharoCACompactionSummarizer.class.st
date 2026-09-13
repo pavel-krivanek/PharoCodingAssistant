@@ -1,12 +1,35 @@
-"Optional provider-backed summarizer for omitted context. It is deliberately bounded and does not expose its stream as the user's assistant response."
+"
+Optional provider-backed summarizer for omitted context. It is deliberately bounded and does not expose its stream as the user's assistant response.
+"
 Class {
 	#name : 'PharoCACompactionSummarizer',
 	#superclass : 'Object',
-	#instVars : [ 'maximumSourceCharacters', 'maximumSummaryCharacters', 'maximumOutputTokens' ],
+	#instVars : [
+		'maximumSourceCharacters',
+		'maximumSummaryCharacters',
+		'maximumOutputTokens'
+	],
 	#category : 'PharoCodingAssistant-Context',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Context'
 }
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> boundedSummary: aString [
+	aString size <= maximumSummaryCharacters ifTrue: [ ^ aString ].
+	^ (aString copyFrom: 1 to: maximumSummaryCharacters), '\n[summary truncated to configured bound]'
+]
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> boundedTranscriptFor: messages [
+	| transcript half |
+	transcript := self transcriptFor: messages.
+	transcript size <= maximumSourceCharacters ifTrue: [ ^ transcript ].
+	half := maximumSourceCharacters // 2.
+	^ (transcript copyFrom: 1 to: half),
+		'\n...[middle of compacted history omitted from summarizer input]...\n',
+		(transcript copyFrom: transcript size - half + 1 to: transcript size)
+]
 
 { #category : 'initialization' }
 PharoCACompactionSummarizer >> initialize [
@@ -17,17 +40,28 @@ PharoCACompactionSummarizer >> initialize [
 ]
 
 { #category : 'accessing' }
-PharoCACompactionSummarizer >> maximumSourceCharacters [ ^ maximumSourceCharacters ]
+PharoCACompactionSummarizer >> maximumOutputTokens [ ^ maximumOutputTokens
+]
+
 { #category : 'accessing' }
-PharoCACompactionSummarizer >> maximumSourceCharacters: anInteger [ maximumSourceCharacters := anInteger max: 1 ]
+PharoCACompactionSummarizer >> maximumOutputTokens: anInteger [ maximumOutputTokens := anInteger max: 1
+]
+
 { #category : 'accessing' }
-PharoCACompactionSummarizer >> maximumSummaryCharacters [ ^ maximumSummaryCharacters ]
+PharoCACompactionSummarizer >> maximumSourceCharacters [ ^ maximumSourceCharacters
+]
+
 { #category : 'accessing' }
-PharoCACompactionSummarizer >> maximumSummaryCharacters: anInteger [ maximumSummaryCharacters := anInteger max: 1 ]
+PharoCACompactionSummarizer >> maximumSourceCharacters: anInteger [ maximumSourceCharacters := anInteger max: 1
+]
+
 { #category : 'accessing' }
-PharoCACompactionSummarizer >> maximumOutputTokens [ ^ maximumOutputTokens ]
+PharoCACompactionSummarizer >> maximumSummaryCharacters [ ^ maximumSummaryCharacters
+]
+
 { #category : 'accessing' }
-PharoCACompactionSummarizer >> maximumOutputTokens: anInteger [ maximumOutputTokens := anInteger max: 1 ]
+PharoCACompactionSummarizer >> maximumSummaryCharacters: anInteger [ maximumSummaryCharacters := anInteger max: 1
+]
 
 { #category : 'summarizing' }
 PharoCACompactionSummarizer >> summarizeMessages: messages model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
@@ -63,21 +97,4 @@ PharoCACompactionSummarizer >> transcriptFor: messages [
 					stream nextPutAll: call name ].
 				stream nextPut: $] ].
 			stream lf ] ]
-]
-
-{ #category : 'private' }
-PharoCACompactionSummarizer >> boundedTranscriptFor: messages [
-	| transcript half |
-	transcript := self transcriptFor: messages.
-	transcript size <= maximumSourceCharacters ifTrue: [ ^ transcript ].
-	half := maximumSourceCharacters // 2.
-	^ (transcript copyFrom: 1 to: half),
-		'\n...[middle of compacted history omitted from summarizer input]...\n',
-		(transcript copyFrom: transcript size - half + 1 to: transcript size)
-]
-
-{ #category : 'private' }
-PharoCACompactionSummarizer >> boundedSummary: aString [
-	aString size <= maximumSummaryCharacters ifTrue: [ ^ aString ].
-	^ (aString copyFrom: 1 to: maximumSummaryCharacters), '\n[summary truncated to configured bound]'
 ]

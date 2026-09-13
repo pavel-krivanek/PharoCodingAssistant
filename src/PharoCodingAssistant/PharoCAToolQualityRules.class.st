@@ -1,4 +1,6 @@
-"Lists the native QualityAssistant rules available in the image."
+"
+Lists the native QualityAssistant rules available in the image.
+"
 Class {
 	#name : 'PharoCAToolQualityRules',
 	#superclass : 'PharoCATool',
@@ -8,34 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolQualityRules class >> toolName [ ^ #quality_rules ]
-
-{ #category : 'definition' }
-PharoCAToolQualityRules class >> toolPack [ ^ #quality ]
-
-{ #category : 'definition' }
-PharoCAToolQualityRules class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolQualityRules class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolQualityRules class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'quality_rules'
-		description: 'Lists native Pharo QualityAssistant/Smalllint rules. Filter by name/class substring, group, or severity; results are deterministic and paginated.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'query' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
-				'group' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
-				'severity' -> { 'type' -> 'string'. 'enum' -> #('all' 'error' 'warning' 'information') } asDictionary.
-				'includeRationale' -> { 'type' -> 'boolean' } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #()
-		} asDictionary
+PharoCAToolQualityRules class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
@@ -70,4 +45,35 @@ PharoCAToolQualityRules class >> execute: args context: context [
 		'rules' -> (page at: 'items').
 		'page' -> (page at: 'page')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolQualityRules class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityRules class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'quality_rules'
+		description: 'Lists native Pharo QualityAssistant/Smalllint rules. Filter by name/class substring, group, or severity; results are deterministic and paginated.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'query' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
+				'group' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
+				'severity' -> { 'type' -> 'string'. 'enum' -> #('all' 'error' 'warning' 'information') } asDictionary.
+				'includeRationale' -> { 'type' -> 'boolean' } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #()
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityRules class >> toolName [ ^ #quality_rules
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityRules class >> toolPack [ ^ #quality
 ]

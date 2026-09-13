@@ -1,8 +1,13 @@
-"Ordered registry and composer for global/project/package/extension/skill instruction sources. Composition is ephemeral and therefore never mutates the durable session."
+"
+Ordered registry and composer for global/project/package/extension/skill instruction sources. Composition is ephemeral and therefore never mutates the durable session.
+"
 Class {
 	#name : 'PharoCAInstructionRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'sources', 'mutex' ],
+	#instVars : [
+		'sources',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-Instructions',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Instructions'
@@ -47,7 +52,8 @@ PharoCAInstructionRegistry >> register: aSource [
 ]
 
 { #category : 'accessing' }
-PharoCAInstructionRegistry >> size [ ^ self sources size ]
+PharoCAInstructionRegistry >> size [ ^ self sources size
+]
 
 { #category : 'accessing' }
 PharoCAInstructionRegistry >> sources [

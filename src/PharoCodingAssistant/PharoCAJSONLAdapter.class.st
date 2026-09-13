@@ -1,14 +1,27 @@
-"JSON Lines serialization adapter over PharoCAExternalProtocol. JSONL is only a transport/serialization choice; the dispatcher itself is also suitable for HTTP, SSE or WebSocket adapters."
+"
+JSON Lines serialization adapter over PharoCAExternalProtocol. JSONL is only a transport/serialization choice; the dispatcher itself is also suitable for HTTP, SSE or WebSocket adapters.
+"
 Class {
 	#name : 'PharoCAJSONLAdapter',
 	#superclass : 'Object',
-	#instVars : [ 'protocol', 'outputMutex' ],
+	#instVars : [
+		'protocol',
+		'outputMutex'
+	],
 	#category : 'PharoCodingAssistant-Protocol',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Protocol'
 }
 
+{ #category : 'instance creation' }
+PharoCAJSONLAdapter class >> on: aProtocol [
+	^ self new protocol: aProtocol; yourself
+]
 
+{ #category : 'private' }
+PharoCAJSONLAdapter >> emitLine: aString to: aBlock [
+	outputMutex critical: [ aBlock value: aString ]
+]
 
 { #category : 'initialization' }
 PharoCAJSONLAdapter >> initialize [
@@ -16,15 +29,28 @@ PharoCAJSONLAdapter >> initialize [
 	outputMutex := Semaphore forMutualExclusion
 ]
 
-{ #category : 'instance creation' }
-PharoCAJSONLAdapter class >> on: aProtocol [
-	^ self new protocol: aProtocol; yourself
+{ #category : 'private' }
+PharoCAJSONLAdapter >> parseErrorEnvelope: anError [
+	^ {
+		'protocolVersion' -> PharoCAExternalProtocol protocolVersion.
+		'type' -> 'response'.
+		'id' -> nil.
+		'ok' -> false.
+		'error' -> {
+			'code' -> 'invalid_json'.
+			'message' -> anError description.
+			'details' -> nil
+		} asDictionary
+	} asDictionary
 ]
 
-{ #category : 'accessing' }
-PharoCAJSONLAdapter >> protocol [ ^ protocol ]
-{ #category : 'accessing' }
-PharoCAJSONLAdapter >> protocol: anObject [ protocol := anObject ]
+{ #category : 'processing' }
+PharoCAJSONLAdapter >> processLine: aString [
+	| lines |
+	lines := OrderedCollection new.
+	self processLine: aString outputDo: [ :line | lines add: line ].
+	^ lines asArray
+]
 
 { #category : 'processing' }
 PharoCAJSONLAdapter >> processLine: aString outputDo: aBlock [
@@ -53,33 +79,12 @@ PharoCAJSONLAdapter >> processLine: aString outputDo: aBlock [
 	^ response
 ]
 
-{ #category : 'processing' }
-PharoCAJSONLAdapter >> processLine: aString [
-	| lines |
-	lines := OrderedCollection new.
-	self processLine: aString outputDo: [ :line | lines add: line ].
-	^ lines asArray
+{ #category : 'accessing' }
+PharoCAJSONLAdapter >> protocol [ ^ protocol
 ]
 
-{ #category : 'private' }
-PharoCAJSONLAdapter >> parseErrorEnvelope: anError [
-	^ {
-		'protocolVersion' -> PharoCAExternalProtocol protocolVersion.
-		'type' -> 'response'.
-		'id' -> nil.
-		'ok' -> false.
-		'error' -> {
-			'code' -> 'invalid_json'.
-			'message' -> anError description.
-			'details' -> nil
-		} asDictionary
-	} asDictionary
-]
-
-
-{ #category : 'private' }
-PharoCAJSONLAdapter >> emitLine: aString to: aBlock [
-	outputMutex critical: [ aBlock value: aString ]
+{ #category : 'accessing' }
+PharoCAJSONLAdapter >> protocol: anObject [ protocol := anObject
 ]
 
 { #category : 'serving' }

@@ -1,4 +1,6 @@
-"Retrieves a bounded page of a package comment."
+"
+Retrieves a bounded page of a package comment.
+"
 Class {
 	#name : 'PharoCAToolGetPackageComment',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolGetPackageComment class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolGetPackageComment class >> execute: args [
@@ -28,10 +34,6 @@ PharoCAToolGetPackageComment class >> execute: args [
 	} asDictionary
 ]
 
-
-{ #category : 'definition' }
-PharoCAToolGetPackageComment class >> capability [ ^ #inspection ]
-
 { #category : 'execution' }
 PharoCAToolGetPackageComment class >> executionMode [
 	^ #parallelSafe
@@ -46,4 +48,5 @@ PharoCAToolGetPackageComment class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolGetPackageComment class >> toolName [ ^ #get_package_comment ]
+PharoCAToolGetPackageComment class >> toolName [ ^ #get_package_comment
+]

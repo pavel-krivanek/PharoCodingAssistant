@@ -1,4 +1,6 @@
-"Returns one bounded, deterministic relation from a class hierarchy."
+"
+Returns one bounded, deterministic relation from a class hierarchy.
+"
 Class {
 	#name : 'PharoCAToolGetClassHierarchy',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolGetClassHierarchy class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolGetClassHierarchy class >> execute: args [
@@ -31,10 +37,6 @@ PharoCAToolGetClassHierarchy class >> execute: args [
 	} asDictionary
 ]
 
-
-{ #category : 'definition' }
-PharoCAToolGetClassHierarchy class >> capability [ ^ #inspection ]
-
 { #category : 'execution' }
 PharoCAToolGetClassHierarchy class >> executionMode [
 	^ #parallelSafe
@@ -49,4 +51,5 @@ PharoCAToolGetClassHierarchy class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolGetClassHierarchy class >> toolName [ ^ #get_class_hierarchy ]
+PharoCAToolGetClassHierarchy class >> toolName [ ^ #get_class_hierarchy
+]

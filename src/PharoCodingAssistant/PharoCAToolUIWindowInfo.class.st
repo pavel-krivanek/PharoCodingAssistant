@@ -7,13 +7,25 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolUIWindowInfo class >> toolName [ ^ #ui_window_info ]
-{ #category : 'definition' }
-PharoCAToolUIWindowInfo class >> toolPack [ ^ #ui ]
-{ #category : 'definition' }
-PharoCAToolUIWindowInfo class >> capability [ ^ #inspection ]
+PharoCAToolUIWindowInfo class >> capability [ ^ #inspection
+]
+
 { #category : 'execution' }
-PharoCAToolUIWindowInfo class >> executionMode [ ^ #sequential ]
+PharoCAToolUIWindowInfo class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
+{ #category : 'execution' }
+PharoCAToolUIWindowInfo class >> execute: args context: context [
+	| window handle |
+	context checkActive.
+	handle := args at: 'handle'.
+	window := self windowFromArguments: args context: context.
+	^ self windowMetadataFor: window handle: handle
+]
+
+{ #category : 'execution' }
+PharoCAToolUIWindowInfo class >> executionMode [ ^ #sequential
+]
 
 { #category : 'definition' }
 PharoCAToolUIWindowInfo class >> llmDefinition [
@@ -27,14 +39,10 @@ PharoCAToolUIWindowInfo class >> llmDefinition [
 		} asDictionary
 ]
 
-{ #category : 'execution' }
-PharoCAToolUIWindowInfo class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+{ #category : 'definition' }
+PharoCAToolUIWindowInfo class >> toolName [ ^ #ui_window_info
+]
 
-{ #category : 'execution' }
-PharoCAToolUIWindowInfo class >> execute: args context: context [
-	| window handle |
-	context checkActive.
-	handle := args at: 'handle'.
-	window := self windowFromArguments: args context: context.
-	^ self windowMetadataFor: window handle: handle
+{ #category : 'definition' }
+PharoCAToolUIWindowInfo class >> toolPack [ ^ #ui
 ]

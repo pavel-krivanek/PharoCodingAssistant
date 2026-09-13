@@ -1,4 +1,6 @@
-"Lists real Pharo package tags and their class counts with deterministic pagination."
+"
+Lists real Pharo package tags and their class counts with deterministic pagination.
+"
 Class {
 	#name : 'PharoCAToolListPackageTags',
 	#superclass : 'PharoCATool',
@@ -8,32 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolListPackageTags class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolListPackageTags class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolListPackageTags class >> toolPack [ ^ #browse ]
-
-{ #category : 'definition' }
-PharoCAToolListPackageTags class >> toolName [ ^ #list_package_tags ]
-
-{ #category : 'definition' }
-PharoCAToolListPackageTags class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'list_package_tags'
-		description: 'Lists real Pharo class tags for a package with class counts. Results are sorted and cursor-paginated; untagged classes are reported separately.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'package' -> { 'type' -> 'string' } asDictionary.
-				'substring' -> { 'type' -> 'string' } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('package')
-		} asDictionary
+PharoCAToolListPackageTags class >> capability [ ^ #inspection
 ]
 
 { #category : 'definition' }
@@ -60,4 +37,33 @@ PharoCAToolListPackageTags class >> execute: args [
 		'untaggedClassCount' -> (package classesTaggedWith: package rootTagName) size.
 		'page' -> (page at: 'page')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolListPackageTags class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolListPackageTags class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'list_package_tags'
+		description: 'Lists real Pharo class tags for a package with class counts. Results are sorted and cursor-paginated; untagged classes are reported separately.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'package' -> { 'type' -> 'string' } asDictionary.
+				'substring' -> { 'type' -> 'string' } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('package')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolListPackageTags class >> toolName [ ^ #list_package_tags
+]
+
+{ #category : 'definition' }
+PharoCAToolListPackageTags class >> toolPack [ ^ #browse
 ]

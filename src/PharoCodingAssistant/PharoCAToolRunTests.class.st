@@ -6,44 +6,6 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'definition' }
-PharoCAToolRunTests class >> toolName [ ^ #run_tests ]
-{ #category : 'definition' }
-PharoCAToolRunTests class >> toolPack [ ^ #core ]
-{ #category : 'definition' }
-PharoCAToolRunTests class >> capability [ ^ #testing ]
-{ #category : 'execution' }
-PharoCAToolRunTests class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolRunTests class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'run_tests'
-		description: 'Runs SUnit tests in deterministic order or with an explicit shuffle seed. Supports method, class, package, tag, and explicit-selection scopes. Failed runs include a bounded preview of concrete defects; use test_results/test_failure for the full paginated statuses and bounded stacks. Legacy className-only calls remain supported.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'kind' -> { 'type' -> 'string'. 'enum' -> #('method' 'class' 'package' 'tag' 'selection') } asDictionary.
-				'className' -> { 'type' -> 'string' } asDictionary.
-				'selector' -> { 'type' -> 'string' } asDictionary.
-				'package' -> { 'type' -> 'string' } asDictionary.
-				'tag' -> { 'type' -> 'string' } asDictionary.
-				'tests' -> { 'type' -> 'array'. 'maxItems' -> 500. 'items' -> { 'type' -> 'string' } asDictionary } asDictionary.
-				'shuffle' -> { 'type' -> 'boolean' } asDictionary.
-				'seed' -> { 'type' -> 'integer' } asDictionary
-			} asDictionary.
-			'required' -> #()
-		} asDictionary
-]
-
-{ #category : 'private' }
-PharoCAToolRunTests class >> testClassNamed: name [
-	| cls |
-	cls := Smalltalk globals at: name asSymbol ifAbsent: [ Error signal: 'Test class not found: ', name ].
-	(cls inheritsFrom: TestCase) ifFalse: [ Error signal: 'Class is not an SUnit TestCase: ', name ].
-	^ cls
-]
-
 { #category : 'private' }
 PharoCAToolRunTests class >> addClass: cls toSuite: suite [
 	cls testSelectors asSortedCollection do: [ :selector | suite addTest: (cls selector: selector) ]
@@ -60,26 +22,8 @@ PharoCAToolRunTests class >> addTestId: testId toSuite: suite [
 	suite addTest: (cls selector: selector)
 ]
 
-{ #category : 'private' }
-PharoCAToolRunTests class >> suiteForSpec: spec [
-	| kind suite cls packageName tagName classes |
-	kind := spec at: 'kind' ifAbsent: [ (spec includesKey: 'className') ifTrue: [ 'class' ] ifFalse: [ Error signal: 'run_tests requires kind or legacy className' ] ].
-	suite := PharoCATestSuite named: 'PharoCodingAssistant tool run'.
-	kind = 'method' ifTrue: [
-		cls := self testClassNamed: (spec at: 'className').
-		self addTestId: cls name, '>>', (spec at: 'selector') toSuite: suite ].
-	kind = 'class' ifTrue: [ cls := self testClassNamed: (spec at: 'className'). self addClass: cls toSuite: suite ].
-	(kind = 'package' or: [ kind = 'tag' ]) ifTrue: [
-		packageName := spec at: 'package'.
-		(PackageOrganizer default hasPackage: packageName) ifFalse: [ Error signal: 'Package not found: ', packageName ].
-		tagName := spec at: 'tag' ifAbsent: [ nil ].
-		kind = 'tag' ifTrue: [ tagName ifNil: [ Error signal: 'Tag scope requires tag' ] ].
-		classes := TestCase allSubclasses select: [ :each |
-			each isAbstract not and: [ each package name = packageName and: [ tagName isNil or: [ (each package tagOf: each) name asString = tagName ] ] ] ].
-		(classes asSortedCollection: [ :a :b | a name <= b name ]) do: [ :each | self addClass: each toSuite: suite ] ].
-	kind = 'selection' ifTrue: [ (spec at: 'tests') do: [ :each | self addTestId: each toSuite: suite ] ].
-	(#('method' 'class' 'package' 'tag' 'selection') includes: kind) ifFalse: [ Error signal: 'Unknown test scope kind: ', kind ].
-	^ suite
+{ #category : 'definition' }
+PharoCAToolRunTests class >> capability [ ^ #testing
 ]
 
 { #category : 'private' }
@@ -97,29 +41,9 @@ PharoCAToolRunTests class >> defectPreviewForResult: result limit: limit [
 		} asDictionary ]) asArray
 ]
 
-{ #category : 'private' }
-PharoCAToolRunTests class >> normalizedSpecFrom: args [
-	| spec |
-	spec := args copy.
-	(spec includesKey: 'kind') ifFalse: [ (spec includesKey: 'className') ifTrue: [ spec at: 'kind' put: 'class' ] ].
-	^ spec
-]
-
-{ #category : 'private' }
-PharoCAToolRunTests class >> summaryForResult: result runId: runId [
-	^ {
-		'runId' -> runId.
-		'status' -> (result hasPassed ifTrue: [ 'passed' ] ifFalse: [ 'failed' ]).
-		'runCount' -> result runCount.
-		'passedCount' -> result passedCount.
-		'failureCount' -> result failureCount.
-		'errorCount' -> result errorCount.
-		'skippedCount' -> result skippedCount
-	} asDictionary
-]
-
 { #category : 'execution' }
-PharoCAToolRunTests class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+PharoCAToolRunTests class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
 { #category : 'execution' }
 PharoCAToolRunTests class >> execute: args context: context [
@@ -148,4 +72,88 @@ PharoCAToolRunTests class >> execute: args context: context [
 			'testFailureTool' -> 'test_failure'
 		} asDictionary;
 		yourself
+]
+
+{ #category : 'execution' }
+PharoCAToolRunTests class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolRunTests class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'run_tests'
+		description: 'Runs SUnit tests in deterministic order or with an explicit shuffle seed. Supports method, class, package, tag, and explicit-selection scopes. Failed runs include a bounded preview of concrete defects; use test_results/test_failure for the full paginated statuses and bounded stacks. Legacy className-only calls remain supported.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'kind' -> { 'type' -> 'string'. 'enum' -> #('method' 'class' 'package' 'tag' 'selection') } asDictionary.
+				'className' -> { 'type' -> 'string' } asDictionary.
+				'selector' -> { 'type' -> 'string' } asDictionary.
+				'package' -> { 'type' -> 'string' } asDictionary.
+				'tag' -> { 'type' -> 'string' } asDictionary.
+				'tests' -> { 'type' -> 'array'. 'maxItems' -> 500. 'items' -> { 'type' -> 'string' } asDictionary } asDictionary.
+				'shuffle' -> { 'type' -> 'boolean' } asDictionary.
+				'seed' -> { 'type' -> 'integer' } asDictionary
+			} asDictionary.
+			'required' -> #()
+		} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolRunTests class >> normalizedSpecFrom: args [
+	| spec |
+	spec := args copy.
+	(spec includesKey: 'kind') ifFalse: [ (spec includesKey: 'className') ifTrue: [ spec at: 'kind' put: 'class' ] ].
+	^ spec
+]
+
+{ #category : 'private' }
+PharoCAToolRunTests class >> suiteForSpec: spec [
+	| kind suite cls packageName tagName classes |
+	kind := spec at: 'kind' ifAbsent: [ (spec includesKey: 'className') ifTrue: [ 'class' ] ifFalse: [ Error signal: 'run_tests requires kind or legacy className' ] ].
+	suite := PharoCATestSuite named: 'PharoCodingAssistant tool run'.
+	kind = 'method' ifTrue: [
+		cls := self testClassNamed: (spec at: 'className').
+		self addTestId: cls name, '>>', (spec at: 'selector') toSuite: suite ].
+	kind = 'class' ifTrue: [ cls := self testClassNamed: (spec at: 'className'). self addClass: cls toSuite: suite ].
+	(kind = 'package' or: [ kind = 'tag' ]) ifTrue: [
+		packageName := spec at: 'package'.
+		(PackageOrganizer default hasPackage: packageName) ifFalse: [ Error signal: 'Package not found: ', packageName ].
+		tagName := spec at: 'tag' ifAbsent: [ nil ].
+		kind = 'tag' ifTrue: [ tagName ifNil: [ Error signal: 'Tag scope requires tag' ] ].
+		classes := TestCase allSubclasses select: [ :each |
+			each isAbstract not and: [ each package name = packageName and: [ tagName isNil or: [ (each package tagOf: each) name asString = tagName ] ] ] ].
+		(classes asSortedCollection: [ :a :b | a name <= b name ]) do: [ :each | self addClass: each toSuite: suite ] ].
+	kind = 'selection' ifTrue: [ (spec at: 'tests') do: [ :each | self addTestId: each toSuite: suite ] ].
+	(#('method' 'class' 'package' 'tag' 'selection') includes: kind) ifFalse: [ Error signal: 'Unknown test scope kind: ', kind ].
+	^ suite
+]
+
+{ #category : 'private' }
+PharoCAToolRunTests class >> summaryForResult: result runId: runId [
+	^ {
+		'runId' -> runId.
+		'status' -> (result hasPassed ifTrue: [ 'passed' ] ifFalse: [ 'failed' ]).
+		'runCount' -> result runCount.
+		'passedCount' -> result passedCount.
+		'failureCount' -> result failureCount.
+		'errorCount' -> result errorCount.
+		'skippedCount' -> result skippedCount
+	} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolRunTests class >> testClassNamed: name [
+	| cls |
+	cls := Smalltalk globals at: name asSymbol ifAbsent: [ Error signal: 'Test class not found: ', name ].
+	(cls inheritsFrom: TestCase) ifFalse: [ Error signal: 'Class is not an SUnit TestCase: ', name ].
+	^ cls
+]
+
+{ #category : 'definition' }
+PharoCAToolRunTests class >> toolName [ ^ #run_tests
+]
+
+{ #category : 'definition' }
+PharoCAToolRunTests class >> toolPack [ ^ #core
 ]

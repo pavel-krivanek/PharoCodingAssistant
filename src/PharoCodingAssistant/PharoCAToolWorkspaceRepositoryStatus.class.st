@@ -1,4 +1,6 @@
-"Returns bounded structured git status for the configured workspace."
+"
+Returns bounded structured git status for the configured workspace.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceRepositoryStatus',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,11 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceRepositoryStatus class >> toolName [ ^ #workspace_repository_status ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceRepositoryStatus class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceRepositoryStatus class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolWorkspaceRepositoryStatus class >> capability [ ^ #inspection
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceRepositoryStatus class >> execute: args context: context [
@@ -41,6 +40,10 @@ PharoCAToolWorkspaceRepositoryStatus class >> execute: args context: context [
 	^ page
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceRepositoryStatus class >> executionMode [ ^ #parallelSafe
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceRepositoryStatus class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -54,4 +57,8 @@ PharoCAToolWorkspaceRepositoryStatus class >> llmDefinition [
 			} asDictionary.
 			'required' -> #()
 		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceRepositoryStatus class >> toolName [ ^ #workspace_repository_status
 ]

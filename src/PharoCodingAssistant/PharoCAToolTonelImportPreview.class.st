@@ -1,4 +1,6 @@
-"Builds and stores a native Monticello/Tonel package replacement preview without mutating the image."
+"
+Builds and stores a native Monticello/Tonel package replacement preview without mutating the image.
+"
 Class {
 	#name : 'PharoCAToolTonelImportPreview',
 	#superclass : 'PharoCATonelTool',
@@ -8,31 +10,12 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolTonelImportPreview class >> capability [ ^ #coding ]
-
-{ #category : 'execution' }
-PharoCAToolTonelImportPreview class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolTonelImportPreview class >> toolName [ ^ #tonel_import_preview ]
-
-{ #category : 'definition' }
-PharoCAToolTonelImportPreview class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tonel_import_preview'
-		description: 'Validates an in-memory Tonel package payload and previews the exact package replacement against the current image. Returns a session-scoped import handle; it does not mutate the image.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'packageName' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'files' -> { 'type' -> 'array'. 'minItems' -> 1. 'maxItems' -> 500. 'items' -> { 'type' -> 'object' } asDictionary } asDictionary
-			} asDictionary.
-			'required' -> #('packageName' 'files')
-		} asDictionary
+PharoCAToolTonelImportPreview class >> capability [ ^ #coding
 ]
 
 { #category : 'execution' }
-PharoCAToolTonelImportPreview class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+PharoCAToolTonelImportPreview class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
 { #category : 'execution' }
 PharoCAToolTonelImportPreview class >> execute: args context: context [
@@ -81,4 +64,27 @@ PharoCAToolTonelImportPreview class >> execute: args context: context [
 		'changes' -> shown.
 		'truncated' -> (shown size < plan size)
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolTonelImportPreview class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelImportPreview class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tonel_import_preview'
+		description: 'Validates an in-memory Tonel package payload and previews the exact package replacement against the current image. Returns a session-scoped import handle; it does not mutate the image.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'packageName' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'files' -> { 'type' -> 'array'. 'minItems' -> 1. 'maxItems' -> 500. 'items' -> { 'type' -> 'object' } asDictionary } asDictionary
+			} asDictionary.
+			'required' -> #('packageName' 'files')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelImportPreview class >> toolName [ ^ #tonel_import_preview
 ]

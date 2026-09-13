@@ -1,4 +1,6 @@
-"Asynchronous cancellable subscription to one run event hub. The producer only enqueues; callbacks execute in this subscription's worker process. A full mailbox fails closed by marking the subscription overflowed."
+"
+Asynchronous cancellable subscription to one run event hub. The producer only enqueues; callbacks execute in this subscription's worker process. A full mailbox fails closed by marking the subscription overflowed.
+"
 Class {
 	#name : 'PharoCARunEventSubscription',
 	#superclass : 'Object',
@@ -51,14 +53,6 @@ PharoCARunEventSubscription class >> on: aRun do: aBlock maxPendingEvents: anInt
 		yourself
 ]
 
-{ #category : 'testing' }
-PharoCARunEventSubscription >> active [
-	| value |
-	queueMutex wait.
-	[ value := active ] ensure: [ queueMutex signal ].
-	^ value
-]
-
 { #category : 'control' }
 PharoCARunEventSubscription >> activate [
 	| registration |
@@ -81,6 +75,14 @@ PharoCARunEventSubscription >> activate [
 			queueMutex wait.
 			[ active := false ] ensure: [ queueMutex signal ] ].
 	^ self
+]
+
+{ #category : 'testing' }
+PharoCARunEventSubscription >> active [
+	| value |
+	queueMutex wait.
+	[ value := active ] ensure: [ queueMutex signal ].
+	^ value
 ]
 
 { #category : 'converting' }
@@ -123,6 +125,14 @@ PharoCARunEventSubscription >> cancel [
 	^ self
 ]
 
+{ #category : 'accessing' }
+PharoCARunEventSubscription >> deliveryError [
+	| value |
+	queueMutex wait.
+	[ value := deliveryError ] ensure: [ queueMutex signal ].
+	^ value
+]
+
 { #category : 'private' }
 PharoCARunEventSubscription >> deliveryLoop [
 	| event |
@@ -142,39 +152,11 @@ PharoCARunEventSubscription >> deliveryLoop [
 ]
 
 { #category : 'accessing' }
-PharoCARunEventSubscription >> deliveryError [
-	| value |
-	queueMutex wait.
-	[ value := deliveryError ] ensure: [ queueMutex signal ].
-	^ value
-]
-
-{ #category : 'accessing' }
 PharoCARunEventSubscription >> droppedCount [
 	| value |
 	queueMutex wait.
 	[ value := droppedCount ] ensure: [ queueMutex signal ].
 	^ value
-]
-
-{ #category : 'events-private' }
-PharoCARunEventSubscription >> enqueueInitialEvents: events [
-	queueMutex wait.
-	[
-		events do: [ :event |
-			queue addLast: event.
-			available signal ]
-	] ensure: [ queueMutex signal ]
-]
-
-{ #category : 'accessing' }
-PharoCARunEventSubscription >> initialReplayCount [
-	^ initialReplayCount
-]
-
-{ #category : 'accessing' }
-PharoCARunEventSubscription >> registrationStatus [
-	^ registrationStatus
 ]
 
 { #category : 'events' }
@@ -199,6 +181,21 @@ PharoCARunEventSubscription >> enqueue: anEvent [
 		run eventHub unregisterSubscription: self.
 		available signal ].
 	^ self
+]
+
+{ #category : 'events-private' }
+PharoCARunEventSubscription >> enqueueInitialEvents: events [
+	queueMutex wait.
+	[
+		events do: [ :event |
+			queue addLast: event.
+			available signal ]
+	] ensure: [ queueMutex signal ]
+]
+
+{ #category : 'accessing' }
+PharoCARunEventSubscription >> initialReplayCount [
+	^ initialReplayCount
 ]
 
 { #category : 'initialization' }
@@ -270,6 +267,11 @@ PharoCARunEventSubscription >> recordDeliveredSequence: anInteger [
 PharoCARunEventSubscription >> recordDeliveryError: anError [
 	queueMutex wait.
 	[ deliveryError := anError ] ensure: [ queueMutex signal ]
+]
+
+{ #category : 'accessing' }
+PharoCARunEventSubscription >> registrationStatus [
+	^ registrationStatus
 ]
 
 { #category : 'accessing' }

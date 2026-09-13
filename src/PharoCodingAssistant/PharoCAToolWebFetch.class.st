@@ -1,4 +1,6 @@
-"Fetches one HTTP(S) page through PharoDuckDuckGo and returns a bounded plain-text slice."
+"
+Fetches one HTTP(S) page through PharoDuckDuckGo and returns a bounded plain-text slice.
+"
 Class {
 	#name : 'PharoCAToolWebFetch',
 	#superclass : 'PharoCATool',
@@ -8,36 +10,12 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWebFetch class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolWebFetch class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolWebFetch class >> toolPack [ ^ #web ]
-
-{ #category : 'definition' }
-PharoCAToolWebFetch class >> toolName [ ^ #web_fetch ]
+PharoCAToolWebFetch class >> capability [ ^ #inspection
+]
 
 { #category : 'private' }
 PharoCAToolWebFetch class >> client [
 	^ DDGClient new
-]
-
-{ #category : 'definition' }
-PharoCAToolWebFetch class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'web_fetch'
-		description: 'Fetch an HTTP(S) URL and return bounded plain text. Use startCharacter to continue a long page.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'url' -> { 'type' -> 'string' } asDictionary.
-				'startCharacter' -> { 'type' -> 'integer'. 'minimum' -> 1 } asDictionary.
-				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 12000 } asDictionary
-			} asDictionary.
-			'required' -> #('url')
-		} asDictionary
 ]
 
 { #category : 'execution' }
@@ -76,4 +54,32 @@ PharoCAToolWebFetch class >> execute: args context: context [
 			'nextStartCharacter' -> (hasMore ifTrue: [ end + 1 ] ifFalse: [ nil ])
 		} asDictionary
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolWebFetch class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolWebFetch class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'web_fetch'
+		description: 'Fetch an HTTP(S) URL and return bounded plain text. Use startCharacter to continue a long page.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'url' -> { 'type' -> 'string' } asDictionary.
+				'startCharacter' -> { 'type' -> 'integer'. 'minimum' -> 1 } asDictionary.
+				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 12000 } asDictionary
+			} asDictionary.
+			'required' -> #('url')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWebFetch class >> toolName [ ^ #web_fetch
+]
+
+{ #category : 'definition' }
+PharoCAToolWebFetch class >> toolPack [ ^ #web
 ]

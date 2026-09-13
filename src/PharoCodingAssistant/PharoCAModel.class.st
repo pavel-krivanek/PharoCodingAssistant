@@ -1,4 +1,6 @@
-"Provider-independent description of a model and the protocol capabilities the agent may rely on."
+"
+Provider-independent description of a model and the protocol capabilities the agent may rely on.
+"
 Class {
 	#name : 'PharoCAModel',
 	#superclass : 'Object',
@@ -25,6 +27,16 @@ PharoCAModel class >> named: aString [
 	^ self new
 		name: aString;
 		yourself
+]
+
+{ #category : 'converting' }
+PharoCAModel >> asDictionary [
+	^ {
+		'name' -> name.
+		'contextSize' -> contextSize.
+		'maximumOutputTokens' -> maximumOutputTokens.
+		'capabilities' -> self capabilities
+	} asDictionary
 ]
 
 { #category : 'accessing' }
@@ -155,7 +167,6 @@ PharoCAModel >> supportsUsageStreaming: aBoolean [
 	supportsUsageStreaming := aBoolean
 ]
 
-
 { #category : 'accessing' }
 PharoCAModel >> tokenEstimator [
 	^ tokenEstimator
@@ -164,14 +175,4 @@ PharoCAModel >> tokenEstimator [
 { #category : 'accessing' }
 PharoCAModel >> tokenEstimator: anEstimatorOrNil [
 	tokenEstimator := anEstimatorOrNil
-]
-
-{ #category : 'converting' }
-PharoCAModel >> asDictionary [
-	^ {
-		'name' -> name.
-		'contextSize' -> contextSize.
-		'maximumOutputTokens' -> maximumOutputTokens.
-		'capabilities' -> self capabilities
-	} asDictionary
 ]

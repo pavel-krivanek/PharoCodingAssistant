@@ -7,9 +7,19 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergRemotes class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolIcebergRemotes class >> execute: args [
+	| repository items page state |
+	repository := self repositoryNamed: (args at: 'repository').
+	self requireValidRepository: repository.
+	items := ((repository remotes collect: [ :remote | self remoteSummaryFor: remote ]) asSortedCollection: [ :a :b | (a at: 'name') <= (b at: 'name') ]) asArray.
+	state := (SHA256 hashMessage: (STONJSON toString: items)) hex.
+	page := PharoCAToolPagination pageItems: items arguments: args scope: 'iceberg_remotes|', repository name, '|', state.
+	^ { 'repository' -> repository name. 'remotes' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+]
 
-{ #category : 'definition' } PharoCAToolIcebergRemotes class >> toolName [ ^ #iceberg_remotes ]
+{ #category : 'execution' }
+PharoCAToolIcebergRemotes class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
 PharoCAToolIcebergRemotes class >> llmDefinition [
@@ -27,13 +37,6 @@ PharoCAToolIcebergRemotes class >> llmDefinition [
 		} asDictionary
 ]
 
-{ #category : 'execution' }
-PharoCAToolIcebergRemotes class >> execute: args [
-	| repository items page state |
-	repository := self repositoryNamed: (args at: 'repository').
-	self requireValidRepository: repository.
-	items := ((repository remotes collect: [ :remote | self remoteSummaryFor: remote ]) asSortedCollection: [ :a :b | (a at: 'name') <= (b at: 'name') ]) asArray.
-	state := (SHA256 hashMessage: (STONJSON toString: items)) hex.
-	page := PharoCAToolPagination pageItems: items arguments: args scope: 'iceberg_remotes|', repository name, '|', state.
-	^ { 'repository' -> repository name. 'remotes' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+{ #category : 'definition' }
+PharoCAToolIcebergRemotes class >> toolName [ ^ #iceberg_remotes
 ]

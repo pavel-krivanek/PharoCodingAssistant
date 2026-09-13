@@ -1,4 +1,6 @@
-"One live agent execution. A run owns streaming state, durable-session context, cancellation, and Pi-like steering/follow-up control queues."
+"
+One live agent execution. A run owns streaming state, durable-session context, cancellation, and Pi-like steering/follow-up control queues.
+"
 Class {
 	#name : 'PharoCARun',
 	#superclass : 'Object',
@@ -38,18 +40,14 @@ Class {
 		'inputMessage',
 		'cancellationReason'
 	],
-	#classVars : [ 'LayoutBindingGeneration', 'LayoutBindingMutex' ],
+	#classVars : [
+		'LayoutBindingGeneration',
+		'LayoutBindingMutex'
+	],
 	#category : 'PharoCodingAssistant-Core',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Core'
 }
-
-
-{ #category : 'instance creation' }
-PharoCARun class >> new [
-	self ensureCurrentLayoutBindings.
-	^ super new
-]
 
 { #category : 'private - compatibility' }
 PharoCARun class >> ensureCurrentLayoutBindings [
@@ -64,6 +62,12 @@ PharoCARun class >> ensureCurrentLayoutBindings [
 { #category : 'private - compatibility' }
 PharoCARun class >> layoutBindingMutex [
 	^ LayoutBindingMutex ifNil: [ LayoutBindingMutex := Semaphore forMutualExclusion ]
+]
+
+{ #category : 'instance creation' }
+PharoCARun class >> new [
+	self ensureCurrentLayoutBindings.
+	^ super new
 ]
 
 { #category : 'testing' }
@@ -83,16 +87,6 @@ PharoCARun >> agent: anAgent [
 ]
 
 { #category : 'accessing' }
-PharoCARun >> answer [
-	^ answer
-]
-
-{ #category : 'accessing' }
-PharoCARun >> answer: aString [
-	answer := aString
-]
-
-{ #category : 'accessing' }
 PharoCARun >> announcer [
 	"Compatibility projection for clients that still consume an Announcer directly. Delivery remains asynchronous because the announcer itself is fed by a bounded event-hub subscription."
 	eventMutex wait.
@@ -102,6 +96,40 @@ PharoCARun >> announcer [
 			announcerSubscription := self subscribeEventsDo: [ :event | announcer announce: event ] ]
 	] ensure: [ eventMutex signal ].
 	^ announcer
+]
+
+{ #category : 'accessing' }
+PharoCARun >> answer [
+	^ answer
+]
+
+{ #category : 'accessing' }
+PharoCARun >> answer: aString [
+	answer := aString
+]
+
+{ #category : 'converting' }
+PharoCARun >> asDictionary [
+	^ {
+		'id' -> id.
+		'status' -> status asString.
+		'answer' -> answer.
+		'iterations' -> iterations.
+		'sessionId' -> (session ifNil: [ nil ] ifNotNil: [ session id ]).
+		'model' -> (model ifNil: [ nil ] ifNotNil: [ model name ]).
+		'provider' -> (provider ifNil: [ nil ] ifNotNil: [ provider class name ]).
+		'environmentId' -> (environment ifNil: [ nil ] ifNotNil: [ environment identifier ]).
+		'error' -> (error ifNil: [ nil ] ifNotNil: [ error description ]).
+		'telemetry' -> telemetry asDictionary.
+		'lastEventSequence' -> self lastEventSequence.
+		'eventRetention' -> self eventRetention.
+		'changes' -> (changes collect: [ :each | PharoCAChangeReview publicRecordFor: each ]) asArray
+	} asDictionary
+]
+
+{ #category : 'finishing' }
+PharoCARun >> beforeFinishDo: aBlock [
+	beforeFinishBlock := aBlock ifNil: [ [ ] ]
 ]
 
 { #category : 'streaming' }
@@ -122,6 +150,11 @@ PharoCARun >> beginModelRequestCancellationToken [
 	^ token
 ]
 
+{ #category : 'events' }
+PharoCARun >> canReplayEventsAfterSequence: anInteger [
+	^ eventHub canReplayAfterSequence: anInteger
+]
+
 { #category : 'control' }
 PharoCARun >> cancel [
 	^ self cancelWithReason: #userInterrupt
@@ -136,9 +169,9 @@ PharoCARun >> cancelWithReason: aReason [
 	cancellationToken cancel
 ]
 
-{ #category : 'testing' }
-PharoCARun >> cancelled [
-	^ cancellationToken cancelled
+{ #category : 'accessing' }
+PharoCARun >> cancellationReason [
+	^ cancellationReason
 ]
 
 { #category : 'accessing' }
@@ -146,9 +179,17 @@ PharoCARun >> cancellationToken [
 	^ cancellationToken
 ]
 
-{ #category : 'accessing' }
-PharoCARun >> cancellationReason [
-	^ cancellationReason
+{ #category : 'testing' }
+PharoCARun >> cancelled [
+	^ cancellationToken cancelled
+]
+
+{ #category : 'changes' }
+PharoCARun >> changes [
+	| snapshot |
+	eventMutex wait.
+	[ snapshot := changes asArray ] ensure: [ eventMutex signal ].
+	^ snapshot
 ]
 
 { #category : 'context' }
@@ -167,6 +208,11 @@ PharoCARun >> conversation: aConversation [
 ]
 
 { #category : 'events' }
+PharoCARun >> earliestRetainedEventSequence [
+	^ eventHub earliestRetainedSequence
+]
+
+{ #category : 'events' }
 PharoCARun >> emit: aSymbol payload: anObject [
 	| event |
 	event := PharoCARunEvent type: aSymbol payload: anObject.
@@ -174,6 +220,14 @@ PharoCARun >> emit: aSymbol payload: anObject [
 	^ eventHub
 		publish: event
 		afterRetainDo: [ telemetry recordEvent: event ]
+]
+
+{ #category : 'finishing-private' }
+PharoCARun >> emitFinalEvent [
+	status = #completed ifTrue: [ ^ self emit: #completed payload: answer ].
+	status = #cancelled ifTrue: [ ^ self emit: #cancelled payload: answer ].
+	status = #failed ifTrue: [ ^ self emit: #failed payload: (error ifNil: [ 'Run failed' ] ifNotNil: [ error description ]) ].
+	status = #iterationLimitReached ifTrue: [ ^ self emit: #iterationLimitReached payload: iterations ]
 ]
 
 { #category : 'control-private' }
@@ -189,6 +243,17 @@ PharoCARun >> endModelRequestCancellationToken: aToken [
 	callback ifNotNil: [ cancellationToken removeCancellationCallback: callback ]
 ]
 
+{ #category : 'environment' }
+PharoCARun >> environment [
+	^ environment
+]
+
+{ #category : 'environment' }
+PharoCARun >> environment: anEnvironment [
+	environment := anEnvironment.
+	telemetry ifNotNil: [ telemetry environmentId: anEnvironment identifier ]
+]
+
 { #category : 'accessing' }
 PharoCARun >> error [
 	^ error
@@ -199,29 +264,9 @@ PharoCARun >> error: anError [
 	error := anError
 ]
 
-{ #category : 'accessing' }
-PharoCARun >> events [
-	^ eventHub eventsAfterSequence: 0
-]
-
 { #category : 'events' }
 PharoCARun >> eventHub [
 	^ eventHub
-]
-
-{ #category : 'events' }
-PharoCARun >> earliestRetainedEventSequence [
-	^ eventHub earliestRetainedSequence
-]
-
-{ #category : 'events' }
-PharoCARun >> canReplayEventsAfterSequence: anInteger [
-	^ eventHub canReplayAfterSequence: anInteger
-]
-
-{ #category : 'events' }
-PharoCARun >> eventRetention [
-	^ eventHub retentionDictionary
 ]
 
 { #category : 'events' }
@@ -230,13 +275,28 @@ PharoCARun >> eventReplaySnapshotAfterSequence: anInteger [
 ]
 
 { #category : 'events' }
-PharoCARun >> eventRetentionMaxEvents: anInteger [
-	eventHub maxRetainedEvents: anInteger
+PharoCARun >> eventRetention [
+	^ eventHub retentionDictionary
 ]
 
 { #category : 'events' }
 PharoCARun >> eventRetentionMaxBytes: anInteger [
 	eventHub maxRetainedBytes: anInteger
+]
+
+{ #category : 'events' }
+PharoCARun >> eventRetentionMaxEvents: anInteger [
+	eventHub maxRetainedEvents: anInteger
+]
+
+{ #category : 'accessing' }
+PharoCARun >> events [
+	^ eventHub eventsAfterSequence: 0
+]
+
+{ #category : 'events' }
+PharoCARun >> eventsAfterSequence: anInteger [
+	^ eventHub eventsAfterSequence: anInteger
 ]
 
 { #category : 'accessing' }
@@ -247,11 +307,6 @@ PharoCARun >> executionProcess [
 { #category : 'accessing' }
 PharoCARun >> executionProcess: aProcess [
 	executionProcess := aProcess
-]
-
-{ #category : 'finishing' }
-PharoCARun >> beforeFinishDo: aBlock [
-	beforeFinishBlock := aBlock ifNil: [ [ ] ]
 ]
 
 { #category : 'finishing' }
@@ -290,14 +345,6 @@ PharoCARun >> finishIterationLimitWithAnswer: aString [
 	^ self
 ]
 
-{ #category : 'finishing-private' }
-PharoCARun >> emitFinalEvent [
-	status = #completed ifTrue: [ ^ self emit: #completed payload: answer ].
-	status = #cancelled ifTrue: [ ^ self emit: #cancelled payload: answer ].
-	status = #failed ifTrue: [ ^ self emit: #failed payload: (error ifNil: [ 'Run failed' ] ifNotNil: [ error description ]) ].
-	status = #iterationLimitReached ifTrue: [ ^ self emit: #iterationLimitReached payload: iterations ]
-]
-
 { #category : 'private' }
 PharoCARun >> finishWithStatus: aSymbol [
 	completionClaimed := true.
@@ -330,6 +377,11 @@ PharoCARun >> hasPendingSteering [
 	^ self pendingSteeringCount > 0
 ]
 
+{ #category : 'accessing' }
+PharoCARun >> id [
+	^ id
+]
+
 { #category : 'initialization' }
 PharoCARun >> initialize [
 	super initialize.
@@ -359,6 +411,16 @@ PharoCARun >> initialize [
 	cancellationReason := nil
 ]
 
+{ #category : 'accessing' }
+PharoCARun >> inputMessage [
+	^ inputMessage
+]
+
+{ #category : 'accessing' }
+PharoCARun >> inputMessage: aMessage [
+	inputMessage := aMessage
+]
+
 { #category : 'testing' }
 PharoCARun >> isFinished [
 	^ finished
@@ -377,6 +439,11 @@ PharoCARun >> iterations: anInteger [
 { #category : 'context' }
 PharoCARun >> lastContext [
 	^ contexts ifEmpty: [ nil ] ifNotEmpty: [ contexts last ]
+]
+
+{ #category : 'events' }
+PharoCARun >> lastEventSequence [
+	^ eventHub lastSequence
 ]
 
 { #category : 'accessing' }
@@ -412,16 +479,6 @@ PharoCARun >> pendingSteeringCount [
 ]
 
 { #category : 'accessing' }
-PharoCARun >> inputMessage [
-	^ inputMessage
-]
-
-{ #category : 'accessing' }
-PharoCARun >> inputMessage: aMessage [
-	inputMessage := aMessage
-]
-
-{ #category : 'accessing' }
 PharoCARun >> prompt [
 	^ prompt
 ]
@@ -442,16 +499,24 @@ PharoCARun >> provider: aProvider [
 	telemetry ifNotNil: [ telemetry providerClass: aProvider class name ]
 ]
 
-{ #category : 'streaming' }
-PharoCARun >> recordLLMEvent: anEvent [
-	anEvent type = #textDelta ifTrue: [
-		partialAnswer := partialAnswer , anEvent payload ].
-	^ self emit: anEvent type payload: anEvent payload
+{ #category : 'changes' }
+PharoCARun >> recordChange: aChangeRecord [
+	eventMutex wait.
+	[ changes add: aChangeRecord ] ensure: [ eventMutex signal ].
+	self emit: #changeRecorded payload: (PharoCAChangeReview publicRecordFor: aChangeRecord).
+	^ aChangeRecord
 ]
 
 { #category : 'context' }
 PharoCARun >> recordContext: aContext [
 	contexts add: aContext
+]
+
+{ #category : 'streaming' }
+PharoCARun >> recordLLMEvent: anEvent [
+	anEvent type = #textDelta ifTrue: [
+		partialAnswer := partialAnswer , anEvent payload ].
+	^ self emit: anEvent type payload: anEvent payload
 ]
 
 { #category : 'accessing' }
@@ -493,6 +558,25 @@ PharoCARun >> steer: aString [
 	^ self
 ]
 
+{ #category : 'events' }
+PharoCARun >> subscribeEventsAfterSequence: afterSequence do: aBlock maxPendingEvents: anInteger [
+	^ PharoCARunEventSubscription
+		on: self
+		do: aBlock
+		maxPendingEvents: anInteger
+		afterSequence: afterSequence
+]
+
+{ #category : 'events' }
+PharoCARun >> subscribeEventsDo: aBlock [
+	^ PharoCARunEventSubscription on: self do: aBlock
+]
+
+{ #category : 'events' }
+PharoCARun >> subscribeEventsDo: aBlock maxPendingEvents: anInteger [
+	^ PharoCARunEventSubscription on: self do: aBlock maxPendingEvents: anInteger
+]
+
 { #category : 'control-private' }
 PharoCARun >> takeNextFollowUp [
 	| message |
@@ -512,6 +596,10 @@ PharoCARun >> takeSteeringMessages [
 		steeringQueue removeAll
 	] ensure: [ controlMutex signal ].
 	^ messages
+]
+
+{ #category : 'observability' }
+PharoCARun >> telemetry [ ^ telemetry
 ]
 
 { #category : 'finishing' }
@@ -560,94 +648,7 @@ PharoCARun >> waitTimeoutMilliseconds: milliseconds [
 	^ true
 ]
 
-
-{ #category : 'accessing' }
-PharoCARun >> id [
-	^ id
-]
-
-{ #category : 'environment' }
-PharoCARun >> environment [
-	^ environment
-]
-
-{ #category : 'environment' }
-PharoCARun >> environment: anEnvironment [
-	environment := anEnvironment.
-	telemetry ifNotNil: [ telemetry environmentId: anEnvironment identifier ]
-]
-
-{ #category : 'changes' }
-PharoCARun >> changes [
-	| snapshot |
-	eventMutex wait.
-	[ snapshot := changes asArray ] ensure: [ eventMutex signal ].
-	^ snapshot
-]
-
-{ #category : 'changes' }
-PharoCARun >> recordChange: aChangeRecord [
-	eventMutex wait.
-	[ changes add: aChangeRecord ] ensure: [ eventMutex signal ].
-	self emit: #changeRecorded payload: (PharoCAChangeReview publicRecordFor: aChangeRecord).
-	^ aChangeRecord
-]
-
 { #category : 'events' }
 PharoCARun >> whenEventDo: aBlock [
 	^ self subscribeEventsDo: aBlock
-]
-
-
-{ #category : 'observability' }
-PharoCARun >> telemetry [ ^ telemetry ]
-
-{ #category : 'converting' }
-PharoCARun >> asDictionary [
-	^ {
-		'id' -> id.
-		'status' -> status asString.
-		'answer' -> answer.
-		'iterations' -> iterations.
-		'sessionId' -> (session ifNil: [ nil ] ifNotNil: [ session id ]).
-		'model' -> (model ifNil: [ nil ] ifNotNil: [ model name ]).
-		'provider' -> (provider ifNil: [ nil ] ifNotNil: [ provider class name ]).
-		'environmentId' -> (environment ifNil: [ nil ] ifNotNil: [ environment identifier ]).
-		'error' -> (error ifNil: [ nil ] ifNotNil: [ error description ]).
-		'telemetry' -> telemetry asDictionary.
-		'lastEventSequence' -> self lastEventSequence.
-		'eventRetention' -> self eventRetention.
-		'changes' -> (changes collect: [ :each | PharoCAChangeReview publicRecordFor: each ]) asArray
-	} asDictionary
-]
-
-
-{ #category : 'events' }
-PharoCARun >> lastEventSequence [
-	^ eventHub lastSequence
-]
-
-{ #category : 'events' }
-PharoCARun >> eventsAfterSequence: anInteger [
-	^ eventHub eventsAfterSequence: anInteger
-]
-
-
-{ #category : 'events' }
-PharoCARun >> subscribeEventsDo: aBlock [
-	^ PharoCARunEventSubscription on: self do: aBlock
-]
-
-{ #category : 'events' }
-PharoCARun >> subscribeEventsDo: aBlock maxPendingEvents: anInteger [
-	^ PharoCARunEventSubscription on: self do: aBlock maxPendingEvents: anInteger
-]
-
-{ #category : 'events' }
-PharoCARun >> subscribeEventsAfterSequence: afterSequence do: aBlock maxPendingEvents: anInteger [
-	^ PharoCARunEventSubscription
-		on: self
-		do: aBlock
-		maxPendingEvents: anInteger
-		afterSequence: afterSequence
 ]

@@ -1,8 +1,12 @@
-"Machine-oriented embedding facade. It exposes run events and final results as JSON-safe dictionaries without any UI dependency."
+"
+Machine-oriented embedding facade. It exposes run events and final results as JSON-safe dictionaries without any UI dependency.
+"
 Class {
 	#name : 'PharoCAHeadlessAdapter',
 	#superclass : 'Object',
-	#instVars : [ 'agent' ],
+	#instVars : [
+		'agent'
+	],
 	#category : 'PharoCodingAssistant-Adapters',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Adapters'
@@ -13,20 +17,23 @@ PharoCAHeadlessAdapter class >> on: anAgent [
 	^ self new agent: anAgent; yourself
 ]
 
+{ #category : 'accessing' }
+PharoCAHeadlessAdapter >> agent [ ^ agent
+]
+
+{ #category : 'accessing' }
+PharoCAHeadlessAdapter >> agent: anAgent [ agent := anAgent
+]
+
 { #category : 'initialization' }
 PharoCAHeadlessAdapter >> initialize [
 	super initialize.
 	agent := PharoCA new
 ]
 
-{ #category : 'accessing' }
-PharoCAHeadlessAdapter >> agent [ ^ agent ]
-{ #category : 'accessing' }
-PharoCAHeadlessAdapter >> agent: anAgent [ agent := anAgent ]
-
-{ #category : 'running' }
-PharoCAHeadlessAdapter >> start: aPrompt eventsDo: aBlock [
-	^ agent start: aPrompt eventsDo: [ :event | aBlock value: event asDictionary ]
+{ #category : 'converting' }
+PharoCAHeadlessAdapter >> resultDictionaryFor: run [
+	^ run asDictionary
 ]
 
 { #category : 'running' }
@@ -48,7 +55,7 @@ PharoCAHeadlessAdapter >> run: aPrompt inSession: aSession eventsDo: aBlock [
 	^ self resultDictionaryFor: run
 ]
 
-{ #category : 'converting' }
-PharoCAHeadlessAdapter >> resultDictionaryFor: run [
-	^ run asDictionary
+{ #category : 'running' }
+PharoCAHeadlessAdapter >> start: aPrompt eventsDo: aBlock [
+	^ agent start: aPrompt eventsDo: [ :event | aBlock value: event asDictionary ]
 ]

@@ -1,17 +1,38 @@
-"Bounded event bridge for the NewTools Transcript. Interactive Transcript entries are announced through SystemAnnouncer. Headless NonInteractiveTranscript does not announce, but the bridge remains testable and reports that limitation explicitly."
+"
+Bounded event bridge for the NewTools Transcript. Interactive Transcript entries are announced through SystemAnnouncer. Headless NonInteractiveTranscript does not announce, but the bridge remains testable and reports that limitation explicitly.
+"
 Class {
 	#name : 'PharoCATranscriptBuffer',
 	#superclass : 'Object',
-	#instVars : [ 'entries', 'nextSequence', 'maximumEntries', 'mutex' ],
-	#classVars : [ 'Current' ],
+	#instVars : [
+		'entries',
+		'nextSequence',
+		'maximumEntries',
+		'mutex'
+	],
+	#classVars : [
+		'Current'
+	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
 }
 
 { #category : 'instance creation' }
-PharoCATranscriptBuffer class >> current [ ^ Current ifNil: [ Current := self new ] ]
+PharoCATranscriptBuffer class >> current [ ^ Current ifNil: [ Current := self new ]
+]
 
+{ #category : 'removing' }
+PharoCATranscriptBuffer >> clear [ mutex critical: [ entries removeAll ]
+]
+
+{ #category : 'accessing' }
+PharoCATranscriptBuffer >> entriesAfter: sequence limit: limit [
+	| selected |
+	(limit isInteger and: [ limit between: 1 and: 200 ]) ifFalse: [ Error signal: 'Transcript limit must be between 1 and 200' ].
+	mutex critical: [ selected := (entries select: [ :each | (each at: 'sequence') > sequence ]) first: (limit min: (entries count: [ :each | (each at: 'sequence') > sequence ])) ].
+	^ selected asArray
+]
 
 { #category : 'initialization' }
 PharoCATranscriptBuffer >> initialize [
@@ -26,11 +47,9 @@ PharoCATranscriptBuffer >> initialize [
 		SystemAnnouncer uniqueInstance when: ClearTranscript send: #recordClearAnnouncement: to: self ]
 ]
 
-{ #category : 'events' }
-PharoCATranscriptBuffer >> recordAnnouncement: announcement [ self record: announcement entry ]
-
-{ #category : 'events' }
-PharoCATranscriptBuffer >> recordClearAnnouncement: announcement [ self clear ]
+{ #category : 'accessing' }
+PharoCATranscriptBuffer >> latestSequence [ ^ mutex critical: [ nextSequence ]
+]
 
 { #category : 'adding' }
 PharoCATranscriptBuffer >> record: text [
@@ -40,21 +59,17 @@ PharoCATranscriptBuffer >> record: text [
 		[ entries size > maximumEntries ] whileTrue: [ entries removeFirst ] ]
 ]
 
-{ #category : 'accessing' }
-PharoCATranscriptBuffer >> entriesAfter: sequence limit: limit [
-	| selected |
-	(limit isInteger and: [ limit between: 1 and: 200 ]) ifFalse: [ Error signal: 'Transcript limit must be between 1 and 200' ].
-	mutex critical: [ selected := (entries select: [ :each | (each at: 'sequence') > sequence ]) first: (limit min: (entries count: [ :each | (each at: 'sequence') > sequence ])) ].
-	^ selected asArray
+{ #category : 'events' }
+PharoCATranscriptBuffer >> recordAnnouncement: announcement [ self record: announcement entry
+]
+
+{ #category : 'events' }
+PharoCATranscriptBuffer >> recordClearAnnouncement: announcement [ self clear
 ]
 
 { #category : 'accessing' }
-PharoCATranscriptBuffer >> latestSequence [ ^ mutex critical: [ nextSequence ] ]
-{ #category : 'accessing' }
-PharoCATranscriptBuffer >> size [ ^ mutex critical: [ entries size ] ]
-
-{ #category : 'removing' }
-PharoCATranscriptBuffer >> clear [ mutex critical: [ entries removeAll ] ]
+PharoCATranscriptBuffer >> size [ ^ mutex critical: [ entries size ]
+]
 
 { #category : 'accessing' }
 PharoCATranscriptBuffer >> statusDictionary [

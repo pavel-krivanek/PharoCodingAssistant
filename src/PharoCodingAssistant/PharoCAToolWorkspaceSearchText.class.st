@@ -1,4 +1,6 @@
-"Bounded recursive plain-text search inside the workspace. Search traversal and collected matches both have hard limits."
+"
+Bounded recursive plain-text search inside the workspace. Search traversal and collected matches both have hard limits.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceSearchText',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -6,43 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Workspace'
 }
-
-{ #category : 'definition' }
-PharoCAToolWorkspaceSearchText class >> toolName [ ^ #workspace_search_text ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceSearchText class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceSearchText class >> executionMode [ ^ #parallelSafe ]
-{ #category : 'defaults' }
-PharoCAToolWorkspaceSearchText class >> maximumCollectedMatches [ ^ 1000 ]
-
-{ #category : 'private' }
-PharoCAToolWorkspaceSearchText class >> candidateFilesUnder: directory access: access maxFiles: maxFiles context: context [
-	| queue files current children |
-	queue := OrderedCollection with: directory.
-	files := OrderedCollection new.
-	[ queue notEmpty and: [ files size < maxFiles ] ] whileTrue: [
-		context checkActive.
-		current := queue removeFirst.
-		children := [ current children ] on: Error do: [ :error | #() ].
-		children := (children asSortedCollection: [ :a :b | a basename <= b basename ]) asArray.
-		children do: [ :child |
-			files size < maxFiles ifTrue: [
-				[ access resolver ensureInsideWorkspace: child canonicalize.
-				child isDirectory
-					ifTrue: [ child basename = '.git' ifFalse: [ queue addLast: child ] ]
-					ifFalse: [ child isFile ifTrue: [ files add: child ] ] ]
-					on: Error do: [ :error | ] ] ] ].
-	^ files asArray
-]
-
-{ #category : 'private' }
-PharoCAToolWorkspaceSearchText class >> columnOf: query in: line caseSensitive: caseSensitive [
-	| haystack needle |
-	haystack := caseSensitive ifTrue: [ line ] ifFalse: [ line asLowercase ].
-	needle := caseSensitive ifTrue: [ query ] ifFalse: [ query asLowercase ].
-	^ haystack findString: needle startingAt: 1
-]
 
 { #category : 'private' }
 PharoCAToolWorkspaceSearchText class >> addMatchesFromFile: file query: query caseSensitive: caseSensitive maxFileBytes: maxFileBytes access: access into: matches [
@@ -64,6 +29,38 @@ PharoCAToolWorkspaceSearchText class >> addMatchesFromFile: file query: query ca
 					'text' -> snippet
 				} asDictionary ] ] ].
 	^ true
+]
+
+{ #category : 'private' }
+PharoCAToolWorkspaceSearchText class >> candidateFilesUnder: directory access: access maxFiles: maxFiles context: context [
+	| queue files current children |
+	queue := OrderedCollection with: directory.
+	files := OrderedCollection new.
+	[ queue notEmpty and: [ files size < maxFiles ] ] whileTrue: [
+		context checkActive.
+		current := queue removeFirst.
+		children := [ current children ] on: Error do: [ :error | #() ].
+		children := (children asSortedCollection: [ :a :b | a basename <= b basename ]) asArray.
+		children do: [ :child |
+			files size < maxFiles ifTrue: [
+				[ access resolver ensureInsideWorkspace: child canonicalize.
+				child isDirectory
+					ifTrue: [ child basename = '.git' ifFalse: [ queue addLast: child ] ]
+					ifFalse: [ child isFile ifTrue: [ files add: child ] ] ]
+					on: Error do: [ :error | ] ] ] ].
+	^ files asArray
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceSearchText class >> capability [ ^ #inspection
+]
+
+{ #category : 'private' }
+PharoCAToolWorkspaceSearchText class >> columnOf: query in: line caseSensitive: caseSensitive [
+	| haystack needle |
+	haystack := caseSensitive ifTrue: [ line ] ifFalse: [ line asLowercase ].
+	needle := caseSensitive ifTrue: [ query ] ifFalse: [ query asLowercase ].
+	^ haystack findString: needle startingAt: 1
 ]
 
 { #category : 'execution' }
@@ -108,6 +105,10 @@ PharoCAToolWorkspaceSearchText class >> execute: args context: context [
 	^ page
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceSearchText class >> executionMode [ ^ #parallelSafe
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceSearchText class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -126,4 +127,12 @@ PharoCAToolWorkspaceSearchText class >> llmDefinition [
 			} asDictionary.
 			'required' -> { 'query' }
 		} asDictionary
+]
+
+{ #category : 'defaults' }
+PharoCAToolWorkspaceSearchText class >> maximumCollectedMatches [ ^ 1000
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceSearchText class >> toolName [ ^ #workspace_search_text
 ]

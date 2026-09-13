@@ -1,12 +1,24 @@
-"Small bounded in-memory continuation store for outputs that must not be recomputed (notably side-effecting process execution). Cursors are opaque UUID-based capabilities."
+"
+Small bounded in-memory continuation store for outputs that must not be recomputed (notably side-effecting process execution). Cursors are opaque UUID-based capabilities.
+"
 Class {
 	#name : 'PharoCAWorkspaceOutputStore',
 	#superclass : 'Object',
-	#instVars : [ 'entries', 'order', 'mutex', 'maximumEntries' ],
+	#instVars : [
+		'entries',
+		'order',
+		'mutex',
+		'maximumEntries'
+	],
 	#category : 'PharoCodingAssistant-Workspace',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Workspace'
 }
+
+{ #category : 'pagination' }
+PharoCAWorkspaceOutputStore >> firstPageForId: id maxCharacters: maxCharacters [
+	^ self pageForId: id offset: 0 maxCharacters: maxCharacters
+]
 
 { #category : 'initialization' }
 PharoCAWorkspaceOutputStore >> initialize [
@@ -18,29 +30,13 @@ PharoCAWorkspaceOutputStore >> initialize [
 ]
 
 { #category : 'accessing' }
-PharoCAWorkspaceOutputStore >> maximumEntries [ ^ maximumEntries ]
+PharoCAWorkspaceOutputStore >> maximumEntries [ ^ maximumEntries
+]
 
 { #category : 'accessing' }
 PharoCAWorkspaceOutputStore >> maximumEntries: anInteger [
 	(anInteger isInteger and: [ anInteger > 0 ]) ifFalse: [ Error signal: 'maximumEntries must be positive' ].
 	maximumEntries := anInteger
-]
-
-{ #category : 'storing' }
-PharoCAWorkspaceOutputStore >> storeText: aString metadata: metadata [
-	| id |
-	id := UUID new asString.
-	mutex critical: [
-		entries at: id put: { 'text' -> aString. 'metadata' -> (metadata ifNil: [ Dictionary new ]) } asDictionary.
-		order addLast: id.
-		[ order size > maximumEntries ] whileTrue: [
-			entries removeKey: order removeFirst ifAbsent: [ ] ] ].
-	^ id
-]
-
-{ #category : 'pagination' }
-PharoCAWorkspaceOutputStore >> firstPageForId: id maxCharacters: maxCharacters [
-	^ self pageForId: id offset: 0 maxCharacters: maxCharacters
 ]
 
 { #category : 'pagination' }
@@ -79,4 +75,16 @@ PharoCAWorkspaceOutputStore >> pageForId: id offset: offset maxCharacters: maxCh
 		} asDictionary.
 		'metadata' -> (entry at: 'metadata')
 	} asDictionary
+]
+
+{ #category : 'storing' }
+PharoCAWorkspaceOutputStore >> storeText: aString metadata: metadata [
+	| id |
+	id := UUID new asString.
+	mutex critical: [
+		entries at: id put: { 'text' -> aString. 'metadata' -> (metadata ifNil: [ Dictionary new ]) } asDictionary.
+		order addLast: id.
+		[ order size > maximumEntries ] whileTrue: [
+			entries removeKey: order removeFirst ifAbsent: [ ] ] ].
+	^ id
 ]

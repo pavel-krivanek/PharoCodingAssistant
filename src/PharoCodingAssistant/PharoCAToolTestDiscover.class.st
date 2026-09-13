@@ -5,27 +5,15 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
 { #category : 'definition' }
-PharoCAToolTestDiscover class >> toolName [ ^ #test_discover ]
-{ #category : 'definition' }
-PharoCAToolTestDiscover class >> toolPack [ ^ #testing ]
-{ #category : 'definition' }
-PharoCAToolTestDiscover class >> capability [ ^ #testing ]
-{ #category : 'execution' }
-PharoCAToolTestDiscover class >> executionMode [ ^ #parallelSafe ]
-{ #category : 'definition' }
-PharoCAToolTestDiscover class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'test_discover' description: 'Discovers SUnit test classes and selectors in the live image, with optional name/package/tag filters and pagination.' parameters: {
-		'type' -> 'object'. 'properties' -> {
-			'query' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
-			'package' -> { 'type' -> 'string' } asDictionary.
-			'tag' -> { 'type' -> 'string' } asDictionary.
-			'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
-			'cursor' -> { 'type' -> 'string' } asDictionary
-		} asDictionary. 'required' -> #() } asDictionary
+PharoCAToolTestDiscover class >> capability [ ^ #testing
 ]
+
 { #category : 'execution' }
-PharoCAToolTestDiscover class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+PharoCAToolTestDiscover class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
 { #category : 'execution' }
 PharoCAToolTestDiscover class >> execute: args context: context [
 	| query packageName tagName rows page scope classes |
@@ -55,4 +43,28 @@ PharoCAToolTestDiscover class >> execute: args context: context [
 	scope := 'test_discover|', query, '|', (packageName ifNil: [ '' ]), '|', (tagName ifNil: [ '' ]).
 	page := PharoCAToolPagination pageItems: rows arguments: args scope: scope.
 	^ { 'tests' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolTestDiscover class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolTestDiscover class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'test_discover' description: 'Discovers SUnit test classes and selectors in the live image, with optional name/package/tag filters and pagination.' parameters: {
+		'type' -> 'object'. 'properties' -> {
+			'query' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
+			'package' -> { 'type' -> 'string' } asDictionary.
+			'tag' -> { 'type' -> 'string' } asDictionary.
+			'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
+			'cursor' -> { 'type' -> 'string' } asDictionary
+		} asDictionary. 'required' -> #() } asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTestDiscover class >> toolName [ ^ #test_discover
+]
+
+{ #category : 'definition' }
+PharoCAToolTestDiscover class >> toolPack [ ^ #testing
 ]

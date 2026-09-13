@@ -1,4 +1,6 @@
-"Validation schema for harness-controlled settings. Unknown or ill-typed settings become diagnostics instead of silently changing agent behavior."
+"
+Validation schema for harness-controlled settings. Unknown or ill-typed settings become diagnostics instead of silently changing agent behavior.
+"
 Class {
 	#name : 'PharoCASettingsSchema',
 	#superclass : 'Object',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Workspace'
 }
+
+{ #category : 'testing' }
+PharoCASettingsSchema >> includesKey: aKey [ ^ self knownKeys includes: aKey asString
+]
 
 { #category : 'accessing' }
 PharoCASettingsSchema >> knownKeys [
@@ -29,9 +35,6 @@ PharoCASettingsSchema >> knownKeys [
 		'tools.exclude'
 	)
 ]
-
-{ #category : 'testing' }
-PharoCASettingsSchema >> includesKey: aKey [ ^ self knownKeys includes: aKey asString ]
 
 { #category : 'validation' }
 PharoCASettingsSchema >> validationErrorForKey: aKey value: value [
@@ -57,7 +60,6 @@ PharoCASettingsSchema >> validationErrorForKey: aKey value: value [
 	key = 'tools.exclude' ifTrue: [ ^ self validationErrorForToolNameCollection: value ].
 	^ nil
 ]
-
 
 { #category : 'validation' }
 PharoCASettingsSchema >> validationErrorForToolNameCollection: value [

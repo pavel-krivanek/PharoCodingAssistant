@@ -7,9 +7,28 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergListRepositories class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolIcebergListRepositories class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
-{ #category : 'definition' } PharoCAToolIcebergListRepositories class >> toolName [ ^ #iceberg_list_repositories ]
+{ #category : 'execution' }
+PharoCAToolIcebergListRepositories class >> execute: args context: context [
+	| items page state |
+	items := OrderedCollection new.
+	IceRepository repositories doWithIndex: [ :repository :index |
+		(index \\ 50 = 0) ifTrue: [ context checkActive ].
+		items add: (self repositorySummary: repository) ].
+	items := (items asSortedCollection: [ :a :b |
+		(a at: 'name') = (b at: 'name')
+			ifTrue: [ ((a at: 'location') ifNil: [ '' ]) <= ((b at: 'location') ifNil: [ '' ]) ]
+			ifFalse: [ (a at: 'name') <= (b at: 'name') ] ]) asArray.
+	state := (SHA256 hashMessage: (STONJSON toString: items)) hex.
+	page := PharoCAToolPagination pageItems: items arguments: args scope: 'iceberg_list_repositories|', state.
+	^ { 'repositories' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergListRepositories class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
 PharoCAToolIcebergListRepositories class >> llmDefinition [
@@ -26,21 +45,6 @@ PharoCAToolIcebergListRepositories class >> llmDefinition [
 		} asDictionary
 ]
 
-{ #category : 'execution' }
-PharoCAToolIcebergListRepositories class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
-
-{ #category : 'execution' }
-PharoCAToolIcebergListRepositories class >> execute: args context: context [
-	| items page state |
-	items := OrderedCollection new.
-	IceRepository repositories doWithIndex: [ :repository :index |
-		(index \\ 50 = 0) ifTrue: [ context checkActive ].
-		items add: (self repositorySummary: repository) ].
-	items := (items asSortedCollection: [ :a :b |
-		(a at: 'name') = (b at: 'name')
-			ifTrue: [ ((a at: 'location') ifNil: [ '' ]) <= ((b at: 'location') ifNil: [ '' ]) ]
-			ifFalse: [ (a at: 'name') <= (b at: 'name') ] ]) asArray.
-	state := (SHA256 hashMessage: (STONJSON toString: items)) hex.
-	page := PharoCAToolPagination pageItems: items arguments: args scope: 'iceberg_list_repositories|', state.
-	^ { 'repositories' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+{ #category : 'definition' }
+PharoCAToolIcebergListRepositories class >> toolName [ ^ #iceberg_list_repositories
 ]

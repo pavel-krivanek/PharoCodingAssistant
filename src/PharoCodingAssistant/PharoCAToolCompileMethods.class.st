@@ -1,4 +1,6 @@
-"Compiles several methods for one class/side in a single atomic tool call. All methods are precompiled before installation; if installation unexpectedly fails, installed methods are restored to their original snapshots."
+"
+Compiles several methods for one class/side in a single atomic tool call. All methods are precompiled before installation; if installation unexpectedly fails, installed methods are restored to their original snapshots.
+"
 Class {
 	#name : 'PharoCAToolCompileMethods',
 	#superclass : 'PharoCAToolCompileMethod',
@@ -8,41 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolCompileMethods class >> capability [ ^ #coding ]
-
-{ #category : 'execution' }
-PharoCAToolCompileMethods class >> executionMode [ ^ #exclusiveMutation ]
-
-{ #category : 'definition' }
-PharoCAToolCompileMethods class >> toolName [ ^ #compile_methods ]
-
-{ #category : 'definition' }
-PharoCAToolCompileMethods class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'compile_methods'
-		description: 'Atomically compile several methods for one class/side. Each item has one source and optional protocol; all preflight before installation and failures leave the batch unchanged.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'className' -> { 'type' -> 'string' } asDictionary.
-				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
-				'protocol' -> { 'type' -> 'string' } asDictionary.
-				'methods' -> {
-					'type' -> 'array'.
-					'minItems' -> 1.
-					'maxItems' -> 50.
-					'items' -> {
-						'type' -> 'object'.
-						'properties' -> {
-							'source' -> { 'type' -> 'string' } asDictionary.
-							'protocol' -> { 'type' -> 'string' } asDictionary
-						} asDictionary.
-						'required' -> #('source')
-					} asDictionary
-				} asDictionary
-			} asDictionary.
-			'required' -> #('className' 'methods')
-		} asDictionary
+PharoCAToolCompileMethods class >> capability [ ^ #coding
 ]
 
 { #category : 'execution' }
@@ -143,9 +111,46 @@ PharoCAToolCompileMethods class >> execute: args context: context [
 	} asDictionary
 ]
 
+{ #category : 'execution' }
+PharoCAToolCompileMethods class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolCompileMethods class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'compile_methods'
+		description: 'Atomically compile several methods for one class/side. Each item has one source and optional protocol; all preflight before installation and failures leave the batch unchanged.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'className' -> { 'type' -> 'string' } asDictionary.
+				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
+				'protocol' -> { 'type' -> 'string' } asDictionary.
+				'methods' -> {
+					'type' -> 'array'.
+					'minItems' -> 1.
+					'maxItems' -> 50.
+					'items' -> {
+						'type' -> 'object'.
+						'properties' -> {
+							'source' -> { 'type' -> 'string' } asDictionary.
+							'protocol' -> { 'type' -> 'string' } asDictionary
+						} asDictionary.
+						'required' -> #('source')
+					} asDictionary
+				} asDictionary
+			} asDictionary.
+			'required' -> #('className' 'methods')
+		} asDictionary
+]
+
 { #category : 'private' }
 PharoCAToolCompileMethods class >> restoreMethodSnapshot: snapshot selector: selector in: targetClass [
 	snapshot
 		ifNil: [ targetClass removeSelector: selector ]
 		ifNotNil: [ targetClass compile: (snapshot at: 'source') classified: (snapshot at: 'protocol') ]
+]
+
+{ #category : 'definition' }
+PharoCAToolCompileMethods class >> toolName [ ^ #compile_methods
 ]

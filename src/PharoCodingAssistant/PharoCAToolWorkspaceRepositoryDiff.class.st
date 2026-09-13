@@ -1,4 +1,6 @@
-"Returns a bounded git diff range without invoking external diff drivers. Cursors are bound to the actual diff content hash."
+"
+Returns a bounded git diff range without invoking external diff drivers. Cursors are bound to the actual diff content hash.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceRepositoryDiff',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,11 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceRepositoryDiff class >> toolName [ ^ #workspace_repository_diff ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceRepositoryDiff class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceRepositoryDiff class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolWorkspaceRepositoryDiff class >> capability [ ^ #inspection
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceRepositoryDiff class >> execute: args context: context [
@@ -42,6 +41,10 @@ PharoCAToolWorkspaceRepositoryDiff class >> execute: args context: context [
 	^ page
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceRepositoryDiff class >> executionMode [ ^ #parallelSafe
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceRepositoryDiff class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -57,4 +60,8 @@ PharoCAToolWorkspaceRepositoryDiff class >> llmDefinition [
 			} asDictionary.
 			'required' -> #()
 		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceRepositoryDiff class >> toolName [ ^ #workspace_repository_diff
 ]

@@ -7,26 +7,13 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolObjectSlots class >> toolName [ ^ #object_slots ]
-{ #category : 'definition' }
-PharoCAToolObjectSlots class >> toolPack [ ^ #execution ]
-{ #category : 'definition' }
-PharoCAToolObjectSlots class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolObjectSlots class >> executionMode [ ^ #parallelSafe ]
-{ #category : 'definition' }
-PharoCAToolObjectSlots class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'object_slots' description: 'Returns paginated slot values for a live object. Non-immediate slot values receive their own opaque handles.' parameters: {
-		'type' -> 'object'.
-		'properties' -> {
-			'handle' -> { 'type' -> 'string' } asDictionary.
-			'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
-			'cursor' -> { 'type' -> 'string' } asDictionary
-		} asDictionary.
-		'required' -> #('handle') } asDictionary
+PharoCAToolObjectSlots class >> capability [ ^ #inspection
 ]
+
 { #category : 'execution' }
-PharoCAToolObjectSlots class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+PharoCAToolObjectSlots class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
 { #category : 'execution' }
 PharoCAToolObjectSlots class >> execute: args context: context [
 	| registry object slots scope page rows |
@@ -51,4 +38,28 @@ PharoCAToolObjectSlots class >> execute: args context: context [
 				'error' -> error description
 			} asDictionary ] ].
 	^ { 'slots' -> rows asArray. 'page' -> (page at: 'page') } asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolObjectSlots class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolObjectSlots class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'object_slots' description: 'Returns paginated slot values for a live object. Non-immediate slot values receive their own opaque handles.' parameters: {
+		'type' -> 'object'.
+		'properties' -> {
+			'handle' -> { 'type' -> 'string' } asDictionary.
+			'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
+			'cursor' -> { 'type' -> 'string' } asDictionary
+		} asDictionary.
+		'required' -> #('handle') } asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolObjectSlots class >> toolName [ ^ #object_slots
+]
+
+{ #category : 'definition' }
+PharoCAToolObjectSlots class >> toolPack [ ^ #execution
 ]

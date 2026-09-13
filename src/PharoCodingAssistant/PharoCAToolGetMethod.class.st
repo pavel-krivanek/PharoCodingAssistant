@@ -1,4 +1,6 @@
-"Returns one exact locally implemented method with bounded source text and structural metadata. Unlike get_method_inheritance it never walks superclasses."
+"
+Returns one exact locally implemented method with bounded source text and structural metadata. Unlike get_method_inheritance it never walks superclasses.
+"
 Class {
 	#name : 'PharoCAToolGetMethod',
 	#superclass : 'PharoCATool',
@@ -8,33 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolGetMethod class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolGetMethod class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolGetMethod class >> toolPack [ ^ #browse ]
-
-{ #category : 'definition' }
-PharoCAToolGetMethod class >> toolName [ ^ #get_method ]
-
-{ #category : 'definition' }
-PharoCAToolGetMethod class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'get_method'
-		description: 'Returns an exact locally implemented method: bounded source, protocol, package, package tag and pragmas. It does not search superclasses. side is instance|class.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'className' -> { 'type' -> 'string' } asDictionary.
-				'selector' -> { 'type' -> 'string' } asDictionary.
-				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
-				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('className' 'selector')
-		} asDictionary
+PharoCAToolGetMethod class >> capability [ ^ #inspection
 ]
 
 { #category : 'definition' }
@@ -69,4 +45,34 @@ PharoCAToolGetMethod class >> execute: args [
 		'source' -> (page at: 'text').
 		'sourceRange' -> (page at: 'range')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolGetMethod class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolGetMethod class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'get_method'
+		description: 'Returns an exact locally implemented method: bounded source, protocol, package, package tag and pragmas. It does not search superclasses. side is instance|class.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'className' -> { 'type' -> 'string' } asDictionary.
+				'selector' -> { 'type' -> 'string' } asDictionary.
+				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
+				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('className' 'selector')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolGetMethod class >> toolName [ ^ #get_method
+]
+
+{ #category : 'definition' }
+PharoCAToolGetMethod class >> toolPack [ ^ #browse
 ]

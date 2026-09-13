@@ -1,31 +1,30 @@
-"UI-neutral live projection of one PharoCARun. It consumes run events and exposes display state without depending on Morphic."
+"
+UI-neutral live projection of one PharoCARun. It consumes run events and exposes display state without depending on Morphic.
+"
 Class {
 	#name : 'PharoCARunViewModel',
 	#superclass : 'Object',
-	#instVars : [ 'run', 'status', 'visibleText', 'reasoningText', 'lastContext', 'lastUsage', 'lastProviderMetrics', 'lastPromptProgress', 'toolStates', 'eventCount', 'mutex', 'announcer' ],
+	#instVars : [
+		'run',
+		'status',
+		'visibleText',
+		'reasoningText',
+		'lastContext',
+		'lastUsage',
+		'lastProviderMetrics',
+		'lastPromptProgress',
+		'toolStates',
+		'eventCount',
+		'mutex',
+		'announcer'
+	],
 	#category : 'PharoCodingAssistant-Adapters',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Adapters'
 }
 
-{ #category : 'initialization' }
-PharoCARunViewModel >> initialize [
-	super initialize.
-	status := #created.
-	visibleText := ''.
-	reasoningText := ''.
-	toolStates := Dictionary new.
-	eventCount := 0.
-	mutex := Semaphore forMutualExclusion.
-	announcer := Announcer new
-]
-
-{ #category : 'accessing' }
-PharoCARunViewModel >> run [ ^ run ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> run: aRun [
-	run := aRun.
-	self reconcileFinishedRun
+{ #category : 'control' }
+PharoCARunViewModel >> cancel [ ^ run cancel
 ]
 
 { #category : 'events' }
@@ -60,6 +59,46 @@ PharoCARunViewModel >> consumeUnlocked: anEvent [
 	(#(completed cancelled failed iterationLimitReached) includes: type) ifTrue: [ status := type ]
 ]
 
+{ #category : 'accessing' }
+PharoCARunViewModel >> eventCount [ ^ eventCount
+]
+
+{ #category : 'control' }
+PharoCARunViewModel >> followUp: aString [ ^ run followUp: aString
+]
+
+{ #category : 'initialization' }
+PharoCARunViewModel >> initialize [
+	super initialize.
+	status := #created.
+	visibleText := ''.
+	reasoningText := ''.
+	toolStates := Dictionary new.
+	eventCount := 0.
+	mutex := Semaphore forMutualExclusion.
+	announcer := Announcer new
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> lastContext [ ^ lastContext
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> lastPromptProgress [ ^ lastPromptProgress
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> lastProviderMetrics [ ^ lastProviderMetrics
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> lastUsage [ ^ lastUsage
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> reasoningText [ ^ reasoningText
+]
+
 { #category : 'private' }
 PharoCARunViewModel >> reconcileFinishedRun [
 	(run isNil or: [ run isFinished not ]) ifTrue: [ ^ self ].
@@ -69,42 +108,39 @@ PharoCARunViewModel >> reconcileFinishedRun [
 ]
 
 { #category : 'accessing' }
+PharoCARunViewModel >> run [ ^ run
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> run: aRun [
+	run := aRun.
+	self reconcileFinishedRun
+]
+
+{ #category : 'accessing' }
 PharoCARunViewModel >> status [
 	self reconcileFinishedRun.
 	^ status
 ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> visibleText [
-	self reconcileFinishedRun.
-	^ visibleText
-]
-{ #category : 'accessing' }
-PharoCARunViewModel >> reasoningText [ ^ reasoningText ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> lastContext [ ^ lastContext ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> lastUsage [ ^ lastUsage ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> lastProviderMetrics [ ^ lastProviderMetrics ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> lastPromptProgress [ ^ lastPromptProgress ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> eventCount [ ^ eventCount ]
-{ #category : 'accessing' }
-PharoCARunViewModel >> toolStates [ ^ toolStates copy ]
 
 { #category : 'control' }
-PharoCARunViewModel >> cancel [ ^ run cancel ]
-{ #category : 'control' }
-PharoCARunViewModel >> steer: aString [ ^ run steer: aString ]
-{ #category : 'control' }
-PharoCARunViewModel >> followUp: aString [ ^ run followUp: aString ]
+PharoCARunViewModel >> steer: aString [ ^ run steer: aString
+]
 
 { #category : 'accessing' }
 PharoCARunViewModel >> telemetry [
 	^ run ifNil: [ Dictionary new ] ifNotNil: [ run telemetry asDictionary ]
 ]
 
+{ #category : 'accessing' }
+PharoCARunViewModel >> toolStates [ ^ toolStates copy
+]
+
+{ #category : 'accessing' }
+PharoCARunViewModel >> visibleText [
+	self reconcileFinishedRun.
+	^ visibleText
+]
 
 { #category : 'events' }
 PharoCARunViewModel >> whenChangedDo: aBlock [

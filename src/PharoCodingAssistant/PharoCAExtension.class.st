@@ -1,4 +1,6 @@
-"Base extension with isolated failures and no-op lifecycle hooks. Extensions are agent-owned and may keep durable per-session private state through PharoCAExtensionContext."
+"
+Base extension with isolated failures and no-op lifecycle hooks. Extensions are agent-owned and may keep durable per-session private state through PharoCAExtensionContext.
+"
 Class {
 	#name : 'PharoCAExtension',
 	#superclass : 'Object',
@@ -46,27 +48,20 @@ PharoCAExtension >> failurePolicy [
 	^ #isolate
 ]
 
-{ #category : 'accessing' }
-PharoCAExtension >> name [
-	^ self class name
-]
-
-
 { #category : 'instructions' }
 PharoCAExtension >> instructionSources: aContext [
 	"Return ephemeral PharoCAInstructionSource instances contributed for this run. They are composed before context budgeting and are not stored in the durable session."
 	^ #()
 ]
 
-
-{ #category : 'persistence' }
-PharoCAExtension >> statePersistencePolicy [
-	"#transient is the safe default because extension state may contain arbitrary live image objects. Override with #persistent only for JSON-safe state."
-	^ #transient
+{ #category : 'accessing' }
+PharoCAExtension >> name [
+	^ self class name
 ]
 
 { #category : 'persistence' }
-PharoCAExtension >> persistenceKey [ ^ self name asString ]
+PharoCAExtension >> persistenceKey [ ^ self name asString
+]
 
 { #category : 'persistence' }
 PharoCAExtension >> persistentStateFrom: anExtensionState [
@@ -90,4 +85,10 @@ PharoCAExtension >> restorePersistentState: aDictionary into: anExtensionState [
 			ifTrue: [ (entry at: 'key') asSymbol ]
 			ifFalse: [ entry at: 'key' ].
 		anExtensionState at: key put: (entry at: 'value') ]
+]
+
+{ #category : 'persistence' }
+PharoCAExtension >> statePersistencePolicy [
+	"#transient is the safe default because extension state may contain arbitrary live image objects. Override with #persistent only for JSON-safe state."
+	^ #transient
 ]

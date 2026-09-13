@@ -1,4 +1,6 @@
-"Common helpers for Pharo process inspection/control tools."
+"
+Common helpers for Pharo process inspection/control tools.
+"
 Class {
 	#name : 'PharoCAProcessTool',
 	#superclass : 'PharoCATool',
@@ -7,16 +9,18 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'testing' }
-PharoCAProcessTool class >> isAbstract [ ^ self = PharoCAProcessTool ]
-{ #category : 'definition' }
-PharoCAProcessTool class >> toolPack [ ^ #process ]
 { #category : 'execution' }
-PharoCAProcessTool class >> executionMode [ ^ #sequential ]
+PharoCAProcessTool class >> executionMode [ ^ #sequential
+]
 
 { #category : 'private' }
-PharoCAProcessTool class >> processAt: handle context: context [
-	^ context requireRuntimeHandleRegistry objectAt: handle kind: #process
+PharoCAProcessTool class >> frameSummaryFor: aContext index: index [
+	^ {
+		'frameIndex' -> index.
+		'className' -> ([ aContext receiver class name asString ] on: Error do: [ :error | '' ]).
+		'selector' -> ([ aContext selector asString ] on: Error do: [ :error | '' ]).
+		'pc' -> ([ aContext pc ] on: Error do: [ :error | nil ])
+	} asDictionary
 ]
 
 { #category : 'private' }
@@ -26,6 +30,15 @@ PharoCAProcessTool class >> handleForProcess: process context: context [
 		kind: #process
 		metadata: Dictionary new
 		cleanup: nil
+]
+
+{ #category : 'testing' }
+PharoCAProcessTool class >> isAbstract [ ^ self = PharoCAProcessTool
+]
+
+{ #category : 'private' }
+PharoCAProcessTool class >> processAt: handle context: context [
+	^ context requireRuntimeHandleRegistry objectAt: handle kind: #process
 ]
 
 { #category : 'private' }
@@ -50,6 +63,17 @@ PharoCAProcessTool class >> requireControllable: process context: context [
 ]
 
 { #category : 'private' }
+PharoCAProcessTool class >> stackContextsFor: process limit: maximum [
+	| current items |
+	current := [ process suspendedContext ] on: Error do: [ :error | nil ].
+	items := OrderedCollection new.
+	[ current notNil and: [ items size < maximum ] ] whileTrue: [
+		items add: current.
+		current := current sender ].
+	^ items asArray
+]
+
+{ #category : 'private' }
 PharoCAProcessTool class >> summaryFor: process context: context [
 	| reason |
 	reason := self protectedReasonFor: process context: context.
@@ -65,23 +89,6 @@ PharoCAProcessTool class >> summaryFor: process context: context [
 	} asDictionary
 ]
 
-{ #category : 'private' }
-PharoCAProcessTool class >> stackContextsFor: process limit: maximum [
-	| current items |
-	current := [ process suspendedContext ] on: Error do: [ :error | nil ].
-	items := OrderedCollection new.
-	[ current notNil and: [ items size < maximum ] ] whileTrue: [
-		items add: current.
-		current := current sender ].
-	^ items asArray
-]
-
-{ #category : 'private' }
-PharoCAProcessTool class >> frameSummaryFor: aContext index: index [
-	^ {
-		'frameIndex' -> index.
-		'className' -> ([ aContext receiver class name asString ] on: Error do: [ :error | '' ]).
-		'selector' -> ([ aContext selector asString ] on: Error do: [ :error | '' ]).
-		'pc' -> ([ aContext pc ] on: Error do: [ :error | nil ])
-	} asDictionary
+{ #category : 'definition' }
+PharoCAProcessTool class >> toolPack [ ^ #process
 ]

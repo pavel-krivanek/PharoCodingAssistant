@@ -27,6 +27,11 @@ PharoCAModelRegistry >> descriptorForModelNamed: modelIdentifier [
 	^ result
 ]
 
+{ #category : 'testing' }
+PharoCAModelRegistry >> includesModelNamed: anIdentifier [
+	^ models includesKey: anIdentifier asString
+]
+
 { #category : 'initialization' }
 PharoCAModelRegistry >> initialize [ super initialize. models := Dictionary new. providers := Dictionary new
 ]
@@ -63,12 +68,6 @@ PharoCAModelRegistry >> register: aModel provider: providerIdentifier [
 	^ aModel
 ]
 
-
-{ #category : 'testing' }
-PharoCAModelRegistry >> includesModelNamed: anIdentifier [
-	^ models includesKey: anIdentifier asString
-]
-
 { #category : 'model-discovery' }
 PharoCAModelRegistry >> registerDiscoveredModels: discoveredModels provider: providerIdentifier [
 	| providerId added updated unchanged conflicts |
@@ -103,4 +102,3 @@ PharoCAModelRegistry >> registerDiscoveredModels: discoveredModels provider: pro
 		'conflicts' -> conflicts asArray
 	} asDictionary
 ]
-

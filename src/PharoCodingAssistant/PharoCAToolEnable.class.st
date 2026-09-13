@@ -1,4 +1,6 @@
-"Activates a lazily exposed tool pack for the current durable session. The new schemas are advertised on the next provider request in the same run."
+"
+Activates a lazily exposed tool pack for the current durable session. The new schemas are advertised on the next provider request in the same run.
+"
 Class {
 	#name : 'PharoCAToolEnable',
 	#superclass : 'PharoCATool',
@@ -8,27 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolEnable class >> capability [ ^ #session ]
-
-{ #category : 'execution' }
-PharoCAToolEnable class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolEnable class >> toolPack [ ^ #catalog ]
-
-{ #category : 'definition' }
-PharoCAToolEnable class >> toolName [ ^ #tool_enable ]
-
-{ #category : 'definition' }
-PharoCAToolEnable class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tool_enable'
-		description: 'Activates a named tool pack for this session. Tools in that pack become available to the model on the next model request. Profile restrictions are not bypassed.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> { 'pack' -> { 'type' -> 'string' } asDictionary } asDictionary.
-			'required' -> #(pack)
-		} asDictionary
+PharoCAToolEnable class >> capability [ ^ #session
 ]
 
 { #category : 'definition' }
@@ -55,4 +37,28 @@ PharoCAToolEnable class >> execute: args context: aContext [
 		'activePacks' -> (registry activePackNamesForSession: run session).
 		'availableOnNextModelRequest' -> true
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolEnable class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolEnable class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tool_enable'
+		description: 'Activates a named tool pack for this session. Tools in that pack become available to the model on the next model request. Profile restrictions are not bypassed.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> { 'pack' -> { 'type' -> 'string' } asDictionary } asDictionary.
+			'required' -> #(pack)
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolEnable class >> toolName [ ^ #tool_enable
+]
+
+{ #category : 'definition' }
+PharoCAToolEnable class >> toolPack [ ^ #catalog
 ]

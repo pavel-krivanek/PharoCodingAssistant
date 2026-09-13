@@ -1,8 +1,15 @@
-"Thread-safe append-only journal of semantic image changes for one PharoCAEnvironment."
+"
+Thread-safe append-only journal of semantic image changes for one PharoCAEnvironment.
+"
 Class {
 	#name : 'PharoCAChangeJournal',
 	#superclass : 'Object',
-	#instVars : [ 'environmentId', 'entries', 'mutex', 'nextEntryNumber' ],
+	#instVars : [
+		'environmentId',
+		'entries',
+		'mutex',
+		'nextEntryNumber'
+	],
 	#category : 'PharoCodingAssistant-Changes',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Changes'
@@ -46,20 +53,6 @@ PharoCAChangeJournal >> entries [
 	^ snapshot
 ]
 
-{ #category : 'accessing' }
-PharoCAChangeJournal >> environmentId [ ^ environmentId ]
-
-{ #category : 'accessing' }
-PharoCAChangeJournal >> environmentId: aString [ environmentId := aString ]
-
-{ #category : 'initialization' }
-PharoCAChangeJournal >> initialize [
-	super initialize.
-	entries := OrderedCollection new.
-	mutex := Semaphore forMutualExclusion.
-	nextEntryNumber := 0
-]
-
 { #category : 'querying' }
 PharoCAChangeJournal >> entriesForRunId: aRunId [
 	^ self entries select: [ :each | each runId = aRunId ]
@@ -71,4 +64,21 @@ PharoCAChangeJournal >> entriesForSessionId: aSessionId [
 ]
 
 { #category : 'accessing' }
-PharoCAChangeJournal >> size [ ^ self entries size ]
+PharoCAChangeJournal >> environmentId [ ^ environmentId
+]
+
+{ #category : 'accessing' }
+PharoCAChangeJournal >> environmentId: aString [ environmentId := aString
+]
+
+{ #category : 'initialization' }
+PharoCAChangeJournal >> initialize [
+	super initialize.
+	entries := OrderedCollection new.
+	mutex := Semaphore forMutualExclusion.
+	nextEntryNumber := 0
+]
+
+{ #category : 'accessing' }
+PharoCAChangeJournal >> size [ ^ self entries size
+]

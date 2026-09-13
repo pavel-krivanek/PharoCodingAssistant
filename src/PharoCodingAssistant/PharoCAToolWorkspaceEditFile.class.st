@@ -1,4 +1,6 @@
-"Performs an exact, hash-guarded text replacement in one workspace file."
+"
+Performs an exact, hash-guarded text replacement in one workspace file.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceEditFile',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,24 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceEditFile class >> toolName [ ^ #workspace_edit_file ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceEditFile class >> capability [ ^ #coding ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceEditFile class >> executionMode [ ^ #exclusiveMutation ]
-
-{ #category : 'private' }
-PharoCAToolWorkspaceEditFile class >> occurrencesOf: needle in: haystack [
-	| count start found |
-	needle isEmpty ifTrue: [ ^ 0 ].
-	count := 0.
-	start := 1.
-	[ start <= haystack size ] whileTrue: [
-		found := haystack findString: needle startingAt: start.
-		found = 0 ifTrue: [ ^ count ].
-		count := count + 1.
-		start := found + needle size ].
-	^ count
+PharoCAToolWorkspaceEditFile class >> capability [ ^ #coding
 ]
 
 { #category : 'execution' }
@@ -76,6 +61,10 @@ PharoCAToolWorkspaceEditFile class >> execute: args context: context [
 	} asDictionary
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceEditFile class >> executionMode [ ^ #exclusiveMutation
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceEditFile class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -92,4 +81,22 @@ PharoCAToolWorkspaceEditFile class >> llmDefinition [
 			} asDictionary.
 			'required' -> { 'path'. 'expectedSha256'. 'oldText'. 'newText' }
 		} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolWorkspaceEditFile class >> occurrencesOf: needle in: haystack [
+	| count start found |
+	needle isEmpty ifTrue: [ ^ 0 ].
+	count := 0.
+	start := 1.
+	[ start <= haystack size ] whileTrue: [
+		found := haystack findString: needle startingAt: start.
+		found = 0 ifTrue: [ ^ count ].
+		count := count + 1.
+		start := found + needle size ].
+	^ count
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceEditFile class >> toolName [ ^ #workspace_edit_file
 ]

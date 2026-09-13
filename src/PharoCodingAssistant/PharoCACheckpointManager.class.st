@@ -1,25 +1,113 @@
-"Creates semantic checkpoints and performs preflighted reverse replay of journaled live-image mutations. Unsupported/opaque changes block the complete rollback before anything is modified."
+"
+Creates semantic checkpoints and performs preflighted reverse replay of journaled live-image mutations. Unsupported/opaque changes block the complete rollback before anything is modified.
+"
 Class {
 	#name : 'PharoCACheckpointManager',
 	#superclass : 'Object',
-	#instVars : [ 'environment', 'checkpoints', 'mutex', 'nextCheckpointNumber' ],
+	#instVars : [
+		'environment',
+		'checkpoints',
+		'mutex',
+		'nextCheckpointNumber'
+	],
 	#category : 'PharoCodingAssistant-Changes',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Changes'
 }
 
-{ #category : 'initialization' }
-PharoCACheckpointManager >> initialize [
-	super initialize.
-	checkpoints := Dictionary new.
-	mutex := Semaphore forMutualExclusion.
-	nextCheckpointNumber := 0
+{ #category : 'private' }
+PharoCACheckpointManager >> applyRollbackOf: record [
+	| kind behavior selector class before |
+	kind := record kind.
+	(kind = #methodAdded or: [ kind = #methodModified ]) ifTrue: [
+		behavior := self behaviorForMethodRecord: record ifAbsent: [ Error signal: 'Rollback target disappeared after preflight' ].
+		selector := self selectorForMethodRecord: record.
+		kind = #methodAdded
+			ifTrue: [ behavior removeSelector: selector ]
+			ifFalse: [
+				before := record before.
+				behavior compile: (before at: 'source') classified: (before at: 'protocol') ].
+		^ self ].
+	kind = #classCommentChanged ifTrue: [
+		class := Smalltalk globals at: record target asSymbol.
+		class comment: record before.
+		^ self ].
+	kind = #classDefined ifTrue: [
+		class := Smalltalk globals at: record target asSymbol.
+		class removeFromSystem.
+		^ self ].
+	Error signal: 'Unsupported rollback kind reached apply phase: ', kind asString
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> behaviorForMethodRecord: record ifAbsent: absentBlock [
+	| className side class |
+	className := record metadata at: 'className' ifAbsent: [ self classNameFromMethodTarget: record target ].
+	side := record metadata at: 'side' ifAbsent: [ (record target includesSubstring: ' class>>') ifTrue: [ 'class' ] ifFalse: [ 'instance' ] ].
+	class := Smalltalk globals at: className asSymbol ifAbsent: [ ^ absentBlock value ].
+	^ side = 'class' ifTrue: [ class class ] ifFalse: [ class ]
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> blockerForRollbackOf: record [
+	| kind currentClass behavior selector current |
+	kind := record kind.
+	kind = #methodAdded ifTrue: [
+		behavior := self behaviorForMethodRecord: record ifAbsent: [ ^ self missingTargetBlockerFor: record ].
+		selector := self selectorForMethodRecord: record.
+		current := PharoCATool methodSnapshotFor: behavior selector: selector.
+		^ current = record after
+			ifTrue: [ nil ]
+			ifFalse: [ self stateMismatchBlockerFor: record ] ].
+	kind = #methodModified ifTrue: [
+		behavior := self behaviorForMethodRecord: record ifAbsent: [ ^ self missingTargetBlockerFor: record ].
+		selector := self selectorForMethodRecord: record.
+		current := PharoCATool methodSnapshotFor: behavior selector: selector.
+		^ current = record after
+			ifTrue: [ nil ]
+			ifFalse: [ self stateMismatchBlockerFor: record ] ].
+	kind = #classCommentChanged ifTrue: [
+		currentClass := Smalltalk globals at: record target asSymbol ifAbsent: [ ^ self missingTargetBlockerFor: record ].
+		^ currentClass comment = record after
+			ifTrue: [ nil ]
+			ifFalse: [ self stateMismatchBlockerFor: record ] ].
+	kind = #classDefined ifTrue: [
+		currentClass := Smalltalk globals at: record target asSymbol ifAbsent: [ ^ self missingTargetBlockerFor: record ].
+		(PharoCATool classSnapshotFor: currentClass) = record after ifFalse: [ ^ self stateMismatchBlockerFor: record ].
+		currentClass methodDict isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has instance-side methods not represented by the class snapshot' ].
+		currentClass class methodDict isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has class-side methods not represented by the class snapshot' ].
+		currentClass subclasses isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has subclasses' ].
+		currentClass allInstances isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has live instances' ].
+		^ nil ].
+	^ self opaqueBlockerFor: record reason: 'change kind has no proven semantic inverse'
 ]
 
 { #category : 'accessing' }
-PharoCACheckpointManager >> environment [ ^ environment ]
+PharoCACheckpointManager >> checkpointNamed: anId [
+	| checkpoint |
+	mutex wait.
+	[ checkpoint := checkpoints at: anId asString ifAbsent: [ nil ] ] ensure: [ mutex signal ].
+	checkpoint ifNil: [ Error signal: 'Unknown checkpoint: ', anId asString ].
+	^ checkpoint
+]
+
 { #category : 'accessing' }
-PharoCACheckpointManager >> environment: anEnvironment [ environment := anEnvironment ]
+PharoCACheckpointManager >> checkpoints [
+	| snapshot |
+	mutex wait.
+	[ snapshot := checkpoints values asArray ] ensure: [ mutex signal ].
+	^ snapshot sorted: [ :left :right | left createdAt <= right createdAt ]
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> classNameFromMethodTarget: target [
+	| marker left |
+	marker := target findString: '>>'.
+	marker = 0 ifTrue: [ Error signal: 'Malformed method change target: ', target ].
+	left := (target copyFrom: 1 to: marker - 1).
+	(left endsWith: ' class') ifTrue: [ ^ left allButLast: 6 ].
+	^ left
+]
 
 { #category : 'creating' }
 PharoCACheckpointManager >> create [
@@ -48,19 +136,58 @@ PharoCACheckpointManager >> createNamed: aLabel [
 ]
 
 { #category : 'accessing' }
-PharoCACheckpointManager >> checkpoints [
-	| snapshot |
-	mutex wait.
-	[ snapshot := checkpoints values asArray ] ensure: [ mutex signal ].
-	^ snapshot sorted: [ :left :right | left createdAt <= right createdAt ]
+PharoCACheckpointManager >> environment [ ^ environment
 ]
 
 { #category : 'accessing' }
-PharoCACheckpointManager >> checkpointNamed: anId [
+PharoCACheckpointManager >> environment: anEnvironment [ environment := anEnvironment
+]
+
+{ #category : 'initialization' }
+PharoCACheckpointManager >> initialize [
+	super initialize.
+	checkpoints := Dictionary new.
+	mutex := Semaphore forMutualExclusion.
+	nextCheckpointNumber := 0
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> missingTargetBlockerFor: record [
+	^ self opaqueBlockerFor: record reason: 'journaled target no longer exists'
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> opaqueBlockerFor: record reason: reason [
+	^ {
+		'changeId' -> record id.
+		'kind' -> record kind asString.
+		'target' -> record target.
+		'reason' -> reason
+	} asDictionary
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> pendingChangesSince: checkpoint [
+	| entries suffix reverted |
+	entries := environment changeJournal entries.
+	checkpoint journalIndex > entries size ifTrue: [ Error signal: 'Checkpoint journal position is no longer valid' ].
+	checkpoint journalIndex = entries size ifTrue: [ ^ #() ].
+	suffix := entries copyFrom: checkpoint journalIndex + 1 to: entries size.
+	reverted := Set new.
+	suffix do: [ :record |
+		record kind = #checkpointRollback ifTrue: [
+			(record metadata at: 'revertedChangeIds' ifAbsent: [ #() ]) do: [ :id | reverted add: id ] ] ].
+	^ suffix select: [ :record |
+		record kind ~= #checkpointRollback and: [ (reverted includes: record id) not ] ]
+]
+
+{ #category : 'private' }
+PharoCACheckpointManager >> resolveCheckpoint: aCheckpointOrId [
 	| checkpoint |
-	mutex wait.
-	[ checkpoint := checkpoints at: anId asString ifAbsent: [ nil ] ] ensure: [ mutex signal ].
-	checkpoint ifNil: [ Error signal: 'Unknown checkpoint: ', anId asString ].
+	checkpoint := (aCheckpointOrId isKindOf: PharoCACheckpoint)
+		ifTrue: [ aCheckpointOrId ]
+		ifFalse: [ self checkpointNamed: aCheckpointOrId ].
+	checkpoint environmentId = environment identifier ifFalse: [ Error signal: 'Checkpoint belongs to a different environment' ].
 	^ checkpoint
 ]
 
@@ -127,110 +254,8 @@ PharoCACheckpointManager >> rollbackUnlockedTo: checkpoint [
 ]
 
 { #category : 'private' }
-PharoCACheckpointManager >> resolveCheckpoint: aCheckpointOrId [
-	| checkpoint |
-	checkpoint := (aCheckpointOrId isKindOf: PharoCACheckpoint)
-		ifTrue: [ aCheckpointOrId ]
-		ifFalse: [ self checkpointNamed: aCheckpointOrId ].
-	checkpoint environmentId = environment identifier ifFalse: [ Error signal: 'Checkpoint belongs to a different environment' ].
-	^ checkpoint
-]
-
-{ #category : 'private' }
-PharoCACheckpointManager >> pendingChangesSince: checkpoint [
-	| entries suffix reverted |
-	entries := environment changeJournal entries.
-	checkpoint journalIndex > entries size ifTrue: [ Error signal: 'Checkpoint journal position is no longer valid' ].
-	checkpoint journalIndex = entries size ifTrue: [ ^ #() ].
-	suffix := entries copyFrom: checkpoint journalIndex + 1 to: entries size.
-	reverted := Set new.
-	suffix do: [ :record |
-		record kind = #checkpointRollback ifTrue: [
-			(record metadata at: 'revertedChangeIds' ifAbsent: [ #() ]) do: [ :id | reverted add: id ] ] ].
-	^ suffix select: [ :record |
-		record kind ~= #checkpointRollback and: [ (reverted includes: record id) not ] ]
-]
-
-{ #category : 'private' }
-PharoCACheckpointManager >> blockerForRollbackOf: record [
-	| kind currentClass behavior selector current |
-	kind := record kind.
-	kind = #methodAdded ifTrue: [
-		behavior := self behaviorForMethodRecord: record ifAbsent: [ ^ self missingTargetBlockerFor: record ].
-		selector := self selectorForMethodRecord: record.
-		current := PharoCATool methodSnapshotFor: behavior selector: selector.
-		^ current = record after
-			ifTrue: [ nil ]
-			ifFalse: [ self stateMismatchBlockerFor: record ] ].
-	kind = #methodModified ifTrue: [
-		behavior := self behaviorForMethodRecord: record ifAbsent: [ ^ self missingTargetBlockerFor: record ].
-		selector := self selectorForMethodRecord: record.
-		current := PharoCATool methodSnapshotFor: behavior selector: selector.
-		^ current = record after
-			ifTrue: [ nil ]
-			ifFalse: [ self stateMismatchBlockerFor: record ] ].
-	kind = #classCommentChanged ifTrue: [
-		currentClass := Smalltalk globals at: record target asSymbol ifAbsent: [ ^ self missingTargetBlockerFor: record ].
-		^ currentClass comment = record after
-			ifTrue: [ nil ]
-			ifFalse: [ self stateMismatchBlockerFor: record ] ].
-	kind = #classDefined ifTrue: [
-		currentClass := Smalltalk globals at: record target asSymbol ifAbsent: [ ^ self missingTargetBlockerFor: record ].
-		(PharoCATool classSnapshotFor: currentClass) = record after ifFalse: [ ^ self stateMismatchBlockerFor: record ].
-		currentClass methodDict isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has instance-side methods not represented by the class snapshot' ].
-		currentClass class methodDict isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has class-side methods not represented by the class snapshot' ].
-		currentClass subclasses isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has subclasses' ].
-		currentClass allInstances isEmpty ifFalse: [ ^ self opaqueBlockerFor: record reason: 'new class has live instances' ].
-		^ nil ].
-	^ self opaqueBlockerFor: record reason: 'change kind has no proven semantic inverse'
-]
-
-{ #category : 'private' }
-PharoCACheckpointManager >> applyRollbackOf: record [
-	| kind behavior selector class before |
-	kind := record kind.
-	(kind = #methodAdded or: [ kind = #methodModified ]) ifTrue: [
-		behavior := self behaviorForMethodRecord: record ifAbsent: [ Error signal: 'Rollback target disappeared after preflight' ].
-		selector := self selectorForMethodRecord: record.
-		kind = #methodAdded
-			ifTrue: [ behavior removeSelector: selector ]
-			ifFalse: [
-				before := record before.
-				behavior compile: (before at: 'source') classified: (before at: 'protocol') ].
-		^ self ].
-	kind = #classCommentChanged ifTrue: [
-		class := Smalltalk globals at: record target asSymbol.
-		class comment: record before.
-		^ self ].
-	kind = #classDefined ifTrue: [
-		class := Smalltalk globals at: record target asSymbol.
-		class removeFromSystem.
-		^ self ].
-	Error signal: 'Unsupported rollback kind reached apply phase: ', kind asString
-]
-
-{ #category : 'private' }
-PharoCACheckpointManager >> behaviorForMethodRecord: record ifAbsent: absentBlock [
-	| className side class |
-	className := record metadata at: 'className' ifAbsent: [ self classNameFromMethodTarget: record target ].
-	side := record metadata at: 'side' ifAbsent: [ (record target includesSubstring: ' class>>') ifTrue: [ 'class' ] ifFalse: [ 'instance' ] ].
-	class := Smalltalk globals at: className asSymbol ifAbsent: [ ^ absentBlock value ].
-	^ side = 'class' ifTrue: [ class class ] ifFalse: [ class ]
-]
-
-{ #category : 'private' }
 PharoCACheckpointManager >> selectorForMethodRecord: record [
 	^ (record metadata at: 'selector' ifAbsent: [ self selectorStringFromMethodTarget: record target ]) asSymbol
-]
-
-{ #category : 'private' }
-PharoCACheckpointManager >> classNameFromMethodTarget: target [
-	| marker left |
-	marker := target findString: '>>'.
-	marker = 0 ifTrue: [ Error signal: 'Malformed method change target: ', target ].
-	left := (target copyFrom: 1 to: marker - 1).
-	(left endsWith: ' class') ifTrue: [ ^ left allButLast: 6 ].
-	^ left
 ]
 
 { #category : 'private' }
@@ -242,21 +267,6 @@ PharoCACheckpointManager >> selectorStringFromMethodTarget: target [
 ]
 
 { #category : 'private' }
-PharoCACheckpointManager >> missingTargetBlockerFor: record [
-	^ self opaqueBlockerFor: record reason: 'journaled target no longer exists'
-]
-
-{ #category : 'private' }
 PharoCACheckpointManager >> stateMismatchBlockerFor: record [
 	^ self opaqueBlockerFor: record reason: 'live image no longer matches the journaled post-change state'
-]
-
-{ #category : 'private' }
-PharoCACheckpointManager >> opaqueBlockerFor: record reason: reason [
-	^ {
-		'changeId' -> record id.
-		'kind' -> record kind asString.
-		'target' -> record target.
-		'reason' -> reason
-	} asDictionary
 ]

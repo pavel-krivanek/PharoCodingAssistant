@@ -1,4 +1,6 @@
-"Lists one workspace directory with deterministic bounded pagination."
+"
+Lists one workspace directory with deterministic bounded pagination.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceListDirectory',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,11 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceListDirectory class >> toolName [ ^ #workspace_list_directory ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceListDirectory class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceListDirectory class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolWorkspaceListDirectory class >> capability [ ^ #inspection
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceListDirectory class >> execute: args context: context [
@@ -39,6 +38,10 @@ PharoCAToolWorkspaceListDirectory class >> execute: args context: context [
 	^ page
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceListDirectory class >> executionMode [ ^ #parallelSafe
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceListDirectory class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -53,4 +56,8 @@ PharoCAToolWorkspaceListDirectory class >> llmDefinition [
 			} asDictionary.
 			'required' -> #()
 		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceListDirectory class >> toolName [ ^ #workspace_list_directory
 ]

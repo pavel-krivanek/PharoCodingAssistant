@@ -7,31 +7,12 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolUIWindowClose class >> toolName [ ^ #ui_window_close ]
-{ #category : 'definition' }
-PharoCAToolUIWindowClose class >> toolPack [ ^ #ui ]
-{ #category : 'definition' }
-PharoCAToolUIWindowClose class >> capability [ ^ #coding ]
-{ #category : 'execution' }
-PharoCAToolUIWindowClose class >> executionMode [ ^ #exclusiveMutation ]
-
-{ #category : 'definition' }
-PharoCAToolUIWindowClose class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'ui_window_close'
-		description: 'Requests a listed Morphic SystemWindow to close. force=true deletes the window directly and bypasses the normal close request; use force only when explicitly appropriate.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'handle' -> { 'type' -> 'string' } asDictionary.
-				'force' -> { 'type' -> 'boolean' } asDictionary
-			} asDictionary.
-			'required' -> #('handle')
-		} asDictionary
+PharoCAToolUIWindowClose class >> capability [ ^ #coding
 ]
 
 { #category : 'execution' }
-PharoCAToolUIWindowClose class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+PharoCAToolUIWindowClose class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
 { #category : 'execution' }
 PharoCAToolUIWindowClose class >> execute: args context: context [
@@ -52,4 +33,31 @@ PharoCAToolUIWindowClose class >> execute: args context: context [
 		'force' -> force.
 		'title' -> (before at: 'title')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolUIWindowClose class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolUIWindowClose class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'ui_window_close'
+		description: 'Requests a listed Morphic SystemWindow to close. force=true deletes the window directly and bypasses the normal close request; use force only when explicitly appropriate.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'handle' -> { 'type' -> 'string' } asDictionary.
+				'force' -> { 'type' -> 'boolean' } asDictionary
+			} asDictionary.
+			'required' -> #('handle')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolUIWindowClose class >> toolName [ ^ #ui_window_close
+]
+
+{ #category : 'definition' }
+PharoCAToolUIWindowClose class >> toolPack [ ^ #ui
 ]

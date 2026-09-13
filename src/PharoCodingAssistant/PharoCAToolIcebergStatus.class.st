@@ -7,28 +7,8 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergStatus class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' } PharoCAToolIcebergStatus class >> toolName [ ^ #iceberg_status ]
-
-{ #category : 'definition' }
-PharoCAToolIcebergStatus class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'iceberg_status'
-		description: 'Returns the native Iceberg working-copy status as paginated changed paths and change kinds.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'repository' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('repository')
-		} asDictionary
+PharoCAToolIcebergStatus class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
 ]
-
-{ #category : 'execution' }
-PharoCAToolIcebergStatus class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
 
 { #category : 'execution' }
 PharoCAToolIcebergStatus class >> execute: args context: context [
@@ -48,4 +28,28 @@ PharoCAToolIcebergStatus class >> execute: args context: context [
 		'changes' -> (page at: 'items').
 		'page' -> (page at: 'page')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergStatus class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergStatus class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'iceberg_status'
+		description: 'Returns the native Iceberg working-copy status as paginated changed paths and change kinds.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'repository' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('repository')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergStatus class >> toolName [ ^ #iceberg_status
 ]

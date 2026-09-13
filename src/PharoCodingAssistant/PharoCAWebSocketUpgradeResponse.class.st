@@ -1,4 +1,6 @@
-"HTTP 101 response that hands the upgraded Zinc connection to a WebSocket handler after Zinc has written the handshake."
+"
+HTTP 101 response that hands the upgraded Zinc connection to a WebSocket handler after Zinc has written the handshake.
+"
 Class {
 	#name : 'PharoCAWebSocketUpgradeResponse',
 	#superclass : 'ZnResponse',

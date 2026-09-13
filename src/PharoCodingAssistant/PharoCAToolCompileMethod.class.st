@@ -1,4 +1,6 @@
-"Tool to compile a method into a class, handling instance/class side and protocol assignment."
+"
+Tool to compile a method into a class, handling instance/class side and protocol assignment.
+"
 Class {
 	#name : 'PharoCAToolCompileMethod',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolCompileMethod class >> capability [ ^ #coding
+]
 
 { #category : 'definition' }
 PharoCAToolCompileMethod class >> execute: args [
@@ -45,11 +51,9 @@ PharoCAToolCompileMethod class >> execute: args context: context [
 	^ result
 ]
 
-{ #category : 'definition' }
-PharoCAToolCompileMethod class >> capability [ ^ #coding ]
-
 { #category : 'execution' }
-PharoCAToolCompileMethod class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolCompileMethod class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'definition' }
 PharoCAToolCompileMethod class >> llmDefinition [
@@ -59,10 +63,6 @@ PharoCAToolCompileMethod class >> llmDefinition [
 		parameters: { 'properties' -> { 'source' -> { 'type' -> 'string' } asDictionary. 'side' -> { 'type' -> 'string' } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'protocol' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'className'. 'source' }. 'type' -> 'object' } asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolCompileMethod class >> toolName [ ^ #compile_method ]
-
-
 { #category : 'private' }
 PharoCAToolCompileMethod class >> normalizedProtocol: protocolName [
 	| string |
@@ -70,4 +70,8 @@ PharoCAToolCompileMethod class >> normalizedProtocol: protocolName [
 	(string size >= 2 and: [ string first = $' and: [ string last = $' ] ]) ifTrue: [
 		^ string copyFrom: 2 to: string size - 1 ].
 	^ string
+]
+
+{ #category : 'definition' }
+PharoCAToolCompileMethod class >> toolName [ ^ #compile_method
 ]

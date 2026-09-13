@@ -1,4 +1,6 @@
-"Versioned JSON persistence for durable session trees and session-scoped agent state. Runtime processes are deliberately not persisted."
+"
+Versioned JSON persistence for durable session trees and session-scoped agent state. Runtime processes are deliberately not persisted.
+"
 Class {
 	#name : 'PharoCASessionPersistence',
 	#superclass : 'Object',
@@ -39,13 +41,21 @@ PharoCASessionPersistence >> dictionaryForSession: aSession agent: anAgentOrNil 
 	} asDictionary
 ]
 
-{ #category : 'serializing' }
-PharoCASessionPersistence >> stringForSession: aSession agent: anAgentOrNil [
-	| dictionary |
-	dictionary := self dictionaryForSession: aSession agent: anAgentOrNil.
-	^ [ STONJSON toString: dictionary ]
-		on: Error
-		do: [ :error | Error signal: 'Session contains non-JSON-persistable state: ', error description ]
+{ #category : 'files' }
+PharoCASessionPersistence >> loadSessionFrom: aFileReference agent: anAgentOrNil [
+	| stream contents |
+	stream := aFileReference readStream.
+	[ contents := stream contents ] ensure: [ stream close ].
+	^ self sessionFromString: contents agent: anAgentOrNil
+]
+
+{ #category : 'files' }
+PharoCASessionPersistence >> saveSession: aSession agent: anAgentOrNil to: aFileReference [
+	| stream |
+	stream := aFileReference writeStream.
+	[ stream nextPutAll: (self stringForSession: aSession agent: anAgentOrNil) ]
+		ensure: [ stream close ].
+	^ aFileReference
 ]
 
 { #category : 'deserializing' }
@@ -78,19 +88,11 @@ PharoCASessionPersistence >> sessionFromString: aString agent: anAgentOrNil [
 	^ self sessionFromDictionary: dictionary agent: anAgentOrNil
 ]
 
-{ #category : 'files' }
-PharoCASessionPersistence >> saveSession: aSession agent: anAgentOrNil to: aFileReference [
-	| stream |
-	stream := aFileReference writeStream.
-	[ stream nextPutAll: (self stringForSession: aSession agent: anAgentOrNil) ]
-		ensure: [ stream close ].
-	^ aFileReference
-]
-
-{ #category : 'files' }
-PharoCASessionPersistence >> loadSessionFrom: aFileReference agent: anAgentOrNil [
-	| stream contents |
-	stream := aFileReference readStream.
-	[ contents := stream contents ] ensure: [ stream close ].
-	^ self sessionFromString: contents agent: anAgentOrNil
+{ #category : 'serializing' }
+PharoCASessionPersistence >> stringForSession: aSession agent: anAgentOrNil [
+	| dictionary |
+	dictionary := self dictionaryForSession: aSession agent: anAgentOrNil.
+	^ [ STONJSON toString: dictionary ]
+		on: Error
+		do: [ :error | Error signal: 'Session contains non-JSON-persistable state: ', error description ]
 ]

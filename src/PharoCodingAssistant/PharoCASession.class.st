@@ -1,4 +1,6 @@
-"Append-only tree of session entries. The selected leaf identifies the branch used for the next conversation."
+"
+Append-only tree of session entries. The selected leaf identifies the branch used for the next conversation.
+"
 Class {
 	#name : 'PharoCASession',
 	#superclass : 'Object',
@@ -13,6 +15,13 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Sessions'
 }
+
+{ #category : 'instance creation' }
+PharoCASession class >> fromPersistenceDictionary: aDictionary [
+	^ self new
+		restoreFromPersistenceDictionary: aDictionary;
+		yourself
+]
 
 { #category : 'private' }
 PharoCASession >> advanceCurrentFrom: oldLeafId to: newLeafId [
@@ -46,6 +55,15 @@ PharoCASession >> appendType: aType payload: aPayload parentId: aParentId [
 	^ entry
 ]
 
+{ #category : 'persistence' }
+PharoCASession >> asPersistenceDictionary [
+	^ {
+		'id' -> id.
+		'currentLeafId' -> currentLeafId.
+		'nextEntryNumber' -> nextEntryNumber.
+		'entries' -> (entries collect: [ :each | each asPersistenceDictionary ]) asArray
+	} asDictionary
+]
 
 { #category : 'changes' }
 PharoCASession >> changesInEnvironment: anEnvironment [
@@ -92,7 +110,6 @@ PharoCASession >> entryAt: anEntryId [
 		ifAbsent: [ self error: 'Unknown session entry: ', anEntryId asString ]
 ]
 
-
 { #category : 'accessing' }
 PharoCASession >> id [
 	^ id
@@ -113,35 +130,6 @@ PharoCASession >> messagesEndingAt: anEntryId [
 	^ ((self entriesEndingAt: anEntryId)
 		select: [ :each | each isMessage ])
 		collect: [ :each | each payload ]
-]
-
-{ #category : 'branching' }
-PharoCASession >> selectEntryId: anEntryId [
-	anEntryId ifNotNil: [ self entryAt: anEntryId ].
-	currentLeafId := anEntryId
-]
-
-{ #category : 'accessing' }
-PharoCASession >> size [
-	^ entries size
-]
-
-
-{ #category : 'persistence' }
-PharoCASession >> asPersistenceDictionary [
-	^ {
-		'id' -> id.
-		'currentLeafId' -> currentLeafId.
-		'nextEntryNumber' -> nextEntryNumber.
-		'entries' -> (entries collect: [ :each | each asPersistenceDictionary ]) asArray
-	} asDictionary
-]
-
-{ #category : 'instance creation' }
-PharoCASession class >> fromPersistenceDictionary: aDictionary [
-	^ self new
-		restoreFromPersistenceDictionary: aDictionary;
-		yourself
 ]
 
 { #category : 'persistence-private' }
@@ -179,4 +167,15 @@ PharoCASession >> restoreFromPersistenceDictionary: aDictionary [
 	restoredNext := aDictionary at: 'nextEntryNumber' ifAbsent: [ entries size ].
 	(restoredNext isInteger and: [ restoredNext >= entries size ]) ifFalse: [ Error signal: 'Invalid persisted next entry number' ].
 	nextEntryNumber := restoredNext
+]
+
+{ #category : 'branching' }
+PharoCASession >> selectEntryId: anEntryId [
+	anEntryId ifNotNil: [ self entryAt: anEntryId ].
+	currentLeafId := anEntryId
+]
+
+{ #category : 'accessing' }
+PharoCASession >> size [
+	^ entries size
 ]

@@ -1,4 +1,6 @@
-"Shared, read-only navigation helpers used by the advanced Pharo browsing tools. The helpers deliberately derive metadata from installed classes/methods without materializing package tags or modifying the image."
+"
+Shared, read-only navigation helpers used by the advanced Pharo browsing tools. The helpers deliberately derive metadata from installed classes/methods without materializing package tags or modifying the image.
+"
 Class {
 	#name : 'PharoCAImageNavigation',
 	#superclass : 'Object',
@@ -7,11 +9,6 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'resolving' }
-PharoCAImageNavigation class >> classNamed: aString [
-	^ Smalltalk globals at: aString asSymbol ifAbsent: [ Error signal: 'Class not found: ', aString ]
-]
-
 { #category : 'metadata' }
 PharoCAImageNavigation class >> baseClassOfMethod: aCompiledMethod [
 	| behavior |
@@ -19,14 +16,17 @@ PharoCAImageNavigation class >> baseClassOfMethod: aCompiledMethod [
 	^ behavior isMeta ifTrue: [ behavior instanceSide ] ifFalse: [ behavior ]
 ]
 
-{ #category : 'metadata' }
-PharoCAImageNavigation class >> sideOfMethod: aCompiledMethod [
-	^ aCompiledMethod methodClass isMeta ifTrue: [ 'class' ] ifFalse: [ 'instance' ]
+{ #category : 'filtering' }
+PharoCAImageNavigation class >> class: aClass matchesPackage: packageName tag: tagName className: className [
+	(packageName notNil and: [ aClass package name ~= packageName ]) ifTrue: [ ^ false ].
+	(tagName notNil and: [ (self tagNameOfClass: aClass) ~= tagName ]) ifTrue: [ ^ false ].
+	(className notNil and: [ aClass name ~= className ]) ifTrue: [ ^ false ].
+	^ true
 ]
 
-{ #category : 'metadata' }
-PharoCAImageNavigation class >> tagNameOfClass: aClass [
-	^ aClass packageTag name asString
+{ #category : 'resolving' }
+PharoCAImageNavigation class >> classNamed: aString [
+	^ Smalltalk globals at: aString asSymbol ifAbsent: [ Error signal: 'Class not found: ', aString ]
 ]
 
 { #category : 'metadata' }
@@ -41,24 +41,6 @@ PharoCAImageNavigation class >> methodSummary: aCompiledMethod [
 		'package' -> baseClass package name.
 		'tag' -> (self tagNameOfClass: baseClass)
 	} asDictionary
-]
-
-{ #category : 'filtering' }
-PharoCAImageNavigation class >> class: aClass matchesPackage: packageName tag: tagName className: className [
-	(packageName notNil and: [ aClass package name ~= packageName ]) ifTrue: [ ^ false ].
-	(tagName notNil and: [ (self tagNameOfClass: aClass) ~= tagName ]) ifTrue: [ ^ false ].
-	(className notNil and: [ aClass name ~= className ]) ifTrue: [ ^ false ].
-	^ true
-]
-
-{ #category : 'validation' }
-PharoCAImageNavigation class >> validatePackage: packageName tag: tagName className: className [
-	| package |
-	packageName ifNotNil: [
-		package := PackageOrganizer default packageNamed: packageName ifAbsent: [ Error signal: 'Package not found: ', packageName ].
-		tagName ifNotNil: [
-			(package tagNames includes: tagName asSymbol) ifFalse: [ Error signal: 'Tag not found in package ', packageName, ': ', tagName ] ] ].
-	className ifNotNil: [ self classNamed: className ].
 ]
 
 { #category : 'enumerating' }
@@ -82,6 +64,11 @@ PharoCAImageNavigation class >> methodsForPackage: packageName tag: tagName clas
 	^ methods
 ]
 
+{ #category : 'metadata' }
+PharoCAImageNavigation class >> sideOfMethod: aCompiledMethod [
+	^ aCompiledMethod methodClass isMeta ifTrue: [ 'class' ] ifFalse: [ 'instance' ]
+]
+
 { #category : 'sorting' }
 PharoCAImageNavigation class >> sortedMethodSummariesFor: methods [
 	^ ((methods collect: [ :method | self methodSummary: method ]) asSortedCollection: [ :a :b |
@@ -90,4 +77,19 @@ PharoCAImageNavigation class >> sortedMethodSummariesFor: methods [
 				ifTrue: [ (a at: 'selector') <= (b at: 'selector') ]
 				ifFalse: [ (a at: 'side') <= (b at: 'side') ] ]
 			ifFalse: [ (a at: 'className') <= (b at: 'className') ] ]) asArray
+]
+
+{ #category : 'metadata' }
+PharoCAImageNavigation class >> tagNameOfClass: aClass [
+	^ aClass packageTag name asString
+]
+
+{ #category : 'validation' }
+PharoCAImageNavigation class >> validatePackage: packageName tag: tagName className: className [
+	| package |
+	packageName ifNotNil: [
+		package := PackageOrganizer default packageNamed: packageName ifAbsent: [ Error signal: 'Package not found: ', packageName ].
+		tagName ifNotNil: [
+			(package tagNames includes: tagName asSymbol) ifFalse: [ Error signal: 'Tag not found in package ', packageName, ': ', tagName ] ] ].
+	className ifNotNil: [ self classNamed: className ].
 ]

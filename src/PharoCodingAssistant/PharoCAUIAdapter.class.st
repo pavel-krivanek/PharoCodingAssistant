@@ -1,22 +1,32 @@
-"Starts runs with a UI-neutral live view model. Concrete Morphic or other UIs can bind to PharoCARunViewModel without coupling the agent engine to a UI framework."
+"
+Starts runs with a UI-neutral live view model. Concrete Morphic or other UIs can bind to PharoCARunViewModel without coupling the agent engine to a UI framework.
+"
 Class {
 	#name : 'PharoCAUIAdapter',
 	#superclass : 'Object',
-	#instVars : [ 'agent' ],
+	#instVars : [
+		'agent'
+	],
 	#category : 'PharoCodingAssistant-Adapters',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Adapters'
 }
 
 { #category : 'instance creation' }
-PharoCAUIAdapter class >> on: anAgent [ ^ self new agent: anAgent; yourself ]
+PharoCAUIAdapter class >> on: anAgent [ ^ self new agent: anAgent; yourself
+]
+
+{ #category : 'accessing' }
+PharoCAUIAdapter >> agent [ ^ agent
+]
+
+{ #category : 'accessing' }
+PharoCAUIAdapter >> agent: anAgent [ agent := anAgent
+]
 
 { #category : 'initialization' }
-PharoCAUIAdapter >> initialize [ super initialize. agent := PharoCA new ]
-{ #category : 'accessing' }
-PharoCAUIAdapter >> agent [ ^ agent ]
-{ #category : 'accessing' }
-PharoCAUIAdapter >> agent: anAgent [ agent := anAgent ]
+PharoCAUIAdapter >> initialize [ super initialize. agent := PharoCA new
+]
 
 { #category : 'running' }
 PharoCAUIAdapter >> start: aPrompt [

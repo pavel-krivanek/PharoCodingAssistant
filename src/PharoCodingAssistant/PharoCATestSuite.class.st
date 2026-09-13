@@ -1,20 +1,26 @@
-"SUnit suite with explicit deterministic-order versus seeded-shuffle control and a cooperative checkpoint before every test case."
+"
+SUnit suite with explicit deterministic-order versus seeded-shuffle control and a cooperative checkpoint before every test case.
+"
 Class {
 	#name : 'PharoCATestSuite',
 	#superclass : 'TestSuite',
-	#instVars : [ 'shuffleEnabled', 'beforeEachBlock' ],
+	#instVars : [
+		'shuffleEnabled',
+		'beforeEachBlock'
+	],
 	#category : 'PharoCodingAssistant-Tools-Pharo',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'accessing' }
+PharoCATestSuite >> beforeEachDo: aBlock [ beforeEachBlock := aBlock
+]
+
 { #category : 'initialization' }
-PharoCATestSuite >> initialize [ super initialize. shuffleEnabled := false. beforeEachBlock := [ :test | ] ]
-{ #category : 'accessing' }
-PharoCATestSuite >> shuffleEnabled: aBoolean [ shuffleEnabled := aBoolean ]
-{ #category : 'accessing' }
-PharoCATestSuite >> beforeEachDo: aBlock [ beforeEachBlock := aBlock ]
-{ #category : 'running' }
-PharoCATestSuite >> shuffledTests [ ^ shuffleEnabled ifTrue: [ super shuffledTests ] ifFalse: [ self tests ] ]
+PharoCATestSuite >> initialize [ super initialize. shuffleEnabled := false. beforeEachBlock := [ :test | ]
+]
+
 { #category : 'running' }
 PharoCATestSuite >> runWith: aBlock [
 	self setUp.
@@ -25,4 +31,12 @@ PharoCATestSuite >> runWith: aBlock [
 			[ aBlock value: each ] ensure: [ each cleanAfterRunOn: self ].
 			self announceTest: each ]
 	] ensure: [ self tearDown ]
+]
+
+{ #category : 'accessing' }
+PharoCATestSuite >> shuffleEnabled: aBoolean [ shuffleEnabled := aBoolean
+]
+
+{ #category : 'running' }
+PharoCATestSuite >> shuffledTests [ ^ shuffleEnabled ifTrue: [ super shuffledTests ] ifFalse: [ self tests ]
 ]

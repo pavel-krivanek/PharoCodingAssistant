@@ -1,12 +1,42 @@
-"Transient credential resolution. Secret values deliberately have no persistence/serialization representation."
+"
+Transient credential resolution. Secret values deliberately have no persistence/serialization representation.
+"
 Class {
 	#name : 'PharoCACredentialResolver',
 	#superclass : 'Object',
-	#instVars : [ 'values', 'environmentVariables', 'mutex' ],
+	#instVars : [
+		'values',
+		'environmentVariables',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-LLM',
 	#package : 'PharoCodingAssistant',
 	#tag : 'LLM'
 }
+
+{ #category : 'accessing' }
+PharoCACredentialResolver >> at: aName put: aSecret [
+	mutex critical: [ values at: aName asString put: aSecret ].
+	^ aSecret
+]
+
+{ #category : 'converting' }
+PharoCACredentialResolver >> descriptionDictionary [
+	"Never include secret values."
+	^ {
+		'inMemoryCredentialNames' -> (mutex critical: [ values keys sorted asArray ]).
+		'environmentMappings' -> environmentVariables copy
+	} asDictionary
+]
+
+{ #category : 'accessing' }
+PharoCACredentialResolver >> environmentMappings [
+	^ environmentVariables copy
+]
+
+{ #category : 'testing' }
+PharoCACredentialResolver >> includes: aName [ ^ (self resolve: aName) notNil
+]
 
 { #category : 'initialization' }
 PharoCACredentialResolver >> initialize [
@@ -16,10 +46,9 @@ PharoCACredentialResolver >> initialize [
 	mutex := Semaphore forMutualExclusion
 ]
 
-{ #category : 'accessing' }
-PharoCACredentialResolver >> at: aName put: aSecret [
-	mutex critical: [ values at: aName asString put: aSecret ].
-	^ aSecret
+{ #category : 'configuration' }
+PharoCACredentialResolver >> map: aName toEnvironmentVariable: variableName [
+	environmentVariables at: aName asString put: variableName asString
 ]
 
 { #category : 'accessing' }
@@ -27,9 +56,9 @@ PharoCACredentialResolver >> remove: aName [
 	mutex critical: [ values removeKey: aName asString ifAbsent: [ ] ]
 ]
 
-{ #category : 'configuration' }
-PharoCACredentialResolver >> map: aName toEnvironmentVariable: variableName [
-	environmentVariables at: aName asString put: variableName asString
+{ #category : 'resolving' }
+PharoCACredentialResolver >> require: aName [
+	^ (self resolve: aName) ifNil: [ Error signal: 'Missing credential: ', aName asString ]
 ]
 
 { #category : 'resolving' }
@@ -41,27 +70,4 @@ PharoCACredentialResolver >> resolve: aName [
 	environmentName := environmentVariables at: key ifAbsent: [ nil ].
 	environmentName ifNil: [ ^ nil ].
 	^ OSEnvironment current at: environmentName ifAbsent: [ nil ]
-]
-
-{ #category : 'resolving' }
-PharoCACredentialResolver >> require: aName [
-	^ (self resolve: aName) ifNil: [ Error signal: 'Missing credential: ', aName asString ]
-]
-
-{ #category : 'testing' }
-PharoCACredentialResolver >> includes: aName [ ^ (self resolve: aName) notNil ]
-
-{ #category : 'converting' }
-PharoCACredentialResolver >> descriptionDictionary [
-	"Never include secret values."
-	^ {
-		'inMemoryCredentialNames' -> (mutex critical: [ values keys sorted asArray ]).
-		'environmentMappings' -> environmentVariables copy
-	} asDictionary
-]
-
-
-{ #category : 'accessing' }
-PharoCACredentialResolver >> environmentMappings [
-	^ environmentVariables copy
 ]

@@ -1,4 +1,6 @@
-"Runs native QualityAssistant critiques over a bounded installed-code scope."
+"
+Runs native QualityAssistant critiques over a bounded installed-code scope.
+"
 Class {
 	#name : 'PharoCAToolQualityCheck',
 	#superclass : 'PharoCATool',
@@ -8,40 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolQualityCheck class >> toolName [ ^ #quality_check ]
-
-{ #category : 'definition' }
-PharoCAToolQualityCheck class >> toolPack [ ^ #quality ]
-
-{ #category : 'definition' }
-PharoCAToolQualityCheck class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolQualityCheck class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolQualityCheck class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'quality_check'
-		description: 'Runs native Pharo QualityAssistant critiques on an installed method, class, or bounded package scope. Large findings are retained briefly behind an analysisHandle for quality_results.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'scope' -> { 'type' -> 'string'. 'enum' -> #('method' 'class' 'package') } asDictionary.
-				'className' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
-				'selector' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
-				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
-				'packageName' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
-				'includeClassSide' -> { 'type' -> 'boolean' } asDictionary.
-				'severity' -> { 'type' -> 'string'. 'enum' -> #('all' 'error' 'warning' 'information') } asDictionary.
-				'ruleClass' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
-				'includeDescriptions' -> { 'type' -> 'boolean' } asDictionary.
-				'maxEntities' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 500 } asDictionary.
-				'maxFindings' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 1000 } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary
-			} asDictionary.
-			'required' -> #('scope')
-		} asDictionary
+PharoCAToolQualityCheck class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
@@ -123,4 +92,41 @@ PharoCAToolQualityCheck class >> execute: args context: context [
 		at: 'findings' put: (page at: 'items');
 		at: 'page' put: (page at: 'page').
 	^ result
+]
+
+{ #category : 'execution' }
+PharoCAToolQualityCheck class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityCheck class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'quality_check'
+		description: 'Runs native Pharo QualityAssistant critiques on an installed method, class, or bounded package scope. Large findings are retained briefly behind an analysisHandle for quality_results.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'scope' -> { 'type' -> 'string'. 'enum' -> #('method' 'class' 'package') } asDictionary.
+				'className' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
+				'selector' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
+				'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary.
+				'packageName' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
+				'includeClassSide' -> { 'type' -> 'boolean' } asDictionary.
+				'severity' -> { 'type' -> 'string'. 'enum' -> #('all' 'error' 'warning' 'information') } asDictionary.
+				'ruleClass' -> { 'type' -> 'string'. 'maxLength' -> 300 } asDictionary.
+				'includeDescriptions' -> { 'type' -> 'boolean' } asDictionary.
+				'maxEntities' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 500 } asDictionary.
+				'maxFindings' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 1000 } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary
+			} asDictionary.
+			'required' -> #('scope')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityCheck class >> toolName [ ^ #quality_check
+]
+
+{ #category : 'definition' }
+PharoCAToolQualityCheck class >> toolPack [ ^ #quality
 ]

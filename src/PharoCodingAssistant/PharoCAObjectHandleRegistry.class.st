@@ -1,45 +1,23 @@
-"Session-scoped registry of opaque handles to live Pharo objects. Handles are deliberately transient and are never persisted with a conversation."
+"
+Session-scoped registry of opaque handles to live Pharo objects. Handles are deliberately transient and are never persisted with a conversation.
+"
 Class {
 	#name : 'PharoCAObjectHandleRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'entries', 'nextNumber', 'ttlMilliseconds', 'clockBlock', 'mutex' ],
+	#instVars : [
+		'entries',
+		'nextNumber',
+		'ttlMilliseconds',
+		'clockBlock',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
 }
 
 { #category : 'defaults' }
-PharoCAObjectHandleRegistry class >> defaultTTLMilliseconds [ ^ 600000 ]
-
-{ #category : 'initialization' }
-PharoCAObjectHandleRegistry >> initialize [
-	super initialize.
-	entries := Dictionary new.
-	nextNumber := 0.
-	ttlMilliseconds := self class defaultTTLMilliseconds.
-	clockBlock := [ Time millisecondClockValue ].
-	mutex := Semaphore forMutualExclusion
-]
-
-{ #category : 'accessing' }
-PharoCAObjectHandleRegistry >> clockBlock: aBlock [ clockBlock := aBlock ]
-
-{ #category : 'accessing' }
-PharoCAObjectHandleRegistry >> ttlMilliseconds [ ^ ttlMilliseconds ]
-
-{ #category : 'accessing' }
-PharoCAObjectHandleRegistry >> ttlMilliseconds: anInteger [
-	(anInteger isInteger and: [ anInteger > 0 ]) ifFalse: [ Error signal: 'Object handle TTL must be a positive integer' ].
-	ttlMilliseconds := anInteger
-]
-
-{ #category : 'private' }
-PharoCAObjectHandleRegistry >> now [ ^ clockBlock value ]
-
-{ #category : 'private' }
-PharoCAObjectHandleRegistry >> purgeExpiredLockedAt: now [
-	(entries keys select: [ :key | ((entries at: key) at: 'expiresAt') <= now ])
-		do: [ :key | entries removeKey: key ifAbsent: [ ] ]
+PharoCAObjectHandleRegistry class >> defaultTTLMilliseconds [ ^ 600000
 ]
 
 { #category : 'adding' }
@@ -56,7 +34,6 @@ PharoCAObjectHandleRegistry >> add: anObject [
 		} asDictionary ].
 	^ handle
 ]
-
 
 { #category : 'adding' }
 PharoCAObjectHandleRegistry >> addOrReuse: anObject [
@@ -79,6 +56,24 @@ PharoCAObjectHandleRegistry >> addOrReuse: anObject [
 	^ handle
 ]
 
+{ #category : 'accessing' }
+PharoCAObjectHandleRegistry >> clockBlock: aBlock [ clockBlock := aBlock
+]
+
+{ #category : 'initialization' }
+PharoCAObjectHandleRegistry >> initialize [
+	super initialize.
+	entries := Dictionary new.
+	nextNumber := 0.
+	ttlMilliseconds := self class defaultTTLMilliseconds.
+	clockBlock := [ Time millisecondClockValue ].
+	mutex := Semaphore forMutualExclusion
+]
+
+{ #category : 'private' }
+PharoCAObjectHandleRegistry >> now [ ^ clockBlock value
+]
+
 { #category : 'lookup' }
 PharoCAObjectHandleRegistry >> objectAt: aHandle [
 	| entry now object |
@@ -93,6 +88,12 @@ PharoCAObjectHandleRegistry >> objectAt: aHandle [
 	^ object
 ]
 
+{ #category : 'private' }
+PharoCAObjectHandleRegistry >> purgeExpiredLockedAt: now [
+	(entries keys select: [ :key | ((entries at: key) at: 'expiresAt') <= now ])
+		do: [ :key | entries removeKey: key ifAbsent: [ ] ]
+]
+
 { #category : 'removing' }
 PharoCAObjectHandleRegistry >> release: aHandle [
 	| removed |
@@ -102,11 +103,22 @@ PharoCAObjectHandleRegistry >> release: aHandle [
 ]
 
 { #category : 'removing' }
-PharoCAObjectHandleRegistry >> releaseAll [ mutex critical: [ entries removeAll ] ]
+PharoCAObjectHandleRegistry >> releaseAll [ mutex critical: [ entries removeAll ]
+]
 
 { #category : 'accessing' }
 PharoCAObjectHandleRegistry >> size [
 	| size |
 	mutex critical: [ self purgeExpiredLockedAt: self now. size := entries size ].
 	^ size
+]
+
+{ #category : 'accessing' }
+PharoCAObjectHandleRegistry >> ttlMilliseconds [ ^ ttlMilliseconds
+]
+
+{ #category : 'accessing' }
+PharoCAObjectHandleRegistry >> ttlMilliseconds: anInteger [
+	(anInteger isInteger and: [ anInteger > 0 ]) ifFalse: [ Error signal: 'Object handle TTL must be a positive integer' ].
+	ttlMilliseconds := anInteger
 ]

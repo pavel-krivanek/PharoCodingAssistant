@@ -1,4 +1,6 @@
-"Replaceable command runner used by repository/process tools. The default implementation uses LibC's popen facility on Unix, shell-quotes every argument, and hard-caps captured output."
+"
+Replaceable command runner used by repository/process tools. The default implementation uses LibC's popen facility on Unix, shell-quotes every argument, and hard-caps captured output.
+"
 Class {
 	#name : 'PharoCAWorkspaceCommandRunner',
 	#superclass : 'Object',
@@ -7,20 +9,12 @@ Class {
 	#tag : 'Workspace'
 }
 
+{ #category : 'testing' }
+PharoCAWorkspaceCommandRunner >> hardTimeoutSupported [ ^ OSPlatform current isLinux
+]
+
 { #category : 'defaults' }
-PharoCAWorkspaceCommandRunner >> maximumCaptureCharacters [ ^ 1048576 ]
-
-{ #category : 'testing' }
-PharoCAWorkspaceCommandRunner >> supported [ ^ OSPlatform current isUnix ]
-
-{ #category : 'testing' }
-PharoCAWorkspaceCommandRunner >> hardTimeoutSupported [ ^ OSPlatform current isLinux ]
-
-{ #category : 'private' }
-PharoCAWorkspaceCommandRunner >> shellQuote: aString [
-	| text |
-	text := aString asString.
-	^ '''', (text copyReplaceAll: '''' with: '''"''"'''), ''''
+PharoCAWorkspaceCommandRunner >> maximumCaptureCharacters [ ^ 1048576
 ]
 
 { #category : 'running' }
@@ -72,4 +66,15 @@ PharoCAWorkspaceCommandRunner >> runExecutable: executable arguments: arguments 
 		'timedOut' -> (exitCode = 124).
 		'timeoutEnforced' -> self hardTimeoutSupported
 	} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAWorkspaceCommandRunner >> shellQuote: aString [
+	| text |
+	text := aString asString.
+	^ '''', (text copyReplaceAll: '''' with: '''"''"'''), ''''
+]
+
+{ #category : 'testing' }
+PharoCAWorkspaceCommandRunner >> supported [ ^ OSPlatform current isUnix
 ]

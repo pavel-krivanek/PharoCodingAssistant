@@ -1,4 +1,6 @@
-"Immutable-in-practice append-only session entry. Session persistence is added later; IDs and parent links are stable within a session now."
+"
+Immutable-in-practice append-only session entry. Session persistence is added later; IDs and parent links are stable within a session now.
+"
 Class {
 	#name : 'PharoCASessionEntry',
 	#superclass : 'Object',
@@ -41,6 +43,21 @@ PharoCASessionEntry >> asDictionary [
 	} asDictionary
 ]
 
+{ #category : 'persistence' }
+PharoCASessionEntry >> asPersistenceDictionary [
+	| serializedPayload |
+	serializedPayload := (payload isCollection not and: [ payload respondsTo: #asPersistenceDictionary ])
+		ifTrue: [ payload asPersistenceDictionary ]
+		ifFalse: [ (payload isCollection not and: [ payload respondsTo: #asDictionary ]) ifTrue: [ payload asDictionary ] ifFalse: [ payload ] ].
+	^ {
+		'id' -> id.
+		'parentId' -> parentId.
+		'type' -> type asString.
+		'payload' -> serializedPayload.
+		'timestamp' -> timestamp asString
+	} asDictionary
+]
+
 { #category : 'accessing' }
 PharoCASessionEntry >> id [
 	^ id
@@ -78,20 +95,4 @@ PharoCASessionEntry >> timestamp [
 { #category : 'accessing' }
 PharoCASessionEntry >> type [
 	^ type
-]
-
-
-{ #category : 'persistence' }
-PharoCASessionEntry >> asPersistenceDictionary [
-	| serializedPayload |
-	serializedPayload := (payload isCollection not and: [ payload respondsTo: #asPersistenceDictionary ])
-		ifTrue: [ payload asPersistenceDictionary ]
-		ifFalse: [ (payload isCollection not and: [ payload respondsTo: #asDictionary ]) ifTrue: [ payload asDictionary ] ifFalse: [ payload ] ].
-	^ {
-		'id' -> id.
-		'parentId' -> parentId.
-		'type' -> type asString.
-		'payload' -> serializedPayload.
-		'timestamp' -> timestamp asString
-	} asDictionary
 ]

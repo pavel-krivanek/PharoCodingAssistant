@@ -1,4 +1,6 @@
-"Tool to evaluate Pharo code and return its printString result. Arbitrary evaluation is journaled as opaque because its image effects cannot be inferred safely."
+"
+Tool to evaluate Pharo code and return its printString result. Arbitrary evaluation is journaled as opaque because its image effects cannot be inferred safely.
+"
 Class {
 	#name : 'PharoCAToolPrintIt',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolPrintIt class >> capability [ ^ #evaluation
+]
 
 { #category : 'execution' }
 PharoCAToolPrintIt class >> execute: args [
@@ -33,11 +39,9 @@ PharoCAToolPrintIt class >> execute: args context: context [
 	} asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolPrintIt class >> capability [ ^ #evaluation ]
-
 { #category : 'execution' }
-PharoCAToolPrintIt class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolPrintIt class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'definition' }
 PharoCAToolPrintIt class >> llmDefinition [
@@ -48,4 +52,5 @@ PharoCAToolPrintIt class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolPrintIt class >> toolName [ ^ #evaluate_and_print ]
+PharoCAToolPrintIt class >> toolName [ ^ #evaluate_and_print
+]

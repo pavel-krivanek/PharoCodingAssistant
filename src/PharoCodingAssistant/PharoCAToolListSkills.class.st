@@ -1,4 +1,6 @@
-"Lists concise skill metadata. Skill instructions are intentionally excluded; activate_skill controls when the body enters model context."
+"
+Lists concise skill metadata. Skill instructions are intentionally excluded; activate_skill controls when the body enters model context.
+"
 Class {
 	#name : 'PharoCAToolListSkills',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
 }
+
+{ #category : 'definition' }
+PharoCAToolListSkills class >> capability [ ^ #session
+]
 
 { #category : 'definition' }
 PharoCAToolListSkills class >> execute: args [
@@ -34,11 +40,9 @@ PharoCAToolListSkills class >> execute: args context: aContext [
 	} asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolListSkills class >> capability [ ^ #session ]
-
 { #category : 'execution' }
-PharoCAToolListSkills class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolListSkills class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
 PharoCAToolListSkills class >> llmDefinition [
@@ -49,4 +53,5 @@ PharoCAToolListSkills class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolListSkills class >> toolName [ ^ #list_skills ]
+PharoCAToolListSkills class >> toolName [ ^ #list_skills
+]

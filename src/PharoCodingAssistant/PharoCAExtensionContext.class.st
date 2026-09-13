@@ -1,37 +1,69 @@
-"Context supplied to extension hooks. The state dictionary is private to one extension in one durable session."
+"
+Context supplied to extension hooks. The state dictionary is private to one extension in one durable session.
+"
 Class {
 	#name : 'PharoCAExtensionContext',
 	#superclass : 'Object',
-	#instVars : [ 'agent', 'run', 'session', 'environment', 'extension', 'state' ],
+	#instVars : [
+		'agent',
+		'run',
+		'session',
+		'environment',
+		'extension',
+		'state'
+	],
 	#category : 'PharoCodingAssistant-Extensions',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Extensions'
 }
 
 { #category : 'accessing' }
-PharoCAExtensionContext >> agent [ ^ agent ]
+PharoCAExtensionContext >> agent [ ^ agent
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> agent: anObject [ agent := anObject ]
+PharoCAExtensionContext >> agent: anObject [ agent := anObject
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> environment [ ^ environment ]
+PharoCAExtensionContext >> environment [ ^ environment
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> environment: anObject [ environment := anObject ]
+PharoCAExtensionContext >> environment: anObject [ environment := anObject
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> extension [ ^ extension ]
+PharoCAExtensionContext >> extension [ ^ extension
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> extension: anObject [ extension := anObject ]
+PharoCAExtensionContext >> extension: anObject [ extension := anObject
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> run [ ^ run ]
+PharoCAExtensionContext >> run [ ^ run
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> run: anObject [ run := anObject ]
+PharoCAExtensionContext >> run: anObject [ run := anObject
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> session [ ^ session ]
+PharoCAExtensionContext >> session [ ^ session
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> session: anObject [ session := anObject ]
+PharoCAExtensionContext >> session: anObject [ session := anObject
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> state [ ^ state ]
+PharoCAExtensionContext >> state [ ^ state
+]
+
 { #category : 'accessing' }
-PharoCAExtensionContext >> state: anExtensionState [ state := anExtensionState ]
+PharoCAExtensionContext >> state: anExtensionState [ state := anExtensionState
+]
 
 { #category : 'state' }
 PharoCAExtensionContext >> stateAt: aKey [

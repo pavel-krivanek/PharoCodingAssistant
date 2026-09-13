@@ -1,38 +1,18 @@
-"Strong, session-scoped handles for runtime entities whose lifetime must not silently expire while suspended or controlled. Unlike ordinary object handles these remain until explicit release or session cleanup."
+"
+Strong, session-scoped handles for runtime entities whose lifetime must not silently expire while suspended or controlled. Unlike ordinary object handles these remain until explicit release or session cleanup.
+"
 Class {
 	#name : 'PharoCARuntimeHandleRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'entries', 'nextNumbersByKind', 'mutex' ],
+	#instVars : [
+		'entries',
+		'nextNumbersByKind',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
 }
-
-{ #category : 'initialization' }
-PharoCARuntimeHandleRegistry >> initialize [
-	super initialize.
-	entries := Dictionary new.
-	nextNumbersByKind := Dictionary new.
-	mutex := Semaphore forMutualExclusion
-]
-
-{ #category : 'private' }
-PharoCARuntimeHandleRegistry >> prefixForKind: kind [
-	kind = #debugger ifTrue: [ ^ 'debug' ].
-	kind = #process ifTrue: [ ^ 'process' ].
-	kind = #debugPoint ifTrue: [ ^ 'point' ].
-	kind = #refactoring ifTrue: [ ^ 'refactor' ].
-	kind = #tonelImport ifTrue: [ ^ 'tonel-import' ].
-	^ kind asString
-]
-
-{ #category : 'private' }
-PharoCARuntimeHandleRegistry >> nextHandleForKind: kind [
-	| next |
-	next := (nextNumbersByKind at: kind ifAbsent: [ 0 ]) + 1.
-	nextNumbersByKind at: kind put: next.
-	^ (self prefixForKind: kind), '-', next asString
-]
 
 { #category : 'adding' }
 PharoCARuntimeHandleRegistry >> add: object kind: kind metadata: metadata cleanup: cleanupBlock [
@@ -50,6 +30,25 @@ PharoCARuntimeHandleRegistry >> add: object kind: kind metadata: metadata cleanu
 	^ handle
 ]
 
+{ #category : 'lookup' }
+PharoCARuntimeHandleRegistry >> entryAt: handle kind: expectedKind [
+	| entry |
+	handle isString ifFalse: [ Error signal: 'Runtime handle must be a string' ].
+	mutex critical: [ entry := entries at: handle ifAbsent: [ nil ] ].
+	entry ifNil: [ Error signal: 'Unknown runtime handle: ', handle ].
+	((entry at: 'kind') = expectedKind) ifFalse: [
+		Error signal: 'Runtime handle ', handle, ' is not a ', expectedKind asString, ' handle' ].
+	^ entry
+]
+
+{ #category : 'removing' }
+PharoCARuntimeHandleRegistry >> forget: handle [
+	| removed |
+	handle isString ifFalse: [ Error signal: 'Runtime handle must be a string' ].
+	mutex critical: [ removed := (entries removeKey: handle ifAbsent: [ nil ]) notNil ].
+	^ removed
+]
+
 { #category : 'adding' }
 PharoCARuntimeHandleRegistry >> handleFor: object kind: kind metadata: metadata cleanup: cleanupBlock [
 	| existing |
@@ -63,27 +62,6 @@ PharoCARuntimeHandleRegistry >> handleFor: object kind: kind metadata: metadata 
 ]
 
 { #category : 'lookup' }
-PharoCARuntimeHandleRegistry >> entryAt: handle kind: expectedKind [
-	| entry |
-	handle isString ifFalse: [ Error signal: 'Runtime handle must be a string' ].
-	mutex critical: [ entry := entries at: handle ifAbsent: [ nil ] ].
-	entry ifNil: [ Error signal: 'Unknown runtime handle: ', handle ].
-	((entry at: 'kind') = expectedKind) ifFalse: [
-		Error signal: 'Runtime handle ', handle, ' is not a ', expectedKind asString, ' handle' ].
-	^ entry
-]
-
-{ #category : 'lookup' }
-PharoCARuntimeHandleRegistry >> objectAt: handle kind: expectedKind [
-	^ (self entryAt: handle kind: expectedKind) at: 'object'
-]
-
-{ #category : 'lookup' }
-PharoCARuntimeHandleRegistry >> metadataAt: handle kind: expectedKind [
-	^ ((self entryAt: handle kind: expectedKind) at: 'metadata') copy
-]
-
-{ #category : 'lookup' }
 PharoCARuntimeHandleRegistry >> handleForExisting: object kind: kind [
 	| existing |
 	mutex critical: [
@@ -92,6 +70,49 @@ PharoCARuntimeHandleRegistry >> handleForExisting: object kind: kind [
 			entry := entries at: key.
 			(entry at: 'kind') = kind and: [ (entry at: 'object') == object ] ] ifNone: [ nil ] ].
 	^ existing
+]
+
+{ #category : 'accessing' }
+PharoCARuntimeHandleRegistry >> handlesOfKind: kind [
+	| handles |
+	mutex critical: [ handles := entries keys select: [ :key | ((entries at: key) at: 'kind') = kind ] ].
+	^ handles asSortedCollection asArray
+]
+
+{ #category : 'initialization' }
+PharoCARuntimeHandleRegistry >> initialize [
+	super initialize.
+	entries := Dictionary new.
+	nextNumbersByKind := Dictionary new.
+	mutex := Semaphore forMutualExclusion
+]
+
+{ #category : 'lookup' }
+PharoCARuntimeHandleRegistry >> metadataAt: handle kind: expectedKind [
+	^ ((self entryAt: handle kind: expectedKind) at: 'metadata') copy
+]
+
+{ #category : 'private' }
+PharoCARuntimeHandleRegistry >> nextHandleForKind: kind [
+	| next |
+	next := (nextNumbersByKind at: kind ifAbsent: [ 0 ]) + 1.
+	nextNumbersByKind at: kind put: next.
+	^ (self prefixForKind: kind), '-', next asString
+]
+
+{ #category : 'lookup' }
+PharoCARuntimeHandleRegistry >> objectAt: handle kind: expectedKind [
+	^ (self entryAt: handle kind: expectedKind) at: 'object'
+]
+
+{ #category : 'private' }
+PharoCARuntimeHandleRegistry >> prefixForKind: kind [
+	kind = #debugger ifTrue: [ ^ 'debug' ].
+	kind = #process ifTrue: [ ^ 'process' ].
+	kind = #debugPoint ifTrue: [ ^ 'point' ].
+	kind = #refactoring ifTrue: [ ^ 'refactor' ].
+	kind = #tonelImport ifTrue: [ ^ 'tonel-import' ].
+	^ kind asString
 ]
 
 { #category : 'removing' }
@@ -117,19 +138,4 @@ PharoCARuntimeHandleRegistry >> size [
 	| size |
 	mutex critical: [ size := entries size ].
 	^ size
-]
-
-{ #category : 'accessing' }
-PharoCARuntimeHandleRegistry >> handlesOfKind: kind [
-	| handles |
-	mutex critical: [ handles := entries keys select: [ :key | ((entries at: key) at: 'kind') = kind ] ].
-	^ handles asSortedCollection asArray
-]
-
-{ #category : 'removing' }
-PharoCARuntimeHandleRegistry >> forget: handle [
-	| removed |
-	handle isString ifFalse: [ Error signal: 'Runtime handle must be a string' ].
-	mutex critical: [ removed := (entries removeKey: handle ifAbsent: [ nil ]) notNil ].
-	^ removed
 ]

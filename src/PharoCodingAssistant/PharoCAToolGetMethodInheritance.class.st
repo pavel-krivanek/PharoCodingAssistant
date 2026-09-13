@@ -1,4 +1,6 @@
-"Finds where a selector is implemented in the superclass chain and returns a bounded character range of its source."
+"
+Finds where a selector is implemented in the superclass chain and returns a bounded character range of its source.
+"
 Class {
 	#name : 'PharoCAToolGetMethodInheritance',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolGetMethodInheritance class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolGetMethodInheritance class >> execute: args [
@@ -58,10 +64,6 @@ PharoCAToolGetMethodInheritance class >> execute: args context: context [
 	^ result
 ]
 
-
-{ #category : 'definition' }
-PharoCAToolGetMethodInheritance class >> capability [ ^ #inspection ]
-
 { #category : 'execution' }
 PharoCAToolGetMethodInheritance class >> executionMode [
 	^ #parallelSafe
@@ -76,4 +78,5 @@ PharoCAToolGetMethodInheritance class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolGetMethodInheritance class >> toolName [ ^ #get_method_inheritance ]
+PharoCAToolGetMethodInheritance class >> toolName [ ^ #get_method_inheritance
+]

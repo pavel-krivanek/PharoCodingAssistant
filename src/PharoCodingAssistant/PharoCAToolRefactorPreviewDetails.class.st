@@ -1,4 +1,6 @@
-"Reads a stored refactoring preview with pagination."
+"
+Reads a stored refactoring preview with pagination.
+"
 Class {
 	#name : 'PharoCAToolRefactorPreviewDetails',
 	#superclass : 'PharoCATool',
@@ -12,26 +14,6 @@ PharoCAToolRefactorPreviewDetails class >> capability [
 	^ #refactoring
 ]
 
-{ #category : 'definition' }
-PharoCAToolRefactorPreviewDetails class >> toolPack [
-	^ #refactoring
-]
-
-{ #category : 'execution' }
-PharoCAToolRefactorPreviewDetails class >> executionMode [
-	^ #parallelSafe
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorPreviewDetails class >> toolName [
-	^ #refactor_preview_details
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorPreviewDetails class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'refactor_preview_details' description: 'Returns paginated native changes from a refactoring preview handle.' parameters: { 'type' -> 'object'. 'properties' -> { 'refactorHandle' -> { 'type' -> 'string' } asDictionary. 'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary. 'cursor' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> #('refactorHandle') } asDictionary
-]
-
 { #category : 'execution' }
 PharoCAToolRefactorPreviewDetails class >> execute: args [
 	^ self execute: args context: PharoCAToolExecutionContext unlimited
@@ -43,3 +25,22 @@ PharoCAToolRefactorPreviewDetails class >> execute: args context: context [
 	^ { 'refactorHandle' -> h. 'tool' -> (descriptor at: 'toolName'). 'target' -> (descriptor at: 'target'). 'signature' -> (descriptor at: 'signature'). 'changeCount' -> plan size. 'changes' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
 ]
 
+{ #category : 'execution' }
+PharoCAToolRefactorPreviewDetails class >> executionMode [
+	^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolRefactorPreviewDetails class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'refactor_preview_details' description: 'Returns paginated native changes from a refactoring preview handle.' parameters: { 'type' -> 'object'. 'properties' -> { 'refactorHandle' -> { 'type' -> 'string' } asDictionary. 'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary. 'cursor' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> #('refactorHandle') } asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolRefactorPreviewDetails class >> toolName [
+	^ #refactor_preview_details
+]
+
+{ #category : 'definition' }
+PharoCAToolRefactorPreviewDetails class >> toolPack [
+	^ #refactoring
+]

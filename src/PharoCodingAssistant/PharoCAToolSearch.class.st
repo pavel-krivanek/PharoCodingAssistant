@@ -1,4 +1,6 @@
-"Searches the complete registered tool catalog, including packs that are not currently active for the session. Results are deterministic and paginated."
+"
+Searches the complete registered tool catalog, including packs that are not currently active for the session. Results are deterministic and paginated.
+"
 Class {
 	#name : 'PharoCAToolSearch',
 	#superclass : 'PharoCATool',
@@ -8,19 +10,34 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolSearch class >> capability [ ^ #session ]
+PharoCAToolSearch class >> capability [ ^ #session
+]
+
+{ #category : 'definition' }
+PharoCAToolSearch class >> execute: args [
+	^ self error: 'search_tools requires a tool execution context'
+]
 
 { #category : 'execution' }
-PharoCAToolSearch class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolSearch class >> execute: args context: aContext [
+	| run registry session |
+	run := aContext run ifNil: [ Error signal: 'search_tools requires an active agent run' ].
+	registry := run agent toolRegistry.
+	session := run session.
+	^ registry
+		searchCatalog: (args at: 'query' ifAbsent: [ '' ])
+		pack: (args at: 'pack' ifAbsent: [ nil ])
+		arguments: args
+		session: session
+]
+
+{ #category : 'execution' }
+PharoCAToolSearch class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
-PharoCAToolSearch class >> isAdvertisedToModel [ ^ false ]
-
-{ #category : 'definition' }
-PharoCAToolSearch class >> toolPack [ ^ #catalog ]
-
-{ #category : 'definition' }
-PharoCAToolSearch class >> toolName [ ^ #search_tools ]
+PharoCAToolSearch class >> isAdvertisedToModel [ ^ false
+]
 
 { #category : 'definition' }
 PharoCAToolSearch class >> llmDefinition [
@@ -41,19 +58,9 @@ PharoCAToolSearch class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolSearch class >> execute: args [
-	^ self error: 'search_tools requires a tool execution context'
+PharoCAToolSearch class >> toolName [ ^ #search_tools
 ]
 
-{ #category : 'execution' }
-PharoCAToolSearch class >> execute: args context: aContext [
-	| run registry session |
-	run := aContext run ifNil: [ Error signal: 'search_tools requires an active agent run' ].
-	registry := run agent toolRegistry.
-	session := run session.
-	^ registry
-		searchCatalog: (args at: 'query' ifAbsent: [ '' ])
-		pack: (args at: 'pack' ifAbsent: [ nil ])
-		arguments: args
-		session: session
+{ #category : 'definition' }
+PharoCAToolSearch class >> toolPack [ ^ #catalog
 ]

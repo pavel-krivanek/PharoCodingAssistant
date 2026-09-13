@@ -1,4 +1,6 @@
-"Creates or modifies a class using Fluid syntax."
+"
+Creates or modifies a class using Fluid syntax.
+"
 Class {
 	#name : 'PharoCAToolDefineClass',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolDefineClass class >> capability [ ^ #coding
+]
 
 { #category : 'definition' }
 PharoCAToolDefineClass class >> execute: args [
@@ -35,11 +41,9 @@ PharoCAToolDefineClass class >> execute: args context: context [
 	^ { 'status' -> 'Class defined/modified' } asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolDefineClass class >> capability [ ^ #coding ]
-
 { #category : 'execution' }
-PharoCAToolDefineClass class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolDefineClass class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'definition' }
 PharoCAToolDefineClass class >> llmDefinition [
@@ -50,4 +54,5 @@ PharoCAToolDefineClass class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolDefineClass class >> toolName [ ^ #define_class ]
+PharoCAToolDefineClass class >> toolName [ ^ #define_class
+]

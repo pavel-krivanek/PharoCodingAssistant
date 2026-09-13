@@ -1,4 +1,6 @@
-"Returns a compact structural summary of one installed class without returning complete method/source lists."
+"
+Returns a compact structural summary of one installed class without returning complete method/source lists.
+"
 Class {
 	#name : 'PharoCAToolGetClassSummary',
 	#superclass : 'PharoCATool',
@@ -8,29 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolGetClassSummary class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolGetClassSummary class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolGetClassSummary class >> toolPack [ ^ #browse ]
-
-{ #category : 'definition' }
-PharoCAToolGetClassSummary class >> toolName [ ^ #get_class_summary ]
-
-{ #category : 'definition' }
-PharoCAToolGetClassSummary class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'get_class_summary'
-		description: 'Returns compact live-image structure for one class: superclass, package/tag, local and inherited slots, class variables, traits, method counts and subclass counts.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'className' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('className')
-		} asDictionary
+PharoCAToolGetClassSummary class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
@@ -56,4 +36,30 @@ PharoCAToolGetClassSummary class >> execute: args [
 		'directSubclassCount' -> aClass subclasses size.
 		'allSubclassCount' -> aClass allSubclasses size
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolGetClassSummary class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolGetClassSummary class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'get_class_summary'
+		description: 'Returns compact live-image structure for one class: superclass, package/tag, local and inherited slots, class variables, traits, method counts and subclass counts.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'className' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('className')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolGetClassSummary class >> toolName [ ^ #get_class_summary
+]
+
+{ #category : 'definition' }
+PharoCAToolGetClassSummary class >> toolPack [ ^ #browse
 ]

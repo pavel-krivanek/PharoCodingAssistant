@@ -1,4 +1,6 @@
-"Immutable semantic record of one image-changing tool operation, including execution provenance and before/after snapshots."
+"
+Immutable semantic record of one image-changing tool operation, including execution provenance and before/after snapshots.
+"
 Class {
 	#name : 'PharoCAChangeRecord',
 	#superclass : 'Object',
@@ -39,6 +41,14 @@ PharoCAChangeRecord class >> id: anId environmentId: environmentId runId: runId 
 		yourself
 ]
 
+{ #category : 'accessing' }
+PharoCAChangeRecord >> after [ ^ after
+]
+
+{ #category : 'accessing' }
+PharoCAChangeRecord >> after: anObject [ after := anObject
+]
+
 { #category : 'converting' }
 PharoCAChangeRecord >> asDictionary [
 	^ {
@@ -58,50 +68,89 @@ PharoCAChangeRecord >> asDictionary [
 ]
 
 { #category : 'accessing' }
-PharoCAChangeRecord >> after [ ^ after ]
+PharoCAChangeRecord >> before [ ^ before
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> after: anObject [ after := anObject ]
+PharoCAChangeRecord >> before: anObject [ before := anObject
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> before [ ^ before ]
+PharoCAChangeRecord >> environmentId [ ^ environmentId
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> before: anObject [ before := anObject ]
+PharoCAChangeRecord >> environmentId: aString [ environmentId := aString
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> environmentId [ ^ environmentId ]
+PharoCAChangeRecord >> id [ ^ id
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> environmentId: aString [ environmentId := aString ]
+PharoCAChangeRecord >> id: aString [ id := aString
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> id [ ^ id ]
+PharoCAChangeRecord >> kind [ ^ kind
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> id: aString [ id := aString ]
+PharoCAChangeRecord >> kind: aSymbol [ kind := aSymbol
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> kind [ ^ kind ]
+PharoCAChangeRecord >> metadata [ ^ metadata
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> kind: aSymbol [ kind := aSymbol ]
+PharoCAChangeRecord >> metadata: aDictionary [ metadata := aDictionary
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> metadata [ ^ metadata ]
+PharoCAChangeRecord >> runId [ ^ runId
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> metadata: aDictionary [ metadata := aDictionary ]
+PharoCAChangeRecord >> runId: aString [ runId := aString
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> runId [ ^ runId ]
+PharoCAChangeRecord >> sessionId [ ^ sessionId
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> runId: aString [ runId := aString ]
+PharoCAChangeRecord >> sessionId: aString [ sessionId := aString
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> sessionId [ ^ sessionId ]
+PharoCAChangeRecord >> target [ ^ target
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> sessionId: aString [ sessionId := aString ]
+PharoCAChangeRecord >> target: aString [ target := aString
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> target [ ^ target ]
+PharoCAChangeRecord >> timestamp [ ^ timestamp
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> target: aString [ target := aString ]
+PharoCAChangeRecord >> timestamp: aDateAndTime [ timestamp := aDateAndTime
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> timestamp [ ^ timestamp ]
+PharoCAChangeRecord >> toolCallId [ ^ toolCallId
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> timestamp: aDateAndTime [ timestamp := aDateAndTime ]
+PharoCAChangeRecord >> toolCallId: aString [ toolCallId := aString
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> toolCallId [ ^ toolCallId ]
+PharoCAChangeRecord >> toolName [ ^ toolName
+]
+
 { #category : 'accessing' }
-PharoCAChangeRecord >> toolCallId: aString [ toolCallId := aString ]
-{ #category : 'accessing' }
-PharoCAChangeRecord >> toolName [ ^ toolName ]
-{ #category : 'accessing' }
-PharoCAChangeRecord >> toolName: aString [ toolName := aString ]
+PharoCAChangeRecord >> toolName: aString [ toolName := aString
+]

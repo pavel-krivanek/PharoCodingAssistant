@@ -1,4 +1,6 @@
-"Abstract base for tools operating on the explicitly configured coding workspace."
+"
+Abstract base for tools operating on the explicitly configured coding workspace.
+"
 Class {
 	#name : 'PharoCAWorkspaceTool',
 	#superclass : 'PharoCATool',
@@ -7,11 +9,10 @@ Class {
 	#tag : 'Tools-Workspace'
 }
 
-{ #category : 'definition' }
-PharoCAWorkspaceTool class >> requiresWorkspace [ ^ true ]
-
 { #category : 'workspace' }
-PharoCAWorkspaceTool class >> workspaceFor: context [ ^ context requireWorkspace ]
+PharoCAWorkspaceTool class >> commandRunnerFor: context [
+	^ context workspaceCommandRunner ifNil: [ PharoCAWorkspaceCommandRunner new ]
+]
 
 { #category : 'workspace' }
 PharoCAWorkspaceTool class >> fileAccessFor: context [
@@ -19,11 +20,14 @@ PharoCAWorkspaceTool class >> fileAccessFor: context [
 ]
 
 { #category : 'workspace' }
-PharoCAWorkspaceTool class >> commandRunnerFor: context [
-	^ context workspaceCommandRunner ifNil: [ PharoCAWorkspaceCommandRunner new ]
+PharoCAWorkspaceTool class >> outputStoreFor: context [
+	^ context workspaceOutputStore ifNil: [ PharoCAWorkspaceOutputStore new ]
+]
+
+{ #category : 'definition' }
+PharoCAWorkspaceTool class >> requiresWorkspace [ ^ true
 ]
 
 { #category : 'workspace' }
-PharoCAWorkspaceTool class >> outputStoreFor: context [
-	^ context workspaceOutputStore ifNil: [ PharoCAWorkspaceOutputStore new ]
+PharoCAWorkspaceTool class >> workspaceFor: context [ ^ context requireWorkspace
 ]

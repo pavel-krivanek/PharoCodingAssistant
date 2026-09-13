@@ -1,4 +1,6 @@
-"Tool to evaluate arbitrary Pharo code. Because arbitrary evaluation cannot be semantically diffed safely, it is journaled explicitly as an opaque image operation."
+"
+Tool to evaluate arbitrary Pharo code. Because arbitrary evaluation cannot be semantically diffed safely, it is journaled explicitly as an opaque image operation.
+"
 Class {
 	#name : 'PharoCAToolDoIt',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolDoIt class >> capability [ ^ #evaluation
+]
 
 { #category : 'TOREMOVE' }
 PharoCAToolDoIt class >> execute: args [
@@ -29,11 +35,9 @@ PharoCAToolDoIt class >> execute: args context: context [
 	^ { 'status' -> 'ok' } asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolDoIt class >> capability [ ^ #evaluation ]
-
 { #category : 'execution' }
-PharoCAToolDoIt class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolDoIt class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'TOREMOVE' }
 PharoCAToolDoIt class >> llmDefinition [
@@ -44,4 +48,5 @@ PharoCAToolDoIt class >> llmDefinition [
 ]
 
 { #category : 'TOREMOVE' }
-PharoCAToolDoIt class >> toolName [ ^ #evaluate ]
+PharoCAToolDoIt class >> toolName [ ^ #evaluate
+]

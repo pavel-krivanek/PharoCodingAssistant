@@ -1,8 +1,16 @@
-"Immutable semantic checkpoint into one PharoCAEnvironment change journal. It identifies a quiescent journal position; rollback safety is decided later against current image state."
+"
+Immutable semantic checkpoint into one PharoCAEnvironment change journal. It identifies a quiescent journal position; rollback safety is decided later against current image state.
+"
 Class {
 	#name : 'PharoCACheckpoint',
 	#superclass : 'Object',
-	#instVars : [ 'id', 'label', 'environmentId', 'journalIndex', 'createdAt' ],
+	#instVars : [
+		'id',
+		'label',
+		'environmentId',
+		'journalIndex',
+		'createdAt'
+	],
 	#category : 'PharoCodingAssistant-Changes',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Changes'
@@ -31,22 +39,41 @@ PharoCACheckpoint >> asDictionary [
 ]
 
 { #category : 'accessing' }
-PharoCACheckpoint >> id [ ^ id ]
+PharoCACheckpoint >> createdAt [ ^ createdAt
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> id: aString [ id := aString ]
+PharoCACheckpoint >> createdAt: aDateAndTime [ createdAt := aDateAndTime
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> label [ ^ label ]
+PharoCACheckpoint >> environmentId [ ^ environmentId
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> label: aString [ label := aString ]
+PharoCACheckpoint >> environmentId: aString [ environmentId := aString
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> environmentId [ ^ environmentId ]
+PharoCACheckpoint >> id [ ^ id
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> environmentId: aString [ environmentId := aString ]
+PharoCACheckpoint >> id: aString [ id := aString
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> journalIndex [ ^ journalIndex ]
+PharoCACheckpoint >> journalIndex [ ^ journalIndex
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> journalIndex: anInteger [ journalIndex := anInteger ]
+PharoCACheckpoint >> journalIndex: anInteger [ journalIndex := anInteger
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> createdAt [ ^ createdAt ]
+PharoCACheckpoint >> label [ ^ label
+]
+
 { #category : 'accessing' }
-PharoCACheckpoint >> createdAt: aDateAndTime [ createdAt := aDateAndTime ]
+PharoCACheckpoint >> label: aString [ label := aString
+]

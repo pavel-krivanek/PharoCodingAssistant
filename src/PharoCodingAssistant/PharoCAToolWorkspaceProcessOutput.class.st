@@ -1,4 +1,6 @@
-"Continues reading already captured process output without re-executing the side-effecting command."
+"
+Continues reading already captured process output without re-executing the side-effecting command.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceProcessOutput',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,11 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceProcessOutput class >> toolName [ ^ #workspace_process_output ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceProcessOutput class >> capability [ ^ #process ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceProcessOutput class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolWorkspaceProcessOutput class >> capability [ ^ #process
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceProcessOutput class >> execute: args context: context [
@@ -20,6 +19,10 @@ PharoCAToolWorkspaceProcessOutput class >> execute: args context: context [
 	^ (self outputStoreFor: context)
 		pageForCursor: (args at: 'cursor')
 		maxCharacters: (args at: 'maxCharacters' ifAbsent: [ PharoCAToolPagination defaultTextCharacters ])
+]
+
+{ #category : 'execution' }
+PharoCAToolWorkspaceProcessOutput class >> executionMode [ ^ #parallelSafe
 ]
 
 { #category : 'definition' }
@@ -35,4 +38,8 @@ PharoCAToolWorkspaceProcessOutput class >> llmDefinition [
 			} asDictionary.
 			'required' -> { 'cursor' }
 		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceProcessOutput class >> toolName [ ^ #workspace_process_output
 ]

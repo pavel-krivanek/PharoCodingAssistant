@@ -7,60 +7,11 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolUIScreenshot class >> toolName [ ^ #ui_screenshot ]
-{ #category : 'definition' }
-PharoCAToolUIScreenshot class >> toolPack [ ^ #ui ]
-{ #category : 'definition' }
-PharoCAToolUIScreenshot class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolUIScreenshot class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolUIScreenshot class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'ui_screenshot'
-		description: 'Captures a bounded PNG artifact of the Morphic world, a listed window, a Morph object handle, or a rectangle in World coordinates. Binary image bytes stay in the artifact store.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'target' -> { 'type' -> 'string'. 'enum' -> #('world' 'window' 'morph' 'rectangle') } asDictionary.
-				'handle' -> { 'type' -> 'string'. 'description' -> 'Required for window or morph targets.' } asDictionary.
-				'x' -> { 'type' -> 'integer' } asDictionary.
-				'y' -> { 'type' -> 'integer' } asDictionary.
-				'width' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 4096 } asDictionary.
-				'height' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 4096 } asDictionary.
-				'lifetimeMilliseconds' -> { 'type' -> 'integer'. 'minimum' -> 1000. 'maximum' -> 3600000 } asDictionary
-			} asDictionary.
-			'required' -> #('target')
-		} asDictionary
+PharoCAToolUIScreenshot class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
-PharoCAToolUIScreenshot class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
-
-{ #category : 'private' }
-PharoCAToolUIScreenshot class >> ownerMetadataForContext: context [
-	| owner run invocation |
-	owner := Dictionary new.
-	context environment ifNotNil: [ :environment | owner at: 'environmentId' put: environment identifier ].
-	run := context run.
-	run ifNotNil: [
-		owner at: 'runId' put: run id.
-		run session ifNotNil: [ :session | owner at: 'sessionId' put: session id ] ].
-	invocation := context invocation.
-	invocation ifNotNil: [
-		owner at: 'toolCallId' put: invocation id.
-		owner at: 'toolName' put: invocation name asString ].
-	^ owner
-]
-
-{ #category : 'private' }
-PharoCAToolUIScreenshot class >> rectangleFromArguments: args [
-	| required |
-	required := #('x' 'y' 'width' 'height').
-	(required allSatisfy: [ :key | args includesKey: key ]) ifFalse: [
-		Error signal: 'Rectangle target requires x, y, width and height' ].
-	^ (args at: 'x') @ (args at: 'y') extent: (args at: 'width') @ (args at: 'height')
+PharoCAToolUIScreenshot class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
 ]
 
 { #category : 'execution' }
@@ -110,4 +61,61 @@ PharoCAToolUIScreenshot class >> execute: args context: context [
 			'format' -> 'png'
 		} asDictionary
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolUIScreenshot class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolUIScreenshot class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'ui_screenshot'
+		description: 'Captures a bounded PNG artifact of the Morphic world, a listed window, a Morph object handle, or a rectangle in World coordinates. Binary image bytes stay in the artifact store.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'target' -> { 'type' -> 'string'. 'enum' -> #('world' 'window' 'morph' 'rectangle') } asDictionary.
+				'handle' -> { 'type' -> 'string'. 'description' -> 'Required for window or morph targets.' } asDictionary.
+				'x' -> { 'type' -> 'integer' } asDictionary.
+				'y' -> { 'type' -> 'integer' } asDictionary.
+				'width' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 4096 } asDictionary.
+				'height' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 4096 } asDictionary.
+				'lifetimeMilliseconds' -> { 'type' -> 'integer'. 'minimum' -> 1000. 'maximum' -> 3600000 } asDictionary
+			} asDictionary.
+			'required' -> #('target')
+		} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolUIScreenshot class >> ownerMetadataForContext: context [
+	| owner run invocation |
+	owner := Dictionary new.
+	context environment ifNotNil: [ :environment | owner at: 'environmentId' put: environment identifier ].
+	run := context run.
+	run ifNotNil: [
+		owner at: 'runId' put: run id.
+		run session ifNotNil: [ :session | owner at: 'sessionId' put: session id ] ].
+	invocation := context invocation.
+	invocation ifNotNil: [
+		owner at: 'toolCallId' put: invocation id.
+		owner at: 'toolName' put: invocation name asString ].
+	^ owner
+]
+
+{ #category : 'private' }
+PharoCAToolUIScreenshot class >> rectangleFromArguments: args [
+	| required |
+	required := #('x' 'y' 'width' 'height').
+	(required allSatisfy: [ :key | args includesKey: key ]) ifFalse: [
+		Error signal: 'Rectangle target requires x, y, width and height' ].
+	^ (args at: 'x') @ (args at: 'y') extent: (args at: 'width') @ (args at: 'height')
+]
+
+{ #category : 'definition' }
+PharoCAToolUIScreenshot class >> toolName [ ^ #ui_screenshot
+]
+
+{ #category : 'definition' }
+PharoCAToolUIScreenshot class >> toolPack [ ^ #ui
 ]

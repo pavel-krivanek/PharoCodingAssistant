@@ -1,13 +1,21 @@
-"Session-scoped lazy skill activation. Skill bodies are never copied into session messages; active bodies are exposed as ephemeral instruction sources for provider requests."
+"
+Session-scoped lazy skill activation. Skill bodies are never copied into session messages; active bodies are exposed as ephemeral instruction sources for provider requests.
+"
 Class {
 	#name : 'PharoCASkillRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'skillsByName', 'skillNames', 'activeNamesBySessionId', 'mutex', 'discoveryCharacterBudget', 'builtinCatalogRevision' ],
+	#instVars : [
+		'skillsByName',
+		'skillNames',
+		'activeNamesBySessionId',
+		'mutex',
+		'discoveryCharacterBudget',
+		'builtinCatalogRevision'
+	],
 	#category : 'PharoCodingAssistant-Skills',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
 }
-
 
 { #category : 'defaults' }
 PharoCASkillRegistry class >> builtinCatalogRevision [
@@ -64,7 +72,8 @@ PharoCASkillRegistry >> deactivateNamed: aName session: aSession [
 ]
 
 { #category : 'accessing' }
-PharoCASkillRegistry >> discoveryCharacterBudget [ ^ discoveryCharacterBudget ]
+PharoCASkillRegistry >> discoveryCharacterBudget [ ^ discoveryCharacterBudget
+]
 
 { #category : 'accessing' }
 PharoCASkillRegistry >> discoveryCharacterBudget: anInteger [
@@ -143,6 +152,26 @@ PharoCASkillRegistry >> register: aSkill [
 	^ aSkill
 ]
 
+{ #category : 'persistence' }
+PharoCASkillRegistry >> restoreActiveSkillNames: names forSession: aSession [
+	| requested restored ignored core |
+	requested := (names collect: [ :each | each asString ]) asOrderedCollection.
+	core := self skillNamed: 'Smalltalk Core' ifAbsent: [ nil ].
+	(core notNil and: [ (requested includes: 'Smalltalk Core') not ]) ifTrue: [ requested add: 'Smalltalk Core' ].
+	restored := OrderedCollection new.
+	ignored := OrderedCollection new.
+	requested do: [ :name |
+		(self skillNamed: name ifAbsent: [ nil ])
+			ifNil: [ ignored add: name ]
+			ifNotNil: [ restored add: name ] ].
+	mutex wait.
+	[ activeNamesBySessionId at: aSession id put: restored asSet ] ensure: [ mutex signal ].
+	^ {
+		'restored' -> restored asArray.
+		'ignoredUnknown' -> ignored asArray
+	} asDictionary
+]
+
 { #category : 'accessing' }
 PharoCASkillRegistry >> size [
 	| size |
@@ -166,7 +195,6 @@ PharoCASkillRegistry >> skills [
 	[ result := skillNames collect: [ :name | skillsByName at: name ] ] ensure: [ mutex signal ].
 	^ (result asSortedCollection: [ :a :b | a name <= b name ]) asArray
 ]
-
 
 { #category : 'registration' }
 PharoCASkillRegistry >> synchronizeBuiltinSkills: builtinSkills [
@@ -196,25 +224,4 @@ PharoCASkillRegistry >> unregisterNamed: aName [
 		activeNamesBySessionId valuesDo: [ :set | set remove: aName asString ifAbsent: [ ] ]
 	] ensure: [ mutex signal ].
 	^ skill
-]
-
-
-{ #category : 'persistence' }
-PharoCASkillRegistry >> restoreActiveSkillNames: names forSession: aSession [
-	| requested restored ignored core |
-	requested := (names collect: [ :each | each asString ]) asOrderedCollection.
-	core := self skillNamed: 'Smalltalk Core' ifAbsent: [ nil ].
-	(core notNil and: [ (requested includes: 'Smalltalk Core') not ]) ifTrue: [ requested add: 'Smalltalk Core' ].
-	restored := OrderedCollection new.
-	ignored := OrderedCollection new.
-	requested do: [ :name |
-		(self skillNamed: name ifAbsent: [ nil ])
-			ifNil: [ ignored add: name ]
-			ifNotNil: [ restored add: name ] ].
-	mutex wait.
-	[ activeNamesBySessionId at: aSession id put: restored asSet ] ensure: [ mutex signal ].
-	^ {
-		'restored' -> restored asArray.
-		'ignoredUnknown' -> ignored asArray
-	} asDictionary
 ]

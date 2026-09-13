@@ -1,4 +1,6 @@
-"Applies one stored Tonel import preview only if the target package has not changed since preview."
+"
+Applies one stored Tonel import preview only if the target package has not changed since preview.
+"
 Class {
 	#name : 'PharoCAToolTonelImportApply',
 	#superclass : 'PharoCATonelTool',
@@ -8,28 +10,12 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolTonelImportApply class >> capability [ ^ #coding ]
-
-{ #category : 'execution' }
-PharoCAToolTonelImportApply class >> executionMode [ ^ #exclusiveMutation ]
-
-{ #category : 'definition' }
-PharoCAToolTonelImportApply class >> toolName [ ^ #tonel_import_apply ]
-
-{ #category : 'definition' }
-PharoCAToolTonelImportApply class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tonel_import_apply'
-		description: 'Applies a stored tonel_import_preview after verifying that the live package snapshot still matches the preview. The handle is one-shot after successful apply.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> { 'importHandle' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary } asDictionary.
-			'required' -> #('importHandle')
-		} asDictionary
+PharoCAToolTonelImportApply class >> capability [ ^ #coding
 ]
 
 { #category : 'execution' }
-PharoCAToolTonelImportApply class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
+PharoCAToolTonelImportApply class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
 { #category : 'execution' }
 PharoCAToolTonelImportApply class >> execute: args context: context [
@@ -81,4 +67,24 @@ PharoCAToolTonelImportApply class >> execute: args context: context [
 		'targetSignature' -> targetSignature.
 		'changeId' -> (record ifNil: [ nil ] ifNotNil: [ record id ])
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolTonelImportApply class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelImportApply class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tonel_import_apply'
+		description: 'Applies a stored tonel_import_preview after verifying that the live package snapshot still matches the preview. The handle is one-shot after successful apply.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> { 'importHandle' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary } asDictionary.
+			'required' -> #('importHandle')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelImportApply class >> toolName [ ^ #tonel_import_apply
 ]

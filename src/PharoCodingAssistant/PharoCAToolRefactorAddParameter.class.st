@@ -1,4 +1,6 @@
-"Previews native add-parameter."
+"
+Previews native add-parameter.
+"
 Class {
 	#name : 'PharoCAToolRefactorAddParameter',
 	#superclass : 'PharoCARefactoringTool',
@@ -6,16 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo-Refactoring'
 }
-
-{ #category : 'definition' }
-PharoCAToolRefactorAddParameter class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'refactor_add_parameter' description: 'Previews adding one parameter to a method. newSelector must have exactly one more argument; newArgumentName names the implementor argument and defaultExpression initializes existing senders.' parameters: { 'type' -> 'object'. 'properties' -> {'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'selector' -> { 'type' -> 'string' } asDictionary. 'newSelector' -> { 'type' -> 'string' } asDictionary. 'newArgumentName' -> { 'type' -> 'string' } asDictionary. 'defaultExpression' -> { 'type' -> 'string' } asDictionary. 'newArgumentIndex' -> { 'type' -> 'integer'. 'minimum' -> 1 } asDictionary} asDictionary. 'required' -> #('className' 'selector' 'newSelector' 'newArgumentName' 'defaultExpression') } asDictionary
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorAddParameter class >> toolName [
-	^ #refactor_add_parameter
-]
 
 { #category : 'private' }
 PharoCAToolRefactorAddParameter class >> buildRefactoringFrom: args [
@@ -28,15 +20,19 @@ PharoCAToolRefactorAddParameter class >> buildRefactoringFrom: args [
 	^ RBAddParameterRefactoring addParameterToMethod: oldSel in: behavior newSelector: newSel permutation: permutation asArray newArgs: { newArg }
 ]
 
+{ #category : 'execution' }
+PharoCAToolRefactorAddParameter class >> execute: args context: context [
+	^ super execute: args context: context
+]
 
 { #category : 'execution' }
 PharoCAToolRefactorAddParameter class >> executionMode [
 	^ #sequential
 ]
 
-{ #category : 'execution' }
-PharoCAToolRefactorAddParameter class >> execute: args context: context [
-	^ super execute: args context: context
+{ #category : 'definition' }
+PharoCAToolRefactorAddParameter class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'refactor_add_parameter' description: 'Previews adding one parameter to a method. newSelector must have exactly one more argument; newArgumentName names the implementor argument and defaultExpression initializes existing senders.' parameters: { 'type' -> 'object'. 'properties' -> {'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'selector' -> { 'type' -> 'string' } asDictionary. 'newSelector' -> { 'type' -> 'string' } asDictionary. 'newArgumentName' -> { 'type' -> 'string' } asDictionary. 'defaultExpression' -> { 'type' -> 'string' } asDictionary. 'newArgumentIndex' -> { 'type' -> 'integer'. 'minimum' -> 1 } asDictionary} asDictionary. 'required' -> #('className' 'selector' 'newSelector' 'newArgumentName' 'defaultExpression') } asDictionary
 ]
 
 { #category : 'private' }
@@ -44,3 +40,7 @@ PharoCAToolRefactorAddParameter class >> targetDescriptionFrom: args [
 	^ (args at: 'className'), '>>', (args at: 'selector'), ' add parameter -> ', (args at: 'newSelector')
 ]
 
+{ #category : 'definition' }
+PharoCAToolRefactorAddParameter class >> toolName [
+	^ #refactor_add_parameter
+]

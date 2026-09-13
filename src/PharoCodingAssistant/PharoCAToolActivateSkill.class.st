@@ -1,4 +1,6 @@
-"Activates a registered skill for the current durable session. The tool result contains metadata only; the skill instructions are injected ephemerally into the next provider request."
+"
+Activates a registered skill for the current durable session. The tool result contains metadata only; the skill instructions are injected ephemerally into the next provider request.
+"
 Class {
 	#name : 'PharoCAToolActivateSkill',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
 }
+
+{ #category : 'definition' }
+PharoCAToolActivateSkill class >> capability [ ^ #session
+]
 
 { #category : 'definition' }
 PharoCAToolActivateSkill class >> execute: args [
@@ -22,11 +28,9 @@ PharoCAToolActivateSkill class >> execute: args context: aContext [
 	^ result
 ]
 
-{ #category : 'definition' }
-PharoCAToolActivateSkill class >> capability [ ^ #session ]
-
 { #category : 'execution' }
-PharoCAToolActivateSkill class >> executionMode [ ^ #sequential ]
+PharoCAToolActivateSkill class >> executionMode [ ^ #sequential
+]
 
 { #category : 'definition' }
 PharoCAToolActivateSkill class >> llmDefinition [
@@ -37,4 +41,5 @@ PharoCAToolActivateSkill class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolActivateSkill class >> toolName [ ^ #activate_skill ]
+PharoCAToolActivateSkill class >> toolName [ ^ #activate_skill
+]

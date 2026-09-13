@@ -1,4 +1,6 @@
-"Bounded, stateless pagination used by read tools. Cursors are deliberately opaque to callers and are bound to the query scope that produced them."
+"
+Bounded, stateless pagination used by read tools. Cursors are deliberately opaque to callers and are bound to the query scope that produced them.
+"
 Class {
 	#name : 'PharoCAToolPagination',
 	#superclass : 'Object',
@@ -7,9 +9,27 @@ Class {
 	#tag : 'Tools'
 }
 
+{ #category : 'private' }
+PharoCAToolPagination class >> cursorForOffset: offset scope: scope [
+	^ 'pca8:', scope hash asString, ':', offset asString
+]
+
 { #category : 'defaults' }
 PharoCAToolPagination class >> defaultItemLimit [
 	^ 50
+]
+
+{ #category : 'defaults' }
+PharoCAToolPagination class >> defaultTextCharacters [
+	^ 8000
+]
+
+{ #category : 'pagination' }
+PharoCAToolPagination class >> itemOffsetFromArguments: arguments scope: scope [
+	| limit |
+	limit := arguments at: 'limit' ifAbsent: [ self defaultItemLimit ].
+	self validateItemLimit: limit.
+	^ self offsetFromCursor: (arguments at: 'cursor' ifAbsent: [ nil ]) scope: scope
 ]
 
 { #category : 'defaults' }
@@ -18,13 +38,24 @@ PharoCAToolPagination class >> maximumItemLimit [
 ]
 
 { #category : 'defaults' }
-PharoCAToolPagination class >> defaultTextCharacters [
-	^ 8000
-]
-
-{ #category : 'defaults' }
 PharoCAToolPagination class >> maximumTextCharacters [
 	^ 16000
+]
+
+{ #category : 'private' }
+PharoCAToolPagination class >> offsetFromCursor: cursor scope: scope [
+	| parts offset |
+	cursor ifNil: [ ^ 0 ].
+	parts := cursor findTokens: ':'.
+	(parts size = 3
+		and: [ parts first = 'pca8'
+		and: [ parts second = scope hash asString ] ]) ifFalse: [
+		self error: 'Invalid or out-of-scope pagination cursor' ].
+	[ offset := parts third asInteger ]
+		on: Error
+		do: [ :error | self error: 'Invalid pagination cursor offset' ].
+	offset < 0 ifTrue: [ self error: 'Invalid pagination cursor offset' ].
+	^ offset
 ]
 
 { #category : 'pagination' }
@@ -54,15 +85,6 @@ PharoCAToolPagination class >> pageItems: aCollection arguments: arguments scope
 	} asDictionary
 ]
 
-
-{ #category : 'pagination' }
-PharoCAToolPagination class >> itemOffsetFromArguments: arguments scope: scope [
-	| limit |
-	limit := arguments at: 'limit' ifAbsent: [ self defaultItemLimit ].
-	self validateItemLimit: limit.
-	^ self offsetFromCursor: (arguments at: 'cursor' ifAbsent: [ nil ]) scope: scope
-]
-
 { #category : 'pagination' }
 PharoCAToolPagination class >> pageText: aString arguments: arguments scope: scope [
 	| limit offset endIndex text hasMore nextCursor |
@@ -89,27 +111,6 @@ PharoCAToolPagination class >> pageText: aString arguments: arguments scope: sco
 			'nextCursor' -> nextCursor
 		} asDictionary
 	} asDictionary
-]
-
-{ #category : 'private' }
-PharoCAToolPagination class >> cursorForOffset: offset scope: scope [
-	^ 'pca8:', scope hash asString, ':', offset asString
-]
-
-{ #category : 'private' }
-PharoCAToolPagination class >> offsetFromCursor: cursor scope: scope [
-	| parts offset |
-	cursor ifNil: [ ^ 0 ].
-	parts := cursor findTokens: ':'.
-	(parts size = 3
-		and: [ parts first = 'pca8'
-		and: [ parts second = scope hash asString ] ]) ifFalse: [
-		self error: 'Invalid or out-of-scope pagination cursor' ].
-	[ offset := parts third asInteger ]
-		on: Error
-		do: [ :error | self error: 'Invalid pagination cursor offset' ].
-	offset < 0 ifTrue: [ self error: 'Invalid pagination cursor offset' ].
-	^ offset
 ]
 
 { #category : 'validation' }

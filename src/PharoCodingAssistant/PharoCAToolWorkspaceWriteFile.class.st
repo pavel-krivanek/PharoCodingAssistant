@@ -1,4 +1,6 @@
-"Creates or replaces one workspace text file. Existing files require an expected sha256 obtained from workspace_read_file to prevent stale overwrites."
+"
+Creates or replaces one workspace text file. Existing files require an expected sha256 obtained from workspace_read_file to prevent stale overwrites.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceWriteFile',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,13 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceWriteFile class >> toolName [ ^ #workspace_write_file ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceWriteFile class >> capability [ ^ #coding ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceWriteFile class >> executionMode [ ^ #exclusiveMutation ]
-{ #category : 'defaults' }
-PharoCAToolWorkspaceWriteFile class >> maximumContentCharacters [ ^ 1048576 ]
+PharoCAToolWorkspaceWriteFile class >> capability [ ^ #coding
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceWriteFile class >> execute: args context: context [
@@ -57,6 +54,10 @@ PharoCAToolWorkspaceWriteFile class >> execute: args context: context [
 	} asDictionary
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceWriteFile class >> executionMode [ ^ #exclusiveMutation
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceWriteFile class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -71,4 +72,12 @@ PharoCAToolWorkspaceWriteFile class >> llmDefinition [
 			} asDictionary.
 			'required' -> { 'path'. 'content' }
 		} asDictionary
+]
+
+{ #category : 'defaults' }
+PharoCAToolWorkspaceWriteFile class >> maximumContentCharacters [ ^ 1048576
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceWriteFile class >> toolName [ ^ #workspace_write_file
 ]

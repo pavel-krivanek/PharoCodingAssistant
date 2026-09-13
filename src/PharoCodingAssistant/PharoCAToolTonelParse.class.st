@@ -1,4 +1,6 @@
-"Parses Tonel source with the native parser and returns compact definition metadata."
+"
+Parses Tonel source with the native parser and returns compact definition metadata.
+"
 Class {
 	#name : 'PharoCAToolTonelParse',
 	#superclass : 'PharoCATonelTool',
@@ -6,28 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
-
-{ #category : 'execution' }
-PharoCAToolTonelParse class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolTonelParse class >> toolName [ ^ #tonel_parse ]
-
-{ #category : 'definition' }
-PharoCAToolTonelParse class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tonel_parse'
-		description: 'Parses Tonel source with Pharo''s native TonelParser and returns cursor-paginated definition metadata without loading or mutating the image.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'source' -> { 'type' -> 'string'. 'minLength' -> 1. 'maxLength' -> 200000 } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('source')
-		} asDictionary
-]
 
 { #category : 'execution' }
 PharoCAToolTonelParse class >> execute: args [
@@ -56,4 +36,28 @@ PharoCAToolTonelParse class >> execute: args context: context [
 		'definitions' -> (page at: 'items').
 		'page' -> (page at: 'page')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolTonelParse class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelParse class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tonel_parse'
+		description: 'Parses Tonel source with Pharo''s native TonelParser and returns cursor-paginated definition metadata without loading or mutating the image.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'source' -> { 'type' -> 'string'. 'minLength' -> 1. 'maxLength' -> 200000 } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('source')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelParse class >> toolName [ ^ #tonel_parse
 ]

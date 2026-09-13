@@ -1,18 +1,42 @@
-"Workspace-level trust policy. Trust gates project settings and executable project resources; it is deliberately not a per-tool permission mechanism."
+"
+Workspace-level trust policy. Trust gates project settings and executable project resources; it is deliberately not a per-tool permission mechanism.
+"
 Class {
 	#name : 'PharoCAWorkspaceTrustPolicy',
 	#superclass : 'Object',
-	#instVars : [ 'trustedIdentifiers', 'defaultTrusted', 'mutex' ],
+	#instVars : [
+		'trustedIdentifiers',
+		'defaultTrusted',
+		'mutex'
+	],
 	#category : 'PharoCodingAssistant-Workspace',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Workspace'
 }
 
 { #category : 'instance creation' }
-PharoCAWorkspaceTrustPolicy class >> trustAll [ ^ self new defaultTrusted: true; yourself ]
+PharoCAWorkspaceTrustPolicy class >> trustAll [ ^ self new defaultTrusted: true; yourself
+]
 
 { #category : 'instance creation' }
-PharoCAWorkspaceTrustPolicy class >> trustNone [ ^ self new ]
+PharoCAWorkspaceTrustPolicy class >> trustNone [ ^ self new
+]
+
+{ #category : 'converting' }
+PharoCAWorkspaceTrustPolicy >> asDictionary [
+	^ {
+		'defaultTrusted' -> defaultTrusted.
+		'trustedWorkspaceIds' -> self trustedIdentifiers
+	} asDictionary
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceTrustPolicy >> defaultTrusted [ ^ defaultTrusted
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceTrustPolicy >> defaultTrusted: aBoolean [ defaultTrusted := aBoolean
+]
 
 { #category : 'initialization' }
 PharoCAWorkspaceTrustPolicy >> initialize [
@@ -21,12 +45,6 @@ PharoCAWorkspaceTrustPolicy >> initialize [
 	defaultTrusted := false.
 	mutex := Semaphore forMutualExclusion
 ]
-
-{ #category : 'accessing' }
-PharoCAWorkspaceTrustPolicy >> defaultTrusted [ ^ defaultTrusted ]
-
-{ #category : 'accessing' }
-PharoCAWorkspaceTrustPolicy >> defaultTrusted: aBoolean [ defaultTrusted := aBoolean ]
 
 { #category : 'testing' }
 PharoCAWorkspaceTrustPolicy >> isTrusted: aWorkspace [
@@ -44,13 +62,6 @@ PharoCAWorkspaceTrustPolicy >> trust: aWorkspace [
 	^ aWorkspace
 ]
 
-{ #category : 'trust' }
-PharoCAWorkspaceTrustPolicy >> untrust: aWorkspace [
-	mutex wait.
-	[ trustedIdentifiers remove: aWorkspace identifier ifAbsent: [ ] ] ensure: [ mutex signal ].
-	^ aWorkspace
-]
-
 { #category : 'accessing' }
 PharoCAWorkspaceTrustPolicy >> trustedIdentifiers [
 	| copy |
@@ -59,10 +70,9 @@ PharoCAWorkspaceTrustPolicy >> trustedIdentifiers [
 	^ copy sorted asArray
 ]
 
-{ #category : 'converting' }
-PharoCAWorkspaceTrustPolicy >> asDictionary [
-	^ {
-		'defaultTrusted' -> defaultTrusted.
-		'trustedWorkspaceIds' -> self trustedIdentifiers
-	} asDictionary
+{ #category : 'trust' }
+PharoCAWorkspaceTrustPolicy >> untrust: aWorkspace [
+	mutex wait.
+	[ trustedIdentifiers remove: aWorkspace identifier ifAbsent: [ ] ] ensure: [ mutex signal ].
+	^ aWorkspace
 ]

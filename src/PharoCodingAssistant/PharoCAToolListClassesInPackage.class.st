@@ -1,4 +1,6 @@
-"Lists classes defined in a specified package using deterministic cursor pagination."
+"
+Lists classes defined in a specified package using deterministic cursor pagination.
+"
 Class {
 	#name : 'PharoCAToolListClassesInPackage',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolListClassesInPackage class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolListClassesInPackage class >> execute: args [
@@ -25,10 +31,6 @@ PharoCAToolListClassesInPackage class >> execute: args [
 		'page' -> (page at: 'page')
 	} asDictionary
 ]
-
-
-{ #category : 'definition' }
-PharoCAToolListClassesInPackage class >> capability [ ^ #inspection ]
 
 { #category : 'execution' }
 PharoCAToolListClassesInPackage class >> executionMode [

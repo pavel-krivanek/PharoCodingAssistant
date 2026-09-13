@@ -1,4 +1,6 @@
-"Removes one existing method while recording a semantically rollbackable method change."
+"
+Removes one existing method while recording a semantically rollbackable method change.
+"
 Class {
 	#name : 'PharoCAToolRemoveMethod',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolRemoveMethod class >> capability [ ^ #coding
+]
 
 { #category : 'execution' }
 PharoCAToolRemoveMethod class >> execute: args [
@@ -45,11 +51,9 @@ PharoCAToolRemoveMethod class >> execute: args context: context [
 	} asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolRemoveMethod class >> capability [ ^ #coding ]
-
 { #category : 'execution' }
-PharoCAToolRemoveMethod class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolRemoveMethod class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'definition' }
 PharoCAToolRemoveMethod class >> llmDefinition [
@@ -68,4 +72,5 @@ PharoCAToolRemoveMethod class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolRemoveMethod class >> toolName [ ^ #remove_method ]
+PharoCAToolRemoveMethod class >> toolName [ ^ #remove_method
+]

@@ -1,9 +1,21 @@
-"Explicit execution environment for agents sharing one Pharo image. It owns mutation scheduling and the semantic change journal."
+"
+Explicit execution environment for agents sharing one Pharo image. It owns mutation scheduling and the semantic change journal.
+"
 Class {
 	#name : 'PharoCAEnvironment',
 	#superclass : 'Object',
-	#instVars : [ 'identifier', 'scheduler', 'changeJournal', 'checkpointManager', 'activeRuns', 'activeRunsMutex', 'artifactStore' ],
-	#classVars : [ 'CurrentImage' ],
+	#instVars : [
+		'identifier',
+		'scheduler',
+		'changeJournal',
+		'checkpointManager',
+		'activeRuns',
+		'activeRunsMutex',
+		'artifactStore'
+	],
+	#classVars : [
+		'CurrentImage'
+	],
 	#category : 'PharoCodingAssistant-Environment',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Environment'
@@ -27,6 +39,17 @@ PharoCAEnvironment class >> resetCurrentImage [
 	CurrentImage := nil
 ]
 
+{ #category : 'observability' }
+PharoCAEnvironment >> activeRunCount [ ^ self activeRuns size
+]
+
+{ #category : 'observability' }
+PharoCAEnvironment >> activeRuns [
+	| snapshot |
+	activeRunsMutex wait.
+	[ snapshot := activeRuns asArray ] ensure: [ activeRunsMutex signal ].
+	^ snapshot
+]
 
 { #category : 'artifacts' }
 PharoCAEnvironment >> artifactStore [
@@ -35,11 +58,12 @@ PharoCAEnvironment >> artifactStore [
 ]
 
 { #category : 'artifacts' }
-PharoCAEnvironment >> artifactStore: aStore [ artifactStore := aStore ]
+PharoCAEnvironment >> artifactStore: aStore [ artifactStore := aStore
+]
 
 { #category : 'accessing' }
-PharoCAEnvironment >> changeJournal [ ^ changeJournal ]
-
+PharoCAEnvironment >> changeJournal [ ^ changeJournal
+]
 
 { #category : 'changes' }
 PharoCAEnvironment >> changesForRun: aRun [
@@ -51,8 +75,21 @@ PharoCAEnvironment >> changesForSession: aSession [
 	^ changeJournal entriesForSessionId: aSession id
 ]
 
+{ #category : 'checkpoints' }
+PharoCAEnvironment >> checkpointManager [ ^ checkpointManager
+]
+
+{ #category : 'checkpoints' }
+PharoCAEnvironment >> createCheckpoint [ ^ checkpointManager create
+]
+
+{ #category : 'checkpoints' }
+PharoCAEnvironment >> createCheckpointNamed: aString [ ^ checkpointManager createNamed: aString
+]
+
 { #category : 'accessing' }
-PharoCAEnvironment >> identifier [ ^ identifier ]
+PharoCAEnvironment >> identifier [ ^ identifier
+]
 
 { #category : 'accessing' }
 PharoCAEnvironment >> identifier: aString [
@@ -76,41 +113,38 @@ PharoCAEnvironment >> initialize [
 	artifactStore := PharoCAArtifactStore new
 ]
 
-{ #category : 'tools' }
-PharoCAEnvironment >> newDefaultToolRegistry [
-	^ PharoCAToolRegistry defaultInEnvironment: self
-]
-
-{ #category : 'accessing' }
-PharoCAEnvironment >> scheduler [ ^ scheduler ]
-
-{ #category : 'accessing' }
-PharoCAEnvironment >> scheduler: aScheduler [ scheduler := aScheduler ]
-
 { #category : 'accessing' }
 PharoCAEnvironment >> mutationCoordinator [
 	"The tool scheduler is the image-mutation coordinator: reads may overlap, while sequential/exclusive operations cross one environment-owned barrier."
 	^ scheduler
 ]
 
-
-{ #category : 'checkpoints' }
-PharoCAEnvironment >> checkpointManager [ ^ checkpointManager ]
-
-{ #category : 'checkpoints' }
-PharoCAEnvironment >> createCheckpoint [ ^ checkpointManager create ]
-
-{ #category : 'checkpoints' }
-PharoCAEnvironment >> createCheckpointNamed: aString [ ^ checkpointManager createNamed: aString ]
-
-{ #category : 'checkpoints' }
-PharoCAEnvironment >> rollbackToCheckpoint: aCheckpointOrId [ ^ checkpointManager rollbackTo: aCheckpointOrId ]
+{ #category : 'tools' }
+PharoCAEnvironment >> newDefaultToolRegistry [
+	^ PharoCAToolRegistry defaultInEnvironment: self
+]
 
 { #category : 'observability' }
 PharoCAEnvironment >> registerActiveRun: aRun [
 	activeRunsMutex wait.
 	[ activeRuns add: aRun ] ensure: [ activeRunsMutex signal ].
 	^ aRun
+]
+
+{ #category : 'checkpoints' }
+PharoCAEnvironment >> rollbackPlanToCheckpoint: aCheckpointOrId [ ^ checkpointManager rollbackPlanTo: aCheckpointOrId
+]
+
+{ #category : 'checkpoints' }
+PharoCAEnvironment >> rollbackToCheckpoint: aCheckpointOrId [ ^ checkpointManager rollbackTo: aCheckpointOrId
+]
+
+{ #category : 'accessing' }
+PharoCAEnvironment >> scheduler [ ^ scheduler
+]
+
+{ #category : 'accessing' }
+PharoCAEnvironment >> scheduler: aScheduler [ scheduler := aScheduler
 ]
 
 { #category : 'observability' }
@@ -120,17 +154,6 @@ PharoCAEnvironment >> unregisterActiveRun: aRun [
 	^ aRun
 ]
 
-{ #category : 'observability' }
-PharoCAEnvironment >> activeRuns [
-	| snapshot |
-	activeRunsMutex wait.
-	[ snapshot := activeRuns asArray ] ensure: [ activeRunsMutex signal ].
-	^ snapshot
-]
-
-{ #category : 'observability' }
-PharoCAEnvironment >> activeRunCount [ ^ self activeRuns size ]
-
 { #category : 'checkpoints-private' }
 PharoCAEnvironment >> withNoActiveRunsDo: aBlock [
 	activeRunsMutex wait.
@@ -139,6 +162,3 @@ PharoCAEnvironment >> withNoActiveRunsDo: aBlock [
 		^ aBlock value
 	] ensure: [ activeRunsMutex signal ]
 ]
-
-{ #category : 'checkpoints' }
-PharoCAEnvironment >> rollbackPlanToCheckpoint: aCheckpointOrId [ ^ checkpointManager rollbackPlanTo: aCheckpointOrId ]

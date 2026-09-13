@@ -1,4 +1,6 @@
-"Versioned JSON format for non-secret global/project harness settings. Plain JSON objects remain accepted as a convenient legacy form."
+"
+Versioned JSON format for non-secret global/project harness settings. Plain JSON objects remain accepted as a convenient legacy form.
+"
 Class {
 	#name : 'PharoCASettingsPersistence',
 	#superclass : 'Object',
@@ -8,15 +10,7 @@ Class {
 }
 
 { #category : 'accessing' }
-PharoCASettingsPersistence class >> currentVersion [ ^ 1 ]
-
-{ #category : 'serializing' }
-PharoCASettingsPersistence >> stringForSettingsDictionary: aDictionary [
-	^ STONJSON toString: ({
-		'format' -> 'PharoCodingAssistantSettings'.
-		'version' -> self class currentVersion.
-		'settings' -> aDictionary
-	} asDictionary)
+PharoCASettingsPersistence class >> currentVersion [ ^ 1
 ]
 
 { #category : 'deserializing' }
@@ -32,4 +26,13 @@ PharoCASettingsPersistence >> settingsDictionaryFromString: aString [
 	settings := object at: 'settings' ifAbsent: [ Error signal: 'Settings file has no settings object' ].
 	settings isDictionary ifFalse: [ Error signal: 'Settings field must be an object' ].
 	^ settings
+]
+
+{ #category : 'serializing' }
+PharoCASettingsPersistence >> stringForSettingsDictionary: aDictionary [
+	^ STONJSON toString: ({
+		'format' -> 'PharoCodingAssistantSettings'.
+		'version' -> self class currentVersion.
+		'settings' -> aDictionary
+	} asDictionary)
 ]

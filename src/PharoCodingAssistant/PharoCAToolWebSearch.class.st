@@ -1,4 +1,6 @@
-"Searches the public web through the vendored PharoDuckDuckGo client. The pack stays lazy because external network access is task-specific."
+"
+Searches the public web through the vendored PharoDuckDuckGo client. The pack stays lazy because external network access is task-specific.
+"
 Class {
 	#name : 'PharoCAToolWebSearch',
 	#superclass : 'PharoCATool',
@@ -8,20 +10,45 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWebSearch class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolWebSearch class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolWebSearch class >> toolPack [ ^ #web ]
-
-{ #category : 'definition' }
-PharoCAToolWebSearch class >> toolName [ ^ #web_search ]
+PharoCAToolWebSearch class >> capability [ ^ #inspection
+]
 
 { #category : 'private' }
 PharoCAToolWebSearch class >> client [
 	^ DDGClient new
+]
+
+{ #category : 'private' }
+PharoCAToolWebSearch class >> copyKey: sourceKey as: targetKey from: source to: target [
+	source at: sourceKey ifPresent: [ :value | value ifNotNil: [ target at: targetKey put: value ] ]
+]
+
+{ #category : 'execution' }
+PharoCAToolWebSearch class >> execute: args [
+	^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
+
+{ #category : 'execution' }
+PharoCAToolWebSearch class >> execute: args context: context [
+	| query category options results |
+	query := args at: 'query'.
+	query isString ifFalse: [ Error signal: 'query must be a String' ].
+	query trimBoth isEmpty ifTrue: [ Error signal: 'query must not be empty' ].
+	category := (args at: 'category' ifAbsent: [ 'text' ]) asString asLowercase asSymbol.
+	(#(text news images videos) includes: category) ifFalse: [ Error signal: 'Unknown web search category: ', category asString ].
+	options := self optionsFrom: args category: category.
+	context checkActive.
+	results := self client search: query category: category options: options.
+	context checkActive.
+	^ {
+		'query' -> query.
+		'category' -> category asString.
+		'results' -> ((results collect: [ :each | self normalize: each category: category ]) asArray)
+	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolWebSearch class >> executionMode [ ^ #sequential
 ]
 
 { #category : 'definition' }
@@ -49,40 +76,6 @@ PharoCAToolWebSearch class >> llmDefinition [
 			} asDictionary.
 			'required' -> #('query')
 		} asDictionary
-]
-
-{ #category : 'private' }
-PharoCAToolWebSearch class >> optionAt: key from: args ifPresent: aBlock [
-	args at: key ifPresent: [ :value |
-		(value isNil or: [ value asString trimBoth isEmpty ]) ifFalse: [ aBlock value: value ] ]
-]
-
-{ #category : 'private' }
-PharoCAToolWebSearch class >> optionsFrom: args category: category [
-	| options |
-	options := DDGSearchOptions default.
-	self optionAt: 'region' from: args ifPresent: [ :value | options region: value asString ].
-	self optionAt: 'safeSearch' from: args ifPresent: [ :value | options safeSearch: value asString asSymbol ].
-	self optionAt: 'timeLimit' from: args ifPresent: [ :value | options timeLimit: value asString ].
-	options
-		page: (args at: 'page' ifAbsent: [ 1 ]);
-		maxResults: (args at: 'maxResults' ifAbsent: [ 8 ]).
-	category = #images ifTrue: [
-		self optionAt: 'size' from: args ifPresent: [ :value | options size: value ].
-		self optionAt: 'color' from: args ifPresent: [ :value | options color: value ].
-		self optionAt: 'type' from: args ifPresent: [ :value | options typeImage: value ].
-		self optionAt: 'layout' from: args ifPresent: [ :value | options layout: value ].
-		self optionAt: 'license' from: args ifPresent: [ :value | options licenseImage: value ] ].
-	category = #videos ifTrue: [
-		self optionAt: 'resolution' from: args ifPresent: [ :value | options resolution: value ].
-		self optionAt: 'duration' from: args ifPresent: [ :value | options duration: value ].
-		self optionAt: 'license' from: args ifPresent: [ :value | options licenseVideos: value ] ].
-	^ options
-]
-
-{ #category : 'private' }
-PharoCAToolWebSearch class >> copyKey: sourceKey as: targetKey from: source to: target [
-	source at: sourceKey ifPresent: [ :value | value ifNotNil: [ target at: targetKey put: value ] ]
 ]
 
 { #category : 'private' }
@@ -122,26 +115,39 @@ PharoCAToolWebSearch class >> normalize: item category: category [
 	^ result
 ]
 
-{ #category : 'execution' }
-PharoCAToolWebSearch class >> execute: args [
-	^ self execute: args context: PharoCAToolExecutionContext unlimited
+{ #category : 'private' }
+PharoCAToolWebSearch class >> optionAt: key from: args ifPresent: aBlock [
+	args at: key ifPresent: [ :value |
+		(value isNil or: [ value asString trimBoth isEmpty ]) ifFalse: [ aBlock value: value ] ]
 ]
 
-{ #category : 'execution' }
-PharoCAToolWebSearch class >> execute: args context: context [
-	| query category options results |
-	query := args at: 'query'.
-	query isString ifFalse: [ Error signal: 'query must be a String' ].
-	query trimBoth isEmpty ifTrue: [ Error signal: 'query must not be empty' ].
-	category := (args at: 'category' ifAbsent: [ 'text' ]) asString asLowercase asSymbol.
-	(#(text news images videos) includes: category) ifFalse: [ Error signal: 'Unknown web search category: ', category asString ].
-	options := self optionsFrom: args category: category.
-	context checkActive.
-	results := self client search: query category: category options: options.
-	context checkActive.
-	^ {
-		'query' -> query.
-		'category' -> category asString.
-		'results' -> ((results collect: [ :each | self normalize: each category: category ]) asArray)
-	} asDictionary
+{ #category : 'private' }
+PharoCAToolWebSearch class >> optionsFrom: args category: category [
+	| options |
+	options := DDGSearchOptions default.
+	self optionAt: 'region' from: args ifPresent: [ :value | options region: value asString ].
+	self optionAt: 'safeSearch' from: args ifPresent: [ :value | options safeSearch: value asString asSymbol ].
+	self optionAt: 'timeLimit' from: args ifPresent: [ :value | options timeLimit: value asString ].
+	options
+		page: (args at: 'page' ifAbsent: [ 1 ]);
+		maxResults: (args at: 'maxResults' ifAbsent: [ 8 ]).
+	category = #images ifTrue: [
+		self optionAt: 'size' from: args ifPresent: [ :value | options size: value ].
+		self optionAt: 'color' from: args ifPresent: [ :value | options color: value ].
+		self optionAt: 'type' from: args ifPresent: [ :value | options typeImage: value ].
+		self optionAt: 'layout' from: args ifPresent: [ :value | options layout: value ].
+		self optionAt: 'license' from: args ifPresent: [ :value | options licenseImage: value ] ].
+	category = #videos ifTrue: [
+		self optionAt: 'resolution' from: args ifPresent: [ :value | options resolution: value ].
+		self optionAt: 'duration' from: args ifPresent: [ :value | options duration: value ].
+		self optionAt: 'license' from: args ifPresent: [ :value | options licenseVideos: value ] ].
+	^ options
+]
+
+{ #category : 'definition' }
+PharoCAToolWebSearch class >> toolName [ ^ #web_search
+]
+
+{ #category : 'definition' }
+PharoCAToolWebSearch class >> toolPack [ ^ #web
 ]

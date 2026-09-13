@@ -1,4 +1,6 @@
-"Searches source code of methods in the live image using SystemNavigation. Full method bodies are deliberately not returned; bounded contextual snippets lead to get_method for selected hits."
+"
+Searches source code of methods in the live image using SystemNavigation. Full method bodies are deliberately not returned; bounded contextual snippets lead to get_method for selected hits.
+"
 Class {
 	#name : 'PharoCAToolSearchMethodSource',
 	#superclass : 'PharoCATool',
@@ -7,50 +9,6 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'definition' }
-PharoCAToolSearchMethodSource class >> capability [ ^ #inspection ]
-
-{ #category : 'execution' }
-PharoCAToolSearchMethodSource class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolSearchMethodSource class >> toolPack [ ^ #browse ]
-
-{ #category : 'definition' }
-PharoCAToolSearchMethodSource class >> toolName [ ^ #search_method_source ]
-
-{ #category : 'definition' }
-PharoCAToolSearchMethodSource class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'search_method_source'
-		description: 'Searches method source in the live Pharo image. Optional package, tag and className filters reduce scope. Returns metadata and short snippets only; use get_method for full source. Cursor-paginated.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'query' -> { 'type' -> 'string' } asDictionary.
-				'matchCase' -> { 'type' -> 'boolean' } asDictionary.
-				'package' -> { 'type' -> 'string' } asDictionary.
-				'tag' -> { 'type' -> 'string' } asDictionary.
-				'className' -> { 'type' -> 'string' } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('query')
-		} asDictionary
-]
-
-{ #category : 'private' }
-PharoCAToolSearchMethodSource class >> snippetFor: source query: query matchCase: matchCase [
-	| haystack needle start finish |
-	haystack := matchCase ifTrue: [ source ] ifFalse: [ source asLowercase ].
-	needle := matchCase ifTrue: [ query ] ifFalse: [ query asLowercase ].
-	start := haystack findString: needle startingAt: 1.
-	start = 0 ifTrue: [ ^ (source copyFrom: 1 to: (source size min: 240)) ].
-	start := (start - 80) max: 1.
-	finish := (start + 239) min: source size.
-	^ source copyFrom: start to: finish
-]
-
 { #category : 'private' }
 PharoCAToolSearchMethodSource class >> baseClassOfMethod: method [
 	| behavior |
@@ -58,61 +16,8 @@ PharoCAToolSearchMethodSource class >> baseClassOfMethod: method [
 	^ behavior isMeta ifTrue: [ behavior instanceSide ] ifFalse: [ behavior ]
 ]
 
-{ #category : 'private' }
-PharoCAToolSearchMethodSource class >> source: source matchesQuery: query matchCase: matchCase [
-	| haystack needle |
-	haystack := matchCase ifTrue: [ source ] ifFalse: [ source asLowercase ].
-	needle := matchCase ifTrue: [ query ] ifFalse: [ query asLowercase ].
-	^ haystack includesSubstring: needle
-]
-
-{ #category : 'private' }
-PharoCAToolSearchMethodSource class >> imageWideMethodsWithSourceString: query matchCase: matchCase context: context [
-	"Pharo 14's SystemNavigation source search assumes every installed method has retrievable source.
-	Mirror its optimized allBehaviorsDo:/selectorsDo: traversal, but tolerate generated/FFI methods without retrievable source. Source-text search must not trigger source reconstruction/decompilation."
-	| matches behaviorCount |
-	matches := OrderedCollection new.
-	behaviorCount := 0.
-	SystemNavigation default allBehaviorsDo: [ :behavior |
-		behaviorCount := behaviorCount + 1.
-		(behaviorCount \\ 100 = 0) ifTrue: [ context checkActive ].
-		behavior selectorsDo: [ :selector |
-			| method source |
-			method := behavior >> selector.
-			source := method sourceCodeOrNil.
-			(source isString and: [ source includesSubstring: query caseSensitive: matchCase ]) ifTrue: [
-				matches add: method ] ] ].
-	^ matches
-]
-
-{ #category : 'private' }
-PharoCAToolSearchMethodSource class >> scopedMethodsMatching: query matchCase: matchCase package: packageFilter tag: tagFilter className: classFilter context: context [
-	| candidates matches |
-	candidates := PharoCAImageNavigation
-		methodsForPackage: packageFilter
-		tag: tagFilter
-		className: classFilter
-		context: context.
-	matches := OrderedCollection new.
-	candidates doWithIndex: [ :method :index | | source |
-		(index \\ 100 = 0) ifTrue: [ context checkActive ].
-		source := method sourceCodeOrNil.
-		(source isString and: [ self source: source matchesQuery: query matchCase: matchCase ]) ifTrue: [
-			matches add: method ] ].
-	^ matches
-]
-
-{ #category : 'private' }
-PharoCAToolSearchMethodSource class >> methodsMatching: query matchCase: matchCase package: packageFilter tag: tagFilter className: classFilter context: context [
-	(packageFilter notNil or: [ tagFilter notNil or: [ classFilter notNil ] ]) ifTrue: [
-		^ self
-			scopedMethodsMatching: query
-			matchCase: matchCase
-			package: packageFilter
-			tag: tagFilter
-			className: classFilter
-			context: context ].
-	^ self imageWideMethodsWithSourceString: query matchCase: matchCase context: context
+{ #category : 'definition' }
+PharoCAToolSearchMethodSource class >> capability [ ^ #inspection
 ]
 
 { #category : 'execution' }
@@ -171,4 +76,105 @@ PharoCAToolSearchMethodSource class >> execute: args context: context [
 		'matches' -> (page at: 'items').
 		'page' -> (page at: 'page')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolSearchMethodSource class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'private' }
+PharoCAToolSearchMethodSource class >> imageWideMethodsWithSourceString: query matchCase: matchCase context: context [
+	"Pharo 14's SystemNavigation source search assumes every installed method has retrievable source.
+	Mirror its optimized allBehaviorsDo:/selectorsDo: traversal, but tolerate generated/FFI methods without retrievable source. Source-text search must not trigger source reconstruction/decompilation."
+	| matches behaviorCount |
+	matches := OrderedCollection new.
+	behaviorCount := 0.
+	SystemNavigation default allBehaviorsDo: [ :behavior |
+		behaviorCount := behaviorCount + 1.
+		(behaviorCount \\ 100 = 0) ifTrue: [ context checkActive ].
+		behavior selectorsDo: [ :selector |
+			| method source |
+			method := behavior >> selector.
+			source := method sourceCodeOrNil.
+			(source isString and: [ source includesSubstring: query caseSensitive: matchCase ]) ifTrue: [
+				matches add: method ] ] ].
+	^ matches
+]
+
+{ #category : 'definition' }
+PharoCAToolSearchMethodSource class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'search_method_source'
+		description: 'Searches method source in the live Pharo image. Optional package, tag and className filters reduce scope. Returns metadata and short snippets only; use get_method for full source. Cursor-paginated.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'query' -> { 'type' -> 'string' } asDictionary.
+				'matchCase' -> { 'type' -> 'boolean' } asDictionary.
+				'package' -> { 'type' -> 'string' } asDictionary.
+				'tag' -> { 'type' -> 'string' } asDictionary.
+				'className' -> { 'type' -> 'string' } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 200 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('query')
+		} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolSearchMethodSource class >> methodsMatching: query matchCase: matchCase package: packageFilter tag: tagFilter className: classFilter context: context [
+	(packageFilter notNil or: [ tagFilter notNil or: [ classFilter notNil ] ]) ifTrue: [
+		^ self
+			scopedMethodsMatching: query
+			matchCase: matchCase
+			package: packageFilter
+			tag: tagFilter
+			className: classFilter
+			context: context ].
+	^ self imageWideMethodsWithSourceString: query matchCase: matchCase context: context
+]
+
+{ #category : 'private' }
+PharoCAToolSearchMethodSource class >> scopedMethodsMatching: query matchCase: matchCase package: packageFilter tag: tagFilter className: classFilter context: context [
+	| candidates matches |
+	candidates := PharoCAImageNavigation
+		methodsForPackage: packageFilter
+		tag: tagFilter
+		className: classFilter
+		context: context.
+	matches := OrderedCollection new.
+	candidates doWithIndex: [ :method :index | | source |
+		(index \\ 100 = 0) ifTrue: [ context checkActive ].
+		source := method sourceCodeOrNil.
+		(source isString and: [ self source: source matchesQuery: query matchCase: matchCase ]) ifTrue: [
+			matches add: method ] ].
+	^ matches
+]
+
+{ #category : 'private' }
+PharoCAToolSearchMethodSource class >> snippetFor: source query: query matchCase: matchCase [
+	| haystack needle start finish |
+	haystack := matchCase ifTrue: [ source ] ifFalse: [ source asLowercase ].
+	needle := matchCase ifTrue: [ query ] ifFalse: [ query asLowercase ].
+	start := haystack findString: needle startingAt: 1.
+	start = 0 ifTrue: [ ^ (source copyFrom: 1 to: (source size min: 240)) ].
+	start := (start - 80) max: 1.
+	finish := (start + 239) min: source size.
+	^ source copyFrom: start to: finish
+]
+
+{ #category : 'private' }
+PharoCAToolSearchMethodSource class >> source: source matchesQuery: query matchCase: matchCase [
+	| haystack needle |
+	haystack := matchCase ifTrue: [ source ] ifFalse: [ source asLowercase ].
+	needle := matchCase ifTrue: [ query ] ifFalse: [ query asLowercase ].
+	^ haystack includesSubstring: needle
+]
+
+{ #category : 'definition' }
+PharoCAToolSearchMethodSource class >> toolName [ ^ #search_method_source
+]
+
+{ #category : 'definition' }
+PharoCAToolSearchMethodSource class >> toolPack [ ^ #browse
 ]

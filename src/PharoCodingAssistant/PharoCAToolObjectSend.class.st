@@ -7,32 +7,13 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolObjectSend class >> toolName [ ^ #object_send ]
-{ #category : 'definition' }
-PharoCAToolObjectSend class >> toolPack [ ^ #execution ]
-{ #category : 'definition' }
-PharoCAToolObjectSend class >> capability [ ^ #evaluation ]
-{ #category : 'execution' }
-PharoCAToolObjectSend class >> executionMode [ ^ #exclusiveMutation ]
-{ #category : 'definition' }
-PharoCAToolObjectSend class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'object_send' description: 'Sends a selector to a live object handle. Arguments are JSON literals or {handle:"obj-N"} references. This is arbitrary execution and requires evaluation capability.' parameters: {
-		'type' -> 'object'.
-		'properties' -> {
-			'handle' -> { 'type' -> 'string' } asDictionary.
-			'selector' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
-			'arguments' -> { 'type' -> 'array'. 'maxItems' -> 20 } asDictionary
-		} asDictionary.
-		'required' -> #('handle' 'selector') } asDictionary
+PharoCAToolObjectSend class >> capability [ ^ #evaluation
 ]
+
 { #category : 'execution' }
-PharoCAToolObjectSend class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
-{ #category : 'private' }
-PharoCAToolObjectSend class >> resolvedArgument: argument registry: registry [
-	(argument isDictionary and: [ argument size = 1 and: [ argument includesKey: 'handle' ] ]) ifTrue: [
-		^ registry objectAt: (argument at: 'handle') ].
-	^ argument
+PharoCAToolObjectSend class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
 ]
+
 { #category : 'execution' }
 PharoCAToolObjectSend class >> execute: args context: context [
 	| registry receiver selector arguments result handle |
@@ -48,4 +29,35 @@ PharoCAToolObjectSend class >> execute: args context: context [
 	context recordChangeKind: #opaqueEvaluation target: receiver class name before: nil after: nil metadata: {
 		'selector' -> selector asString. 'resultHandle' -> handle. 'effectsInspectable' -> false } asDictionary.
 	^ { 'handle' -> handle. 'className' -> result class name asString. 'printString' -> (PharoCAToolEvaluateExpression boundedPrintStringOf: result) } asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolObjectSend class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolObjectSend class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'object_send' description: 'Sends a selector to a live object handle. Arguments are JSON literals or {handle:"obj-N"} references. This is arbitrary execution and requires evaluation capability.' parameters: {
+		'type' -> 'object'.
+		'properties' -> {
+			'handle' -> { 'type' -> 'string' } asDictionary.
+			'selector' -> { 'type' -> 'string'. 'maxLength' -> 200 } asDictionary.
+			'arguments' -> { 'type' -> 'array'. 'maxItems' -> 20 } asDictionary
+		} asDictionary.
+		'required' -> #('handle' 'selector') } asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolObjectSend class >> resolvedArgument: argument registry: registry [
+	(argument isDictionary and: [ argument size = 1 and: [ argument includesKey: 'handle' ] ]) ifTrue: [
+		^ registry objectAt: (argument at: 'handle') ].
+	^ argument
+]
+
+{ #category : 'definition' }
+PharoCAToolObjectSend class >> toolName [ ^ #object_send
+]
+
+{ #category : 'definition' }
+PharoCAToolObjectSend class >> toolPack [ ^ #execution
 ]

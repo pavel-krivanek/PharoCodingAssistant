@@ -1,8 +1,15 @@
-"Shared readers/exclusive scheduler for tool execution. #parallelSafe tools may overlap; #sequential and #exclusiveMutation tools execute exclusively. Waiting is cancellation/deadline aware."
+"
+Shared readers/exclusive scheduler for tool execution. #parallelSafe tools may overlap; #sequential and #exclusiveMutation tools execute exclusively. Waiting is cancellation/deadline aware.
+"
 Class {
 	#name : 'PharoCAToolScheduler',
 	#superclass : 'Object',
-	#instVars : [ 'readerMutex', 'resourceSemaphore', 'writerGate', 'activeReaders' ],
+	#instVars : [
+		'readerMutex',
+		'resourceSemaphore',
+		'writerGate',
+		'activeReaders'
+	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'

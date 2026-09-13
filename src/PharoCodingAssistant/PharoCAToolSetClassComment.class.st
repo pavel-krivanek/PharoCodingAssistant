@@ -1,4 +1,6 @@
-"Sets the comment/description for a given class."
+"
+Sets the comment/description for a given class.
+"
 Class {
 	#name : 'PharoCAToolSetClassComment',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolSetClassComment class >> capability [ ^ #coding
+]
 
 { #category : 'execution' }
 PharoCAToolSetClassComment class >> execute: args [
@@ -34,18 +40,9 @@ PharoCAToolSetClassComment class >> execute: args context: context [
 	} asDictionary
 ]
 
-{ #category : 'private' }
-PharoCAToolSetClassComment class >> normalizedComment: aString [
-	(aString size >= 2 and: [ aString first = $" and: [ aString last = $" ] ]) ifTrue: [
-		^ aString copyFrom: 2 to: aString size - 1 ].
-	^ aString
-]
-
-{ #category : 'definition' }
-PharoCAToolSetClassComment class >> capability [ ^ #coding ]
-
 { #category : 'execution' }
-PharoCAToolSetClassComment class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolSetClassComment class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'definition' }
 PharoCAToolSetClassComment class >> llmDefinition [
@@ -55,5 +52,13 @@ PharoCAToolSetClassComment class >> llmDefinition [
 		parameters: { 'properties' -> { 'className' -> { 'type' -> 'string' } asDictionary. 'comment' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'className'. 'comment' }. 'type' -> 'object' } asDictionary
 ]
 
+{ #category : 'private' }
+PharoCAToolSetClassComment class >> normalizedComment: aString [
+	(aString size >= 2 and: [ aString first = $" and: [ aString last = $" ] ]) ifTrue: [
+		^ aString copyFrom: 2 to: aString size - 1 ].
+	^ aString
+]
+
 { #category : 'definition' }
-PharoCAToolSetClassComment class >> toolName [ ^ #set_class_comment ]
+PharoCAToolSetClassComment class >> toolName [ ^ #set_class_comment
+]

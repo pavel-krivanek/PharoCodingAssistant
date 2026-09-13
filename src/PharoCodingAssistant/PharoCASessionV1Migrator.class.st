@@ -1,4 +1,6 @@
-"Historical migration boundary for session snapshots written before iteration 016. Version 1 stored OpenAI-shaped message dictionaries; current sessions do not."
+"
+Historical migration boundary for session snapshots written before iteration 016. Version 1 stored OpenAI-shaped message dictionaries; current sessions do not.
+"
 Class {
 	#name : 'PharoCASessionV1Migrator',
 	#superclass : 'Object',

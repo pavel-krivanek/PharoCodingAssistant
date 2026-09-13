@@ -51,6 +51,32 @@ PharoCAOpenAIProvider >> credentialResolver [ ^ credentialResolver
 PharoCAOpenAIProvider >> credentialResolver: aResolver [ credentialResolver := aResolver
 ]
 
+{ #category : 'model-discovery' }
+PharoCAOpenAIProvider >> discoverModels [
+	^ self modelsFromWireList: self fetchModelListDictionary
+]
+
+{ #category : 'model-discovery-private' }
+PharoCAOpenAIProvider >> fetchModelListDictionary [
+	| client code apiKey body object |
+	client := ZnClient new.
+	[
+		client timeout: timeout; url: self modelListUrl.
+		apiKey := credentialResolver resolve: credentialName.
+		apiKey ifNotNil: [ client headerAt: 'Authorization' put: 'Bearer ', apiKey ].
+		client get.
+		code := client response code.
+		body := [ client response entity contents ] on: Error do: [ :error | '' ].
+		(code between: 200 and: 299) ifFalse: [
+			PharoCALLMHTTPError statusCode: code responseBody: body ].
+		object := [ STONJSON fromString: body ]
+			on: Error
+			do: [ :error | Error signal: 'Invalid model-list JSON from ', self modelListUrl, ': ', error description ].
+		object isDictionary ifFalse: [ Error signal: 'Model-list response must be a JSON object' ].
+		^ object
+	] ensure: [ [ client close ] on: Error do: [ :error | ] ]
+]
+
 { #category : 'initialization' }
 PharoCAOpenAIProvider >> initialize [
 	super initialize.
@@ -63,12 +89,93 @@ PharoCAOpenAIProvider >> initialize [
 	extendedTelemetryDetected := false
 ]
 
+{ #category : 'model-discovery-mapping' }
+PharoCAOpenAIProvider >> modelFromWireDescriptor: aDictionary [
+	| id model context maximum architecture modalities |
+	aDictionary isDictionary ifFalse: [ Error signal: 'Model descriptor must be an object' ].
+	id := aDictionary at: 'id' ifAbsent: [ Error signal: 'Model descriptor has no id' ].
+	(id isString and: [ id trimBoth isNotEmpty ]) ifFalse: [ Error signal: 'Model descriptor id must be a non-empty string' ].
+	model := PharoCAModel named: id.
+	"Model-list APIs generally do not promise protocol capability metadata. Keep discovery conservative; users may explicitly enable richer capabilities after discovery."
+	model
+		supportsParallelToolCalls: false;
+		supportsReasoning: false;
+		supportsReasoningStreaming: false;
+		supportsUsageStreaming: false.
+	context := self positiveIntegerFromModelDescriptor: aDictionary keys: #('context_length' 'max_context_length' 'context_window' 'max_input_tokens').
+	context ifNil: [
+		| meta |
+		meta := aDictionary at: 'meta' ifAbsent: [ nil ].
+		meta isDictionary ifTrue: [ context := self positiveIntegerFromModelDescriptor: meta keys: #('n_ctx_train' 'n_ctx') ] ].
+	maximum := self positiveIntegerFromModelDescriptor: aDictionary keys: #('max_tokens' 'max_output_tokens' 'maximum_output_tokens').
+	model contextSize: context; maximumOutputTokens: maximum.
+	architecture := aDictionary at: 'architecture' ifAbsent: [ nil ].
+	architecture isDictionary ifTrue: [
+		modalities := architecture at: 'input_modalities' ifAbsent: [ nil ].
+		modalities ifNotNil: [ model supportsImages: (modalities includes: 'image') ] ].
+	^ model
+]
+
+{ #category : 'model-discovery' }
+PharoCAOpenAIProvider >> modelListUrl [
+	| marker index |
+	modelListUrl ifNotNil: [ ^ modelListUrl ].
+	marker := '/chat/completions'.
+	index := baseUrl findString: marker startingAt: 1.
+	index > 0 ifTrue: [ ^ (baseUrl copyFrom: 1 to: index - 1), '/models' ].
+	(baseUrl endsWith: '/v1') ifTrue: [ ^ baseUrl, '/models' ].
+	(baseUrl endsWith: '/') ifTrue: [ ^ baseUrl, 'models' ].
+	^ baseUrl, '/models'
+]
+
+{ #category : 'model-discovery' }
+PharoCAOpenAIProvider >> modelListUrl: aStringOrNil [
+	modelListUrl := aStringOrNil ifNotNil: [ aStringOrNil asString ]
+]
+
+{ #category : 'model-discovery-mapping' }
+PharoCAOpenAIProvider >> modelsFromWireList: aDictionary [
+	| data |
+	aDictionary isDictionary ifFalse: [ Error signal: 'Model-list response must be an object' ].
+	data := aDictionary at: 'data' ifAbsent: [ Error signal: 'Model-list response has no data array' ].
+	(data isArray or: [ data isKindOf: SequenceableCollection ]) ifFalse: [ Error signal: 'Model-list data must be an array' ].
+	^ (data collect: [ :wire | self modelFromWireDescriptor: wire ]) asArray
+]
+
 { #category : 'mapping' }
 PharoCAOpenAIProvider >> normalizedFinishReason: aString [
 	aString ifNil: [ ^ nil ].
 	aString = 'tool_calls' ifTrue: [ ^ #toolCalls ].
 	aString = 'content_filter' ifTrue: [ ^ #contentFilter ].
 	^ aString asSymbol
+]
+
+{ #category : 'telemetry-private' }
+PharoCAOpenAIProvider >> noteProviderMetrics: metrics [
+	(self serverTelemetryMode = #auto
+		and: [ metrics isDictionary
+		and: [ (metrics at: 'format' ifAbsent: [ '' ]) = 'llama.cpp-timings' ] ]) ifTrue: [
+		extendedTelemetryDetected := true ]
+]
+
+{ #category : 'model-discovery-mapping' }
+PharoCAOpenAIProvider >> positiveIntegerFromModelDescriptor: aDictionary keys: keys [
+	keys do: [ :key |
+		| value |
+		value := aDictionary at: key ifAbsent: [ nil ].
+		(value isInteger and: [ value > 0 ]) ifTrue: [ ^ value ] ].
+	^ nil
+]
+
+{ #category : 'mapping' }
+PharoCAOpenAIProvider >> preparedStreamingPayloadFrom: aDictionary [
+	| payload |
+	payload := aDictionary copy.
+	payload at: 'stream' put: true.
+	self shouldRequestExtendedServerTelemetry ifTrue: [
+		payload at: 'return_progress' ifAbsentPut: [ true ].
+		payload at: 'timings_per_token' ifAbsentPut: [ true ] ].
+	^ payload
 ]
 
 { #category : 'accessing' }
@@ -95,6 +202,29 @@ PharoCAOpenAIProvider >> responseFromWireCompletion: aDictionary [
 	finish := self normalizedFinishReason: (choice at: 'finish_reason' ifAbsent: [ nil ]).
 	usageObject := (aDictionary at: 'usage' ifAbsent: [ nil ]) ifNotNil: [ :wireUsage | self usageFromWire: wireUsage ].
 	^ PharoCALLMResponse message: message finishReason: finish usage: usageObject
+]
+
+{ #category : 'telemetry' }
+PharoCAOpenAIProvider >> serverTelemetryMode [
+	^ serverTelemetryMode ifNil: [ #auto ]
+]
+
+{ #category : 'telemetry' }
+PharoCAOpenAIProvider >> serverTelemetryMode: aSymbolOrString [
+	| normalized |
+	normalized := aSymbolOrString ifNil: [ 'auto' ] ifNotNil: [ aSymbolOrString asString asLowercase ].
+	(#('auto' 'standard' 'llamacpp') includes: normalized) ifFalse: [
+		Error signal: 'serverTelemetryMode must be auto, standard, or llamacpp' ].
+	serverTelemetryMode := normalized asSymbol.
+	serverTelemetryMode = #standard ifTrue: [ extendedTelemetryDetected := false ].
+	^ self
+]
+
+{ #category : 'telemetry-private' }
+PharoCAOpenAIProvider >> shouldRequestExtendedServerTelemetry [
+	self serverTelemetryMode = #llamacpp ifTrue: [ ^ true ].
+	self serverTelemetryMode = #standard ifTrue: [ ^ false ].
+	^ extendedTelemetryDetected = true
 ]
 
 { #category : 'compatibility' }
@@ -163,6 +293,11 @@ PharoCAOpenAIProvider >> streamWirePayloadOnce: aDictionary eventsDo: aBlock can
 		[ client close ] on: Error do: [ :error | ] ]
 ]
 
+{ #category : 'model-discovery' }
+PharoCAOpenAIProvider >> supportsModelDiscovery [
+	^ true
+]
+
 { #category : 'accessing' }
 PharoCAOpenAIProvider >> timeout [ ^ timeout
 ]
@@ -209,7 +344,6 @@ PharoCAOpenAIProvider >> wireMessageFor: message [
 		result at: 'tool_calls' put: (message toolCalls collect: [ :call | self wireToolCallFor: call ]) asArray ].
 	^ result
 ]
-
 
 { #category : 'mapping-056' }
 PharoCAOpenAIProvider >> wireMessagesForRequest: request [
@@ -270,6 +404,18 @@ PharoCAOpenAIProvider >> wirePayloadForRequest: aRequest [
 ]
 
 { #category : 'mapping' }
+PharoCAOpenAIProvider >> wireStreamingPayloadForRequest: aRequest [
+	| payload streamOptions |
+	payload := self wirePayloadForRequest: aRequest.
+	(aRequest model respondsTo: #supportsUsageStreaming) ifTrue: [
+		aRequest model supportsUsageStreaming ifTrue: [
+			streamOptions := (payload at: 'stream_options' ifAbsent: [ Dictionary new ]) copy.
+			streamOptions at: 'include_usage' put: true.
+			payload at: 'stream_options' put: streamOptions ] ].
+	^ payload
+]
+
+{ #category : 'mapping' }
 PharoCAOpenAIProvider >> wireToolCallFor: call [
 	^ {
 		'id' -> call id.
@@ -288,154 +434,4 @@ PharoCAOpenAIProvider >> wireToolDefinitionFor: definition [
 			'parameters' -> definition parameters
 		} asDictionary)
 	} asDictionary
-]
-
-{ #category : 'model-discovery' }
-PharoCAOpenAIProvider >> supportsModelDiscovery [
-	^ true
-]
-
-{ #category : 'model-discovery' }
-PharoCAOpenAIProvider >> modelListUrl [
-	| marker index |
-	modelListUrl ifNotNil: [ ^ modelListUrl ].
-	marker := '/chat/completions'.
-	index := baseUrl findString: marker startingAt: 1.
-	index > 0 ifTrue: [ ^ (baseUrl copyFrom: 1 to: index - 1), '/models' ].
-	(baseUrl endsWith: '/v1') ifTrue: [ ^ baseUrl, '/models' ].
-	(baseUrl endsWith: '/') ifTrue: [ ^ baseUrl, 'models' ].
-	^ baseUrl, '/models'
-]
-
-{ #category : 'model-discovery' }
-PharoCAOpenAIProvider >> modelListUrl: aStringOrNil [
-	modelListUrl := aStringOrNil ifNotNil: [ aStringOrNil asString ]
-]
-
-{ #category : 'model-discovery' }
-PharoCAOpenAIProvider >> discoverModels [
-	^ self modelsFromWireList: self fetchModelListDictionary
-]
-
-{ #category : 'model-discovery-private' }
-PharoCAOpenAIProvider >> fetchModelListDictionary [
-	| client code apiKey body object |
-	client := ZnClient new.
-	[
-		client timeout: timeout; url: self modelListUrl.
-		apiKey := credentialResolver resolve: credentialName.
-		apiKey ifNotNil: [ client headerAt: 'Authorization' put: 'Bearer ', apiKey ].
-		client get.
-		code := client response code.
-		body := [ client response entity contents ] on: Error do: [ :error | '' ].
-		(code between: 200 and: 299) ifFalse: [
-			PharoCALLMHTTPError statusCode: code responseBody: body ].
-		object := [ STONJSON fromString: body ]
-			on: Error
-			do: [ :error | Error signal: 'Invalid model-list JSON from ', self modelListUrl, ': ', error description ].
-		object isDictionary ifFalse: [ Error signal: 'Model-list response must be a JSON object' ].
-		^ object
-	] ensure: [ [ client close ] on: Error do: [ :error | ] ]
-]
-
-{ #category : 'model-discovery-mapping' }
-PharoCAOpenAIProvider >> modelsFromWireList: aDictionary [
-	| data |
-	aDictionary isDictionary ifFalse: [ Error signal: 'Model-list response must be an object' ].
-	data := aDictionary at: 'data' ifAbsent: [ Error signal: 'Model-list response has no data array' ].
-	(data isArray or: [ data isKindOf: SequenceableCollection ]) ifFalse: [ Error signal: 'Model-list data must be an array' ].
-	^ (data collect: [ :wire | self modelFromWireDescriptor: wire ]) asArray
-]
-
-{ #category : 'model-discovery-mapping' }
-PharoCAOpenAIProvider >> modelFromWireDescriptor: aDictionary [
-	| id model context maximum architecture modalities |
-	aDictionary isDictionary ifFalse: [ Error signal: 'Model descriptor must be an object' ].
-	id := aDictionary at: 'id' ifAbsent: [ Error signal: 'Model descriptor has no id' ].
-	(id isString and: [ id trimBoth isNotEmpty ]) ifFalse: [ Error signal: 'Model descriptor id must be a non-empty string' ].
-	model := PharoCAModel named: id.
-	"Model-list APIs generally do not promise protocol capability metadata. Keep discovery conservative; users may explicitly enable richer capabilities after discovery."
-	model
-		supportsParallelToolCalls: false;
-		supportsReasoning: false;
-		supportsReasoningStreaming: false;
-		supportsUsageStreaming: false.
-	context := self positiveIntegerFromModelDescriptor: aDictionary keys: #('context_length' 'max_context_length' 'context_window' 'max_input_tokens').
-	context ifNil: [
-		| meta |
-		meta := aDictionary at: 'meta' ifAbsent: [ nil ].
-		meta isDictionary ifTrue: [ context := self positiveIntegerFromModelDescriptor: meta keys: #('n_ctx_train' 'n_ctx') ] ].
-	maximum := self positiveIntegerFromModelDescriptor: aDictionary keys: #('max_tokens' 'max_output_tokens' 'maximum_output_tokens').
-	model contextSize: context; maximumOutputTokens: maximum.
-	architecture := aDictionary at: 'architecture' ifAbsent: [ nil ].
-	architecture isDictionary ifTrue: [
-		modalities := architecture at: 'input_modalities' ifAbsent: [ nil ].
-		modalities ifNotNil: [ model supportsImages: (modalities includes: 'image') ] ].
-	^ model
-]
-
-{ #category : 'model-discovery-mapping' }
-PharoCAOpenAIProvider >> positiveIntegerFromModelDescriptor: aDictionary keys: keys [
-	keys do: [ :key |
-		| value |
-		value := aDictionary at: key ifAbsent: [ nil ].
-		(value isInteger and: [ value > 0 ]) ifTrue: [ ^ value ] ].
-	^ nil
-]
-
-
-
-{ #category : 'telemetry' }
-PharoCAOpenAIProvider >> serverTelemetryMode [
-	^ serverTelemetryMode ifNil: [ #auto ]
-]
-
-{ #category : 'telemetry' }
-PharoCAOpenAIProvider >> serverTelemetryMode: aSymbolOrString [
-	| normalized |
-	normalized := aSymbolOrString ifNil: [ 'auto' ] ifNotNil: [ aSymbolOrString asString asLowercase ].
-	(#('auto' 'standard' 'llamacpp') includes: normalized) ifFalse: [
-		Error signal: 'serverTelemetryMode must be auto, standard, or llamacpp' ].
-	serverTelemetryMode := normalized asSymbol.
-	serverTelemetryMode = #standard ifTrue: [ extendedTelemetryDetected := false ].
-	^ self
-]
-
-{ #category : 'telemetry-private' }
-PharoCAOpenAIProvider >> noteProviderMetrics: metrics [
-	(self serverTelemetryMode = #auto
-		and: [ metrics isDictionary
-		and: [ (metrics at: 'format' ifAbsent: [ '' ]) = 'llama.cpp-timings' ] ]) ifTrue: [
-		extendedTelemetryDetected := true ]
-]
-
-{ #category : 'telemetry-private' }
-PharoCAOpenAIProvider >> shouldRequestExtendedServerTelemetry [
-	self serverTelemetryMode = #llamacpp ifTrue: [ ^ true ].
-	self serverTelemetryMode = #standard ifTrue: [ ^ false ].
-	^ extendedTelemetryDetected = true
-]
-
-{ #category : 'mapping' }
-PharoCAOpenAIProvider >> wireStreamingPayloadForRequest: aRequest [
-	| payload streamOptions |
-	payload := self wirePayloadForRequest: aRequest.
-	(aRequest model respondsTo: #supportsUsageStreaming) ifTrue: [
-		aRequest model supportsUsageStreaming ifTrue: [
-			streamOptions := (payload at: 'stream_options' ifAbsent: [ Dictionary new ]) copy.
-			streamOptions at: 'include_usage' put: true.
-			payload at: 'stream_options' put: streamOptions ] ].
-	^ payload
-]
-
-
-{ #category : 'mapping' }
-PharoCAOpenAIProvider >> preparedStreamingPayloadFrom: aDictionary [
-	| payload |
-	payload := aDictionary copy.
-	payload at: 'stream' put: true.
-	self shouldRequestExtendedServerTelemetry ifTrue: [
-		payload at: 'return_progress' ifAbsentPut: [ true ].
-		payload at: 'timings_per_token' ifAbsentPut: [ true ] ].
-	^ payload
 ]

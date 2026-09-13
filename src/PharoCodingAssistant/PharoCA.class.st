@@ -1,4 +1,6 @@
-"Compatibility entry point. All coding-agent behavior is implemented by PharoCAAgent."
+"
+Compatibility entry point. All coding-agent behavior is implemented by PharoCAAgent.
+"
 Class {
 	#name : 'PharoCA',
 	#superclass : 'PharoCAAgent',

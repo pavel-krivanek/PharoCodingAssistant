@@ -1,8 +1,15 @@
-"Passive prompt-template resource discovered by the workspace loader. Invocation/argument semantics belong to iteration 021's command/template layer."
+"
+Passive prompt-template resource discovered by the workspace loader. Invocation/argument semantics belong to iteration 021's command/template layer.
+"
 Class {
 	#name : 'PharoCAPromptTemplate',
 	#superclass : 'Object',
-	#instVars : [ 'name', 'content', 'scope', 'sourcePath' ],
+	#instVars : [
+		'name',
+		'content',
+		'scope',
+		'sourcePath'
+	],
 	#category : 'PharoCodingAssistant-Workspace',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Workspace'
@@ -12,23 +19,6 @@ Class {
 PharoCAPromptTemplate class >> named: aName content: aString [
 	^ self new name: aName; content: aString; yourself
 ]
-
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> name [ ^ name ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> name: aName [ name := aName asString ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> content [ ^ content ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> content: aString [ content := aString ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> scope [ ^ scope ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> scope: anObject [ scope := anObject ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> sourcePath [ ^ sourcePath ]
-{ #category : 'accessing' }
-PharoCAPromptTemplate >> sourcePath: anObject [ sourcePath := anObject ]
 
 { #category : 'converting' }
 PharoCAPromptTemplate >> asDictionary [
@@ -40,6 +30,21 @@ PharoCAPromptTemplate >> asDictionary [
 	} asDictionary
 ]
 
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> content [ ^ content
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> content: aString [ content := aString
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> name [ ^ name
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> name: aName [ name := aName asString
+]
 
 { #category : 'rendering' }
 PharoCAPromptTemplate >> renderWith: aDictionary [
@@ -50,6 +55,22 @@ PharoCAPromptTemplate >> renderWith: aDictionary [
 		rendered := rendered copyReplaceAll: '{{', key asString, '}}' with: value asString ].
 	(rendered includesSubstring: '{{') ifTrue: [ Error signal: 'Template has unresolved variables' ].
 	^ rendered
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> scope [ ^ scope
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> scope: anObject [ scope := anObject
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> sourcePath [ ^ sourcePath
+]
+
+{ #category : 'accessing' }
+PharoCAPromptTemplate >> sourcePath: anObject [ sourcePath := anObject
 ]
 
 { #category : 'rendering' }

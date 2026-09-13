@@ -1,12 +1,28 @@
-"A named, ordered source of instructions that is composed into the ephemeral model context rather than stored as conversation history."
+"
+A named, ordered source of instructions that is composed into the ephemeral model context rather than stored as conversation history.
+"
 Class {
 	#name : 'PharoCAInstructionSource',
 	#superclass : 'Object',
-	#instVars : [ 'name', 'content', 'kind', 'priority', 'enabled', 'sourcePath' ],
+	#instVars : [
+		'name',
+		'content',
+		'kind',
+		'priority',
+		'enabled',
+		'sourcePath'
+	],
 	#category : 'PharoCodingAssistant-Instructions',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Instructions'
 }
+
+{ #category : 'instance creation' }
+PharoCAInstructionSource class >> globalNamed: aName content: aString [
+	^ (self named: aName content: aString)
+		kind: #global;
+		yourself
+]
 
 { #category : 'instance creation' }
 PharoCAInstructionSource class >> named: aName content: aString [
@@ -17,9 +33,9 @@ PharoCAInstructionSource class >> named: aName content: aString [
 ]
 
 { #category : 'instance creation' }
-PharoCAInstructionSource class >> globalNamed: aName content: aString [
+PharoCAInstructionSource class >> packageNamed: aName content: aString [
 	^ (self named: aName content: aString)
-		kind: #global;
+		kind: #package;
 		yourself
 ]
 
@@ -30,15 +46,20 @@ PharoCAInstructionSource class >> projectNamed: aName content: aString [
 		yourself
 ]
 
-{ #category : 'instance creation' }
-PharoCAInstructionSource class >> packageNamed: aName content: aString [
-	^ (self named: aName content: aString)
-		kind: #package;
-		yourself
+{ #category : 'converting' }
+PharoCAInstructionSource >> asDictionary [
+	^ {
+		'name' -> name.
+		'kind' -> kind asString.
+		'priority' -> priority.
+		'enabled' -> enabled.
+		'sourcePath' -> sourcePath
+	} asDictionary
 ]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> content [ ^ content ]
+PharoCAInstructionSource >> content [ ^ content
+]
 
 { #category : 'accessing' }
 PharoCAInstructionSource >> content: aString [
@@ -47,10 +68,12 @@ PharoCAInstructionSource >> content: aString [
 ]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> enabled [ ^ enabled ]
+PharoCAInstructionSource >> enabled [ ^ enabled
+]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> enabled: aBoolean [ enabled := aBoolean ]
+PharoCAInstructionSource >> enabled: aBoolean [ enabled := aBoolean
+]
 
 { #category : 'initialization' }
 PharoCAInstructionSource >> initialize [
@@ -61,13 +84,16 @@ PharoCAInstructionSource >> initialize [
 ]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> kind [ ^ kind ]
+PharoCAInstructionSource >> kind [ ^ kind
+]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> kind: aSymbol [ kind := aSymbol ]
+PharoCAInstructionSource >> kind: aSymbol [ kind := aSymbol
+]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> name [ ^ name ]
+PharoCAInstructionSource >> name [ ^ name
+]
 
 { #category : 'accessing' }
 PharoCAInstructionSource >> name: aName [
@@ -78,25 +104,17 @@ PharoCAInstructionSource >> name: aName [
 ]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> priority [ ^ priority ]
+PharoCAInstructionSource >> priority [ ^ priority
+]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> priority: anInteger [ priority := anInteger ]
-
-
-{ #category : 'accessing' }
-PharoCAInstructionSource >> sourcePath [ ^ sourcePath ]
+PharoCAInstructionSource >> priority: anInteger [ priority := anInteger
+]
 
 { #category : 'accessing' }
-PharoCAInstructionSource >> sourcePath: anObject [ sourcePath := anObject ]
+PharoCAInstructionSource >> sourcePath [ ^ sourcePath
+]
 
-{ #category : 'converting' }
-PharoCAInstructionSource >> asDictionary [
-	^ {
-		'name' -> name.
-		'kind' -> kind asString.
-		'priority' -> priority.
-		'enabled' -> enabled.
-		'sourcePath' -> sourcePath
-	} asDictionary
+{ #category : 'accessing' }
+PharoCAInstructionSource >> sourcePath: anObject [ sourcePath := anObject
 ]

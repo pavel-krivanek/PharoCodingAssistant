@@ -1,30 +1,53 @@
-"Incremental OpenAI-compatible SSE parser. OpenAI wire fields terminate here; completion and emitted semantic payloads are provider-neutral objects."
+"
+Incremental OpenAI-compatible SSE parser. OpenAI wire fields terminate here; completion and emitted semantic payloads are provider-neutral objects.
+"
 Class {
 	#name : 'PharoCAOpenAIStreamParser',
 	#superclass : 'Object',
-	#instVars : [ 'content', 'reasoning', 'role', 'finishReason', 'toolCalls', 'usage', 'done', 'lastMetricsPredictedMilliseconds' ],
+	#instVars : [
+		'content',
+		'reasoning',
+		'role',
+		'finishReason',
+		'toolCalls',
+		'usage',
+		'done',
+		'lastMetricsPredictedMilliseconds'
+	],
 	#category : 'PharoCodingAssistant-LLM',
 	#package : 'PharoCodingAssistant',
 	#tag : 'LLM'
 }
 
-{ #category : 'initialization' }
-PharoCAOpenAIStreamParser >> initialize [
-	super initialize.
-	content := ''.
-	reasoning := ''.
-	role := #assistant.
-	finishReason := nil.
-	toolCalls := Dictionary new.
-	usage := nil.
-	done := false.
-	lastMetricsPredictedMilliseconds := nil
-]
-
 { #category : 'private' }
 PharoCAOpenAIStreamParser >> append: fragment to: key in: dictionary [
 	fragment ifNil: [ ^ self ].
 	dictionary at: key put: ((dictionary at: key ifAbsent: [ '' ]) , fragment)
+]
+
+{ #category : 'accessing' }
+PharoCAOpenAIStreamParser >> completion [
+	| calls message |
+	calls := (toolCalls keys sorted collect: [ :wireIndex | self finalizedToolCallAt: wireIndex ]) asArray.
+	message := PharoCALLMMessage assistant: content toolCalls: calls reasoning: reasoning.
+	^ PharoCALLMResponse message: message finishReason: finishReason usage: usage
+]
+
+{ #category : 'private' }
+PharoCAOpenAIStreamParser >> consumeChoice: choice eventDo: aBlock [
+	| delta reasonFragment |
+	delta := choice at: 'delta' ifAbsent: [ Dictionary new ].
+	(delta at: 'role' ifAbsent: [ nil ]) ifNotNil: [ :newRole | role := newRole asSymbol ].
+	(delta at: 'content' ifAbsent: [ nil ]) ifNotNil: [ :fragment |
+		content := content , fragment.
+		aBlock value: (PharoCALLMStreamEvent type: #textDelta payload: fragment) ].
+	reasonFragment := delta at: 'reasoning_content' ifAbsent: [ delta at: 'reasoning' ifAbsent: [ nil ] ].
+	reasonFragment ifNotNil: [
+		reasoning := reasoning , reasonFragment.
+		aBlock value: (PharoCALLMStreamEvent type: #reasoningDelta payload: reasonFragment) ].
+	(delta at: 'tool_calls' ifAbsent: [ #() ]) do: [ :toolCallDelta |
+		self consumeToolCallDelta: toolCallDelta eventDo: aBlock ].
+	(choice at: 'finish_reason' ifAbsent: [ nil ]) ifNotNil: [ :reason | finishReason := self normalizedFinishReason: reason ]
 ]
 
 { #category : 'parsing' }
@@ -60,23 +83,6 @@ PharoCAOpenAIStreamParser >> consumeObject: object eventDo: aBlock [
 ]
 
 { #category : 'private' }
-PharoCAOpenAIStreamParser >> consumeChoice: choice eventDo: aBlock [
-	| delta reasonFragment |
-	delta := choice at: 'delta' ifAbsent: [ Dictionary new ].
-	(delta at: 'role' ifAbsent: [ nil ]) ifNotNil: [ :newRole | role := newRole asSymbol ].
-	(delta at: 'content' ifAbsent: [ nil ]) ifNotNil: [ :fragment |
-		content := content , fragment.
-		aBlock value: (PharoCALLMStreamEvent type: #textDelta payload: fragment) ].
-	reasonFragment := delta at: 'reasoning_content' ifAbsent: [ delta at: 'reasoning' ifAbsent: [ nil ] ].
-	reasonFragment ifNotNil: [
-		reasoning := reasoning , reasonFragment.
-		aBlock value: (PharoCALLMStreamEvent type: #reasoningDelta payload: reasonFragment) ].
-	(delta at: 'tool_calls' ifAbsent: [ #() ]) do: [ :toolCallDelta |
-		self consumeToolCallDelta: toolCallDelta eventDo: aBlock ].
-	(choice at: 'finish_reason' ifAbsent: [ nil ]) ifNotNil: [ :reason | finishReason := self normalizedFinishReason: reason ]
-]
-
-{ #category : 'private' }
 PharoCAOpenAIStreamParser >> consumeToolCallDelta: delta eventDo: aBlock [
 	| wireIndex state function semanticDelta |
 	wireIndex := delta at: 'index' ifAbsent: [ 0 ].
@@ -95,6 +101,10 @@ PharoCAOpenAIStreamParser >> consumeToolCallDelta: delta eventDo: aBlock [
 	aBlock value: (PharoCALLMStreamEvent type: #toolCallDelta payload: semanticDelta)
 ]
 
+{ #category : 'testing' }
+PharoCAOpenAIStreamParser >> done [ ^ done
+]
+
 { #category : 'private' }
 PharoCAOpenAIStreamParser >> finalizedToolCallAt: wireIndex [
 	| state |
@@ -106,6 +116,27 @@ PharoCAOpenAIStreamParser >> finalizedToolCallAt: wireIndex [
 		index: wireIndex + 1
 ]
 
+{ #category : 'initialization' }
+PharoCAOpenAIStreamParser >> initialize [
+	super initialize.
+	content := ''.
+	reasoning := ''.
+	role := #assistant.
+	finishReason := nil.
+	toolCalls := Dictionary new.
+	usage := nil.
+	done := false.
+	lastMetricsPredictedMilliseconds := nil
+]
+
+{ #category : 'private-telemetry' }
+PharoCAOpenAIStreamParser >> nonNegativeNumberAt: key in: dictionary default: defaultValue [
+	| value |
+	value := dictionary at: key ifAbsent: [ defaultValue ].
+	(value isNumber and: [ value >= 0 ]) ifFalse: [ ^ defaultValue ].
+	^ value
+]
+
 { #category : 'private' }
 PharoCAOpenAIStreamParser >> normalizedFinishReason: aString [
 	aString ifNil: [ ^ nil ].
@@ -114,36 +145,29 @@ PharoCAOpenAIStreamParser >> normalizedFinishReason: aString [
 	^ aString asSymbol
 ]
 
-{ #category : 'private' }
-PharoCAOpenAIStreamParser >> usageFromWire: aDictionary [
-	| details |
-	details := aDictionary at: 'completion_tokens_details' ifAbsent: [ Dictionary new ].
-	^ PharoCALLMUsage new
-		promptTokens: (aDictionary at: 'prompt_tokens' ifAbsent: [ 0 ]);
-		completionTokens: (aDictionary at: 'completion_tokens' ifAbsent: [ 0 ]);
-		totalTokens: (aDictionary at: 'total_tokens' ifAbsent: [ 0 ]);
-		reasoningTokens: (details at: 'reasoning_tokens' ifAbsent: [ 0 ]);
-		yourself
-]
-
-{ #category : 'accessing' }
-PharoCAOpenAIStreamParser >> completion [
-	| calls message |
-	calls := (toolCalls keys sorted collect: [ :wireIndex | self finalizedToolCallAt: wireIndex ]) asArray.
-	message := PharoCALLMMessage assistant: content toolCalls: calls reasoning: reasoning.
-	^ PharoCALLMResponse message: message finishReason: finishReason usage: usage
-]
-
-{ #category : 'testing' }
-PharoCAOpenAIStreamParser >> done [ ^ done ]
-
-
 { #category : 'private-telemetry' }
-PharoCAOpenAIStreamParser >> nonNegativeNumberAt: key in: dictionary default: defaultValue [
-	| value |
-	value := dictionary at: key ifAbsent: [ defaultValue ].
-	(value isNumber and: [ value >= 0 ]) ifFalse: [ ^ defaultValue ].
-	^ value
+PharoCAOpenAIStreamParser >> promptProgressFromWire: progress [
+	| total cache processed elapsed timedProcessed timedTotal rate |
+	total := self nonNegativeNumberAt: 'total' in: progress default: 0.
+	cache := self nonNegativeNumberAt: 'cache' in: progress default: 0.
+	processed := self nonNegativeNumberAt: 'processed' in: progress default: 0.
+	elapsed := self nonNegativeNumberAt: 'time_ms' in: progress default: 0.
+	timedProcessed := (processed - cache) max: 0.
+	timedTotal := (total - cache) max: 0.
+	rate := elapsed > 0 ifTrue: [ timedProcessed asFloat * 1000.0 / elapsed asFloat ] ifFalse: [ 0.0 ].
+	^ {
+		'source' -> 'server'.
+		'format' -> 'llama.cpp-prompt-progress'.
+		'totalTokens' -> total.
+		'cachedTokens' -> cache.
+		'processedTokens' -> processed.
+		'promptTokensProcessed' -> timedProcessed.
+		'promptTokensToProcess' -> timedTotal.
+		'elapsedMilliseconds' -> elapsed.
+		'progress' -> (total > 0 ifTrue: [ processed asFloat / total asFloat ] ifFalse: [ 0.0 ]).
+		'processingProgress' -> (timedTotal > 0 ifTrue: [ timedProcessed asFloat / timedTotal asFloat ] ifFalse: [ 1.0 ]).
+		'promptTokensPerSecond' -> rate
+	} asDictionary
 ]
 
 { #category : 'private-telemetry' }
@@ -183,31 +207,6 @@ PharoCAOpenAIStreamParser >> providerMetricsFromWire: timings [
 ]
 
 { #category : 'private-telemetry' }
-PharoCAOpenAIStreamParser >> promptProgressFromWire: progress [
-	| total cache processed elapsed timedProcessed timedTotal rate |
-	total := self nonNegativeNumberAt: 'total' in: progress default: 0.
-	cache := self nonNegativeNumberAt: 'cache' in: progress default: 0.
-	processed := self nonNegativeNumberAt: 'processed' in: progress default: 0.
-	elapsed := self nonNegativeNumberAt: 'time_ms' in: progress default: 0.
-	timedProcessed := (processed - cache) max: 0.
-	timedTotal := (total - cache) max: 0.
-	rate := elapsed > 0 ifTrue: [ timedProcessed asFloat * 1000.0 / elapsed asFloat ] ifFalse: [ 0.0 ].
-	^ {
-		'source' -> 'server'.
-		'format' -> 'llama.cpp-prompt-progress'.
-		'totalTokens' -> total.
-		'cachedTokens' -> cache.
-		'processedTokens' -> processed.
-		'promptTokensProcessed' -> timedProcessed.
-		'promptTokensToProcess' -> timedTotal.
-		'elapsedMilliseconds' -> elapsed.
-		'progress' -> (total > 0 ifTrue: [ processed asFloat / total asFloat ] ifFalse: [ 0.0 ]).
-		'processingProgress' -> (timedTotal > 0 ifTrue: [ timedProcessed asFloat / timedTotal asFloat ] ifFalse: [ 1.0 ]).
-		'promptTokensPerSecond' -> rate
-	} asDictionary
-]
-
-{ #category : 'private-telemetry' }
 PharoCAOpenAIStreamParser >> shouldEmitMetricsFromWire: timings finishing: finishing usagePresent: usagePresent [
 	| predictedMs |
 	(finishing or: [ usagePresent ]) ifTrue: [
@@ -221,4 +220,16 @@ PharoCAOpenAIStreamParser >> shouldEmitMetricsFromWire: timings finishing: finis
 	(predictedMs - lastMetricsPredictedMilliseconds) >= 500 ifFalse: [ ^ false ].
 	lastMetricsPredictedMilliseconds := predictedMs.
 	^ true
+]
+
+{ #category : 'private' }
+PharoCAOpenAIStreamParser >> usageFromWire: aDictionary [
+	| details |
+	details := aDictionary at: 'completion_tokens_details' ifAbsent: [ Dictionary new ].
+	^ PharoCALLMUsage new
+		promptTokens: (aDictionary at: 'prompt_tokens' ifAbsent: [ 0 ]);
+		completionTokens: (aDictionary at: 'completion_tokens' ifAbsent: [ 0 ]);
+		totalTokens: (aDictionary at: 'total_tokens' ifAbsent: [ 0 ]);
+		reasoningTokens: (details at: 'reasoning_tokens' ifAbsent: [ 0 ]);
+		yourself
 ]

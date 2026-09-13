@@ -1,8 +1,12 @@
-"Raised before any rollback mutation when a checkpoint suffix contains an opaque change or the live image no longer matches the journaled post-change state."
+"
+Raised before any rollback mutation when a checkpoint suffix contains an opaque change or the live image no longer matches the journaled post-change state.
+"
 Class {
 	#name : 'PharoCARollbackBlocked',
 	#superclass : 'Error',
-	#instVars : [ 'details' ],
+	#instVars : [
+		'details'
+	],
 	#category : 'PharoCodingAssistant-Changes',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Changes'
@@ -16,6 +20,9 @@ PharoCARollbackBlocked class >> details: aDictionary [
 ]
 
 { #category : 'accessing' }
-PharoCARollbackBlocked >> details [ ^ details ]
+PharoCARollbackBlocked >> details [ ^ details
+]
+
 { #category : 'accessing' }
-PharoCARollbackBlocked >> details: aDictionary [ details := aDictionary ]
+PharoCARollbackBlocked >> details: aDictionary [ details := aDictionary
+]

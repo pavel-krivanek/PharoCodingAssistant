@@ -1,4 +1,6 @@
-"Previews a native method rename."
+"
+Previews a native method rename.
+"
 Class {
 	#name : 'PharoCAToolRefactorRenameMethod',
 	#superclass : 'PharoCARefactoringTool',
@@ -6,16 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo-Refactoring'
 }
-
-{ #category : 'definition' }
-PharoCAToolRefactorRenameMethod class >> llmDefinition [
-	^ PharoCALLMToolDefinition name: 'refactor_rename_method' description: 'Previews a native Pharo method rename while preserving argument order.' parameters: { 'type' -> 'object'. 'properties' -> {'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'selector' -> { 'type' -> 'string' } asDictionary. 'newSelector' -> { 'type' -> 'string' } asDictionary} asDictionary. 'required' -> #('className' 'selector' 'newSelector') } asDictionary
-]
-
-{ #category : 'definition' }
-PharoCAToolRefactorRenameMethod class >> toolName [
-	^ #refactor_rename_method
-]
 
 { #category : 'private' }
 PharoCAToolRefactorRenameMethod class >> buildRefactoringFrom: args [
@@ -25,15 +17,19 @@ PharoCAToolRefactorRenameMethod class >> buildRefactoringFrom: args [
 	^ ReRenameMethodRefactoring renameMethod: selector in: behavior to: (args at: 'newSelector') asSymbol permutation: permutation
 ]
 
+{ #category : 'execution' }
+PharoCAToolRefactorRenameMethod class >> execute: args context: context [
+	^ super execute: args context: context
+]
 
 { #category : 'execution' }
 PharoCAToolRefactorRenameMethod class >> executionMode [
 	^ #sequential
 ]
 
-{ #category : 'execution' }
-PharoCAToolRefactorRenameMethod class >> execute: args context: context [
-	^ super execute: args context: context
+{ #category : 'definition' }
+PharoCAToolRefactorRenameMethod class >> llmDefinition [
+	^ PharoCALLMToolDefinition name: 'refactor_rename_method' description: 'Previews a native Pharo method rename while preserving argument order.' parameters: { 'type' -> 'object'. 'properties' -> {'side' -> { 'type' -> 'string'. 'enum' -> #('instance' 'class') } asDictionary. 'className' -> { 'type' -> 'string' } asDictionary. 'selector' -> { 'type' -> 'string' } asDictionary. 'newSelector' -> { 'type' -> 'string' } asDictionary} asDictionary. 'required' -> #('className' 'selector' 'newSelector') } asDictionary
 ]
 
 { #category : 'private' }
@@ -41,3 +37,7 @@ PharoCAToolRefactorRenameMethod class >> targetDescriptionFrom: args [
 	^ (args at: 'className'), '>>', (args at: 'selector'), ' -> ', (args at: 'newSelector')
 ]
 
+{ #category : 'definition' }
+PharoCAToolRefactorRenameMethod class >> toolName [
+	^ #refactor_rename_method
+]

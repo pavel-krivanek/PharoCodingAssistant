@@ -1,4 +1,6 @@
-"Minimal Zinc host for the browser UI. HTTP serves the static browser files; all application communication uses a WebSocket endpoint backed by PharoCAExternalProtocol."
+"
+Minimal Zinc host for the browser UI. HTTP serves the static browser files; all application communication uses a WebSocket endpoint backed by PharoCAExternalProtocol.
+"
 Class {
 	#name : 'PharoCAWebServer',
 	#superclass : 'Object',
@@ -13,6 +15,11 @@ Class {
 	#tag : 'Web'
 }
 
+{ #category : 'defaults' }
+PharoCAWebServer class >> defaultPort [
+	^ 17080
+]
+
 { #category : 'instance creation' }
 PharoCAWebServer class >> on: aHarness webRoot: aFileReference [
 	^ self new
@@ -21,9 +28,35 @@ PharoCAWebServer class >> on: aHarness webRoot: aFileReference [
 		yourself
 ]
 
-{ #category : 'defaults' }
-PharoCAWebServer class >> defaultPort [
-	^ 17080
+{ #category : 'http' }
+PharoCAWebServer >> handleRequest: request [
+	(request uri firstPathSegment = 'ws') ifTrue: [ ^ self handleWebSocketUpgrade: request ].
+	(request uri isSlash or: [ request uri firstPathSegment = 'index.html' ]) ifTrue: [ ^ self serveIndex ].
+	request uri firstPathSegment = 'app.js' ifTrue: [
+		request uri pathSegments size = 1 ifFalse: [ ^ ZnResponse notFound: request uri ].
+		^ self serveApplicationScript ].
+	request uri firstPathSegment = 'assets' ifTrue: [
+		request uri pathSegments size = 2 ifFalse: [ ^ ZnResponse notFound: request uri ].
+		^ self serveAssetNamed: request uri pathSegments second ].
+	request uri firstPathSegment = 'artifacts' ifTrue: [
+		request uri pathSegments size = 2 ifFalse: [ ^ ZnResponse notFound: request uri ].
+		^ self serveArtifactId: request uri pathSegments second ].
+	^ ZnResponse notFound: request uri
+]
+
+{ #category : 'websocket' }
+PharoCAWebServer >> handleWebSocketUpgrade: request [
+	| key version upgrade |
+	request method = #GET ifFalse: [ ^ ZnResponse methodNotAllowed: request ].
+	upgrade := request headers at: 'Upgrade' ifAbsent: [ '' ].
+	version := request headers at: 'Sec-WebSocket-Version' ifAbsent: [ '' ].
+	key := request headers at: 'Sec-WebSocket-Key' ifAbsent: [ '' ].
+	(upgrade asLowercase = 'websocket' and: [ version = '13' and: [ key trimBoth isNotEmpty ] ]) ifFalse: [
+		^ ZnResponse badRequest: request entity: (ZnEntity text: 'Invalid WebSocket upgrade request') ].
+	^ PharoCAWebSocketUpgradeResponse
+		forKey: key
+		do: [ :connectionStream |
+			(PharoCAWebSocketConnection on: protocol) runOn: connectionStream ]
 ]
 
 { #category : 'accessing' }
@@ -32,19 +65,67 @@ PharoCAWebServer >> harness: anObject [
 	protocol := PharoCAExternalProtocol on: harness
 ]
 
+{ #category : 'testing' }
+PharoCAWebServer >> isRunning [
+	^ server notNil and: [ server isRunning ]
+]
+
+{ #category : 'accessing' }
+PharoCAWebServer >> port [
+	^ server ifNil: [ nil ] ifNotNil: [ server port ]
+]
+
 { #category : 'accessing' }
 PharoCAWebServer >> protocol [
 	^ protocol
 ]
 
-{ #category : 'accessing' }
-PharoCAWebServer >> webRoot [
-	^ webRoot
+{ #category : 'http-042' }
+PharoCAWebServer >> serveApplicationScript [
+	| file contents |
+	file := webRoot / 'app.js'.
+	file exists ifFalse: [ ^ ZnResponse serverError: 'Static UI script not found: ' , file fullName ].
+	file readStreamDo: [ :input | contents := input upToEnd ].
+	^ ZnResponse ok: (ZnEntity with: contents type: ZnMimeType applicationJavascript)
 ]
 
-{ #category : 'accessing' }
-PharoCAWebServer >> webRoot: aFileReference [
-	webRoot := aFileReference asFileReference
+{ #category : 'http-054' }
+PharoCAWebServer >> serveArtifactId: identifier [
+	| artifact response |
+	[ artifact := harness agent environment artifactStore artifactAt: identifier ]
+		on: Error
+		do: [ :ignored | ^ ZnResponse notFound: '/artifacts/', identifier ].
+	response := ZnResponse ok: (ZnEntity with: artifact bytes type: (ZnMimeType fromString: artifact mimeType)).
+	response headers
+		at: 'Cache-Control' put: 'private, no-store';
+		at: 'X-Content-Type-Options' put: 'nosniff';
+		at: 'Content-Security-Policy' put: 'default-src ''none''; sandbox'.
+	^ response
+]
+
+{ #category : 'http-037' }
+PharoCAWebServer >> serveAssetNamed: aName [
+	| file contents mime |
+	((aName includesSubstring: '..') or: [ aName includes: $/ ]) ifTrue: [
+		^ ZnResponse badRequest: nil entity: (ZnEntity text: 'Invalid asset name') ].
+	file := webRoot / 'assets' / aName.
+	file exists ifFalse: [ ^ ZnResponse notFound: '/assets/' , aName ].
+	file readStreamDo: [ :input | contents := input upToEnd ].
+	mime := (aName endsWith: '.js')
+		ifTrue: [ ZnMimeType applicationJavascript ]
+		ifFalse: [ (aName endsWith: '.css')
+			ifTrue: [ ZnMimeType textCss ]
+			ifFalse: [ ZnMimeType textPlain ] ].
+	^ ZnResponse ok: (ZnEntity with: contents type: mime)
+]
+
+{ #category : 'http' }
+PharoCAWebServer >> serveIndex [
+	| file contents |
+	file := webRoot / 'index.html'.
+	file exists ifFalse: [ ^ ZnResponse serverError: 'Static UI not found: ' , file fullName ].
+	file readStreamDo: [ :input | contents := input upToEnd ].
+	^ ZnResponse ok: (ZnEntity with: contents type: ZnMimeType textHtml)
 ]
 
 { #category : 'running' }
@@ -69,98 +150,17 @@ PharoCAWebServer >> stop [
 	^ self
 ]
 
-{ #category : 'testing' }
-PharoCAWebServer >> isRunning [
-	^ server notNil and: [ server isRunning ]
-]
-
-{ #category : 'accessing' }
-PharoCAWebServer >> port [
-	^ server ifNil: [ nil ] ifNotNil: [ server port ]
-]
-
 { #category : 'accessing' }
 PharoCAWebServer >> url [
 	^ 'http://127.0.0.1:' , self port asString
 ]
 
-{ #category : 'http' }
-PharoCAWebServer >> handleRequest: request [
-	(request uri firstPathSegment = 'ws') ifTrue: [ ^ self handleWebSocketUpgrade: request ].
-	(request uri isSlash or: [ request uri firstPathSegment = 'index.html' ]) ifTrue: [ ^ self serveIndex ].
-	request uri firstPathSegment = 'app.js' ifTrue: [
-		request uri pathSegments size = 1 ifFalse: [ ^ ZnResponse notFound: request uri ].
-		^ self serveApplicationScript ].
-	request uri firstPathSegment = 'assets' ifTrue: [
-		request uri pathSegments size = 2 ifFalse: [ ^ ZnResponse notFound: request uri ].
-		^ self serveAssetNamed: request uri pathSegments second ].
-	request uri firstPathSegment = 'artifacts' ifTrue: [
-		request uri pathSegments size = 2 ifFalse: [ ^ ZnResponse notFound: request uri ].
-		^ self serveArtifactId: request uri pathSegments second ].
-	^ ZnResponse notFound: request uri
+{ #category : 'accessing' }
+PharoCAWebServer >> webRoot [
+	^ webRoot
 ]
 
-{ #category : 'http' }
-PharoCAWebServer >> serveIndex [
-	| file contents |
-	file := webRoot / 'index.html'.
-	file exists ifFalse: [ ^ ZnResponse serverError: 'Static UI not found: ' , file fullName ].
-	file readStreamDo: [ :input | contents := input upToEnd ].
-	^ ZnResponse ok: (ZnEntity with: contents type: ZnMimeType textHtml)
-]
-
-
-{ #category : 'http-042' }
-PharoCAWebServer >> serveApplicationScript [
-	| file contents |
-	file := webRoot / 'app.js'.
-	file exists ifFalse: [ ^ ZnResponse serverError: 'Static UI script not found: ' , file fullName ].
-	file readStreamDo: [ :input | contents := input upToEnd ].
-	^ ZnResponse ok: (ZnEntity with: contents type: ZnMimeType applicationJavascript)
-]
-
-{ #category : 'websocket' }
-PharoCAWebServer >> handleWebSocketUpgrade: request [
-	| key version upgrade |
-	request method = #GET ifFalse: [ ^ ZnResponse methodNotAllowed: request ].
-	upgrade := request headers at: 'Upgrade' ifAbsent: [ '' ].
-	version := request headers at: 'Sec-WebSocket-Version' ifAbsent: [ '' ].
-	key := request headers at: 'Sec-WebSocket-Key' ifAbsent: [ '' ].
-	(upgrade asLowercase = 'websocket' and: [ version = '13' and: [ key trimBoth isNotEmpty ] ]) ifFalse: [
-		^ ZnResponse badRequest: request entity: (ZnEntity text: 'Invalid WebSocket upgrade request') ].
-	^ PharoCAWebSocketUpgradeResponse
-		forKey: key
-		do: [ :connectionStream |
-			(PharoCAWebSocketConnection on: protocol) runOn: connectionStream ]
-]
-
-{ #category : 'http-037' }
-PharoCAWebServer >> serveAssetNamed: aName [
-	| file contents mime |
-	((aName includesSubstring: '..') or: [ aName includes: $/ ]) ifTrue: [
-		^ ZnResponse badRequest: nil entity: (ZnEntity text: 'Invalid asset name') ].
-	file := webRoot / 'assets' / aName.
-	file exists ifFalse: [ ^ ZnResponse notFound: '/assets/' , aName ].
-	file readStreamDo: [ :input | contents := input upToEnd ].
-	mime := (aName endsWith: '.js')
-		ifTrue: [ ZnMimeType applicationJavascript ]
-		ifFalse: [ (aName endsWith: '.css')
-			ifTrue: [ ZnMimeType textCss ]
-			ifFalse: [ ZnMimeType textPlain ] ].
-	^ ZnResponse ok: (ZnEntity with: contents type: mime)
-]
-
-
-{ #category : 'http-054' }
-PharoCAWebServer >> serveArtifactId: identifier [
-	| artifact response |
-	[ artifact := harness agent environment artifactStore artifactAt: identifier ]
-		on: Error
-		do: [ :ignored | ^ ZnResponse notFound: '/artifacts/', identifier ].
-	response := ZnResponse ok: (ZnEntity with: artifact bytes type: (ZnMimeType fromString: artifact mimeType)).
-	response headers
-		at: 'Cache-Control' put: 'private, no-store';
-		at: 'X-Content-Type-Options' put: 'nosniff';
-		at: 'Content-Security-Policy' put: 'default-src ''none''; sandbox'.
-	^ response
+{ #category : 'accessing' }
+PharoCAWebServer >> webRoot: aFileReference [
+	webRoot := aFileReference asFileReference
 ]

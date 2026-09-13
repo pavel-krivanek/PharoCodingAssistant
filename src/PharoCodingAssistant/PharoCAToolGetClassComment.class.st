@@ -1,4 +1,6 @@
-"Retrieves a bounded page of a class comment."
+"
+Retrieves a bounded page of a class comment.
+"
 Class {
 	#name : 'PharoCAToolGetClassComment',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolGetClassComment class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolGetClassComment class >> execute: args [
@@ -23,10 +29,6 @@ PharoCAToolGetClassComment class >> execute: args [
 	} asDictionary
 ]
 
-
-{ #category : 'definition' }
-PharoCAToolGetClassComment class >> capability [ ^ #inspection ]
-
 { #category : 'execution' }
 PharoCAToolGetClassComment class >> executionMode [
 	^ #parallelSafe
@@ -41,4 +43,5 @@ PharoCAToolGetClassComment class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolGetClassComment class >> toolName [ ^ #get_class_comment ]
+PharoCAToolGetClassComment class >> toolName [ ^ #get_class_comment
+]

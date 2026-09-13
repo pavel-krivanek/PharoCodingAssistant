@@ -19,6 +19,32 @@ Class {
 	#tag : 'Protocol'
 }
 
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol class >> maximumAttachmentCount [
+	^ 8
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol class >> maximumAttachmentNameCharacters [
+	^ 256
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol class >> maximumImageAttachmentCharacters [
+	"Encoded URL characters. Kept below the 8 MiB WebSocket message ceiling so JSON overhead cannot consume the entire transport budget."
+	^ 4 * 1024 * 1024
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol class >> maximumTextAttachmentBytes [
+	^ 256 * 1024
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol class >> maximumTotalAttachmentCharacters [
+	^ 6 * 1024 * 1024
+]
+
 { #category : 'instance creation' }
 PharoCAExternalProtocol class >> on: aHarness [
 	^ self new harness: aHarness; yourself
@@ -131,6 +157,115 @@ PharoCAExternalProtocol >> applyCapabilities: capabilities toModel: model [
 			model perform: mapping second asSymbol with: value ] ]
 ]
 
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol >> attachmentMetadataKind: kind name: name mimeType: mimeType size: size [
+	^ {
+		'attachment' -> true.
+		'kind' -> kind.
+		'name' -> name.
+		'mimeType' -> mimeType.
+		'size' -> size
+	} asDictionary
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol >> attachmentNameFrom: attachment [
+	| name |
+	name := self requiredString: 'name' from: attachment.
+	name size > self class maximumAttachmentNameCharacters ifTrue: [
+		PharoCAProtocolError code: 'invalid_params' message: 'Attachment name is too long' ].
+	^ name
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol >> attachmentPartsFrom: attachments forAgent: agent [
+	| parts totalCharacters |
+	attachments ifNil: [ ^ #() ].
+	attachments isArray ifFalse: [
+		PharoCAProtocolError code: 'invalid_params' message: 'attachments must be an array' ].
+	attachments size > self class maximumAttachmentCount ifTrue: [
+		PharoCAProtocolError
+			code: 'attachment_limit_exceeded'
+			message: 'At most ', self class maximumAttachmentCount asString, ' attachments are allowed' ].
+	parts := OrderedCollection new.
+	totalCharacters := 0.
+	attachments do: [ :attachment |
+		| kind name mimeType text url part size label |
+		attachment isDictionary ifFalse: [
+			PharoCAProtocolError code: 'invalid_params' message: 'Each attachment must be an object' ].
+		kind := self requiredString: 'kind' from: attachment.
+		name := self attachmentNameFrom: attachment.
+		mimeType := attachment at: 'mimeType' ifAbsent: [ kind = 'image' ifTrue: [ 'image/unknown' ] ifFalse: [ 'text/plain' ] ].
+		(mimeType isString and: [ mimeType trimBoth isNotEmpty ]) ifFalse: [
+			PharoCAProtocolError code: 'invalid_params' message: 'mimeType must be a non-empty string' ].
+		kind = 'text'
+			ifTrue: [
+				text := attachment at: 'text' ifAbsent: [ PharoCAProtocolError code: 'invalid_params' message: 'Text attachment requires text' ].
+				text isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'Attachment text must be a string' ].
+				size := text utf8Encoded size.
+				size > self class maximumTextAttachmentBytes ifTrue: [
+					PharoCAProtocolError code: 'attachment_too_large' message: 'Text attachment exceeds 256 KiB' ].
+				totalCharacters := totalCharacters + text size.
+				label := 'Attached text file: ', name, ' (', mimeType, ')', String lf,
+					'--- BEGIN ATTACHMENT ---', String lf, text, String lf, '--- END ATTACHMENT ---'.
+				part := PharoCALLMContentPart text: label.
+				part metadata: (self attachmentMetadataKind: 'text' name: name mimeType: mimeType size: size).
+				parts add: part ]
+			ifFalse: [
+				kind = 'image' ifFalse: [
+					PharoCAProtocolError code: 'invalid_params' message: 'Unsupported attachment kind: ', kind ].
+				agent model supportsImages ifFalse: [
+					PharoCAProtocolError
+						code: 'model_capability_mismatch'
+						message: 'Selected model does not advertise image support'
+						details: ({ 'modelId' -> agent model name. 'capability' -> 'images' } asDictionary) ].
+				url := self requiredString: 'url' from: attachment.
+				((url beginsWith: 'https://') or: [ (url beginsWith: 'http://') or: [ url beginsWith: 'data:image/' ] ]) ifFalse: [
+					PharoCAProtocolError code: 'invalid_params' message: 'Image attachment URL must be http(s) or a data:image URL' ].
+				url size > self class maximumImageAttachmentCharacters ifTrue: [
+					PharoCAProtocolError code: 'attachment_too_large' message: 'Encoded image attachment exceeds 4 MiB' ].
+				(url beginsWith: 'data:image/') ifTrue: [
+					| markerIndex dataMimeType |
+					markerIndex := url findString: ';base64,' startingAt: 1.
+					markerIndex = 0 ifTrue: [
+						PharoCAProtocolError code: 'invalid_params' message: 'Image data URL must use base64 encoding' ].
+					dataMimeType := url copyFrom: 6 to: markerIndex - 1.
+					(#('image/png' 'image/jpeg' 'image/gif' 'image/webp') includes: dataMimeType) ifFalse: [
+						PharoCAProtocolError code: 'invalid_params' message: 'Unsupported image data URL media type: ', dataMimeType ].
+					(mimeType ~= 'image/unknown' and: [ mimeType ~= dataMimeType ]) ifTrue: [
+						PharoCAProtocolError code: 'invalid_params' message: 'Image attachment mimeType does not match data URL media type' ] ].
+				totalCharacters := totalCharacters + url size.
+				label := PharoCALLMContentPart text: 'Attached image: ', name, ' (', mimeType, ')'.
+				label metadata: (self attachmentMetadataKind: 'imageLabel' name: name mimeType: mimeType size: url size).
+				parts add: label.
+				part := PharoCALLMContentPart imageURL: url.
+				part metadata: (self attachmentMetadataKind: 'image' name: name mimeType: mimeType size: url size).
+				parts add: part ].
+		totalCharacters > self class maximumTotalAttachmentCharacters ifTrue: [
+			PharoCAProtocolError code: 'attachment_limit_exceeded' message: 'Combined attachment payload exceeds 6 MiB' ] ].
+	^ parts asArray
+]
+
+{ #category : 'changes-030' }
+PharoCAExternalProtocol >> changesGet: params [
+	| run changeId change maxCharacters detail revertedIds |
+	run := self runNamed: (self requiredString: 'runId' from: params).
+	changeId := self requiredString: 'changeId' from: params.
+	change := run changes detect: [ :each | each id = changeId ] ifNone: [ nil ].
+	change ifNil: [
+		PharoCAProtocolError
+			code: 'change_not_found'
+			message: 'Unknown change for run: ', changeId
+			details: ({ 'runId' -> run id. 'changeId' -> changeId } asDictionary) ].
+	maxCharacters := params at: 'maxDiffCharacters' ifAbsent: [ PharoCAChangeReview defaultMaximumDiffCharacters ].
+	(maxCharacters isInteger and: [ maxCharacters >= 256 and: [ maxCharacters <= PharoCAChangeReview maximumDiffCharacters ] ])
+		ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'maxDiffCharacters must be between 256 and ', PharoCAChangeReview maximumDiffCharacters asString ].
+	detail := PharoCAChangeReview detailFor: change maxDiffCharacters: maxCharacters.
+	revertedIds := PharoCAChangeReview revertedChangeIdsForRun: run.
+	detail at: 'reverted' put: (revertedIds includes: change id).
+	^ detail
+]
+
 { #category : 'checkpoints' }
 PharoCAExternalProtocol >> checkpointsCreate: params [
 	| label checkpoint |
@@ -166,46 +301,6 @@ PharoCAExternalProtocol >> checkpointsRollback: params [
 			(error isKindOf: PharoCARollbackBlocked)
 				ifTrue: [ PharoCAProtocolError code: 'rollback_blocked' message: error messageText details: error details ]
 				ifFalse: [ PharoCAProtocolError code: 'checkpoint_error' message: error description ] ]
-]
-
-{ #category : 'accessing' }
-PharoCAExternalProtocol >> commandRegistry [ ^ commandRegistry
-]
-
-{ #category : 'commands' }
-PharoCAExternalProtocol >> commandsInvoke: params [
-	| name commandParams |
-	name := self requiredString: 'name' from: params.
-	commandParams := params at: 'params' ifAbsent: [ Dictionary new ].
-	commandParams isDictionary ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'command params must be an object' ].
-	^ commandRegistry invokeNamed: name params: commandParams
-]
-
-{ #category : 'commands' }
-PharoCAExternalProtocol >> commandsExecuteLine: params [
-	| line commandParams |
-	line := self requiredString: 'line' from: params.
-	commandParams := params copy.
-	commandParams removeKey: 'line' ifAbsent: [ ].
-	^ commandRegistry executeLine: line params: commandParams
-]
-
-
-{ #category : 'commands' }
-PharoCAExternalProtocol >> commandsComplete: params [
-	| line limit suggestions |
-	line := params at: 'line' ifAbsent: [ '' ].
-	line isString ifFalse: [
-		PharoCAProtocolError code: 'invalid_params' message: 'line must be a string' ].
-	limit := params at: 'limit' ifAbsent: [ 12 ].
-	((limit isInteger) and: [ limit between: 1 and: 50 ]) ifFalse: [
-		PharoCAProtocolError code: 'invalid_params' message: 'limit must be an integer between 1 and 50' ].
-	suggestions := self commandCompletionSuggestionsForLine: line params: params.
-	suggestions size > limit ifTrue: [ suggestions := suggestions first: limit ].
-	^ {
-		'line' -> line.
-		'items' -> suggestions asArray
-	} asDictionary
 ]
 
 { #category : 'commands-private' }
@@ -274,6 +369,59 @@ PharoCAExternalProtocol >> commandCompletionSuggestionsForLine: line params: par
 		} asDictionary ]) asArray
 ]
 
+{ #category : 'accessing' }
+PharoCAExternalProtocol >> commandRegistry [ ^ commandRegistry
+]
+
+{ #category : 'commands' }
+PharoCAExternalProtocol >> commandsComplete: params [
+	| line limit suggestions |
+	line := params at: 'line' ifAbsent: [ '' ].
+	line isString ifFalse: [
+		PharoCAProtocolError code: 'invalid_params' message: 'line must be a string' ].
+	limit := params at: 'limit' ifAbsent: [ 12 ].
+	((limit isInteger) and: [ limit between: 1 and: 50 ]) ifFalse: [
+		PharoCAProtocolError code: 'invalid_params' message: 'limit must be an integer between 1 and 50' ].
+	suggestions := self commandCompletionSuggestionsForLine: line params: params.
+	suggestions size > limit ifTrue: [ suggestions := suggestions first: limit ].
+	^ {
+		'line' -> line.
+		'items' -> suggestions asArray
+	} asDictionary
+]
+
+{ #category : 'commands' }
+PharoCAExternalProtocol >> commandsExecuteLine: params [
+	| line commandParams |
+	line := self requiredString: 'line' from: params.
+	commandParams := params copy.
+	commandParams removeKey: 'line' ifAbsent: [ ].
+	^ commandRegistry executeLine: line params: commandParams
+]
+
+{ #category : 'commands' }
+PharoCAExternalProtocol >> commandsInvoke: params [
+	| name commandParams |
+	name := self requiredString: 'name' from: params.
+	commandParams := params at: 'params' ifAbsent: [ Dictionary new ].
+	commandParams isDictionary ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'command params must be an object' ].
+	^ commandRegistry invokeNamed: name params: commandParams
+]
+
+{ #category : 'credentials' }
+PharoCAExternalProtocol >> credentialsMapEnvironment: params [
+	| credentialName environmentVariable |
+	credentialName := self requiredString: 'credentialName' from: params.
+	environmentVariable := self requiredString: 'environmentVariable' from: params.
+	harness providerRegistry credentialResolver map: credentialName toEnvironmentVariable: environmentVariable.
+	^ self credentialsStatus
+]
+
+{ #category : 'credentials' }
+PharoCAExternalProtocol >> credentialsStatus [
+	^ harness providerRegistry credentialResolver descriptionDictionary
+]
+
 { #category : 'private-dispatch' }
 PharoCAExternalProtocol >> dispatchMethod: method params: params eventsDo: eventBlock [
 	method = 'protocol.hello' ifTrue: [ ^ self helloResult ].
@@ -335,6 +483,28 @@ PharoCAExternalProtocol >> dispatchMethod: method params: params eventsDo: event
 	PharoCAProtocolError code: 'method_not_found' message: 'Unknown method: ', method
 ]
 
+{ #category : 'sessions-private-027' }
+PharoCAExternalProtocol >> ensureEntryId: anEntryId existsInSession: aSession [
+	(aSession entries anySatisfy: [ :each | each id = anEntryId ]) ifFalse: [
+		PharoCAProtocolError
+			code: 'session_entry_not_found'
+			message: 'Unknown session entry: ', anEntryId
+			details: ({ 'sessionId' -> aSession id. 'entryId' -> anEntryId } asDictionary) ].
+	^ anEntryId
+]
+
+{ #category : 'sessions-private-027' }
+PharoCAExternalProtocol >> ensureSessionNotBusy: aSession [
+	| active |
+	active := self activeRunForSessionId: aSession id.
+	active ifNotNil: [
+		PharoCAProtocolError
+			code: 'session_busy'
+			message: 'Session has an active run'
+			details: ({ 'sessionId' -> aSession id. 'runId' -> active id } asDictionary) ].
+	^ aSession
+]
+
 { #category : 'private-response' }
 PharoCAExternalProtocol >> errorResponseId: requestId code: code message: message details: details [
 	^ {
@@ -372,6 +542,48 @@ PharoCAExternalProtocol >> eventEnvelopeForRun: runOrNil event: event agentId: a
 		'sequence' -> event sequence.
 		'data' -> event asDictionary
 	} asDictionary
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol >> externalMessageDictionaryFor: message [
+	| result |
+	result := message asDictionary copy.
+	result at: 'contentParts' put: ((message contentParts collect: [ :part |
+		| dictionary metadata name kind |
+		dictionary := part asDictionary copy.
+		metadata := part metadata.
+		(metadata at: 'attachment' ifAbsent: [ false ])
+			ifTrue: [
+				name := metadata at: 'name' ifAbsent: [ 'attachment' ].
+				kind := metadata at: 'kind' ifAbsent: [ part type asString ].
+				dictionary at: 'value' put: '[', kind, ' attachment: ', name, ']'.
+				dictionary at: 'omitted' put: true ]
+			ifFalse: [
+				(part type = #imageURL and: [ part value isString and: [ part value beginsWith: 'data:image/' ] ]) ifTrue: [
+					dictionary at: 'value' put: '[inline image data omitted]'.
+					dictionary at: 'omitted' put: true ] ].
+		dictionary ]) asArray).
+	^ result
+]
+
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol >> externalTextPreviewForMessage: message [
+	| stream attachmentNames preview |
+	attachmentNames := OrderedCollection new.
+	stream := String new writeStream.
+	message contentParts do: [ :part |
+		| metadata name |
+		metadata := part metadata.
+		(metadata at: 'attachment' ifAbsent: [ false ])
+			ifTrue: [
+				name := metadata at: 'name' ifAbsent: [ 'attachment' ].
+				(attachmentNames includes: name) ifFalse: [ attachmentNames add: name ] ]
+			ifFalse: [ part isText ifTrue: [ stream nextPutAll: part value ] ] ].
+	attachmentNames do: [ :name |
+		stream nextPutAll: ' [attached: '; nextPutAll: name; nextPut: $] ].
+	preview := stream contents.
+	preview size > 160 ifTrue: [ preview := (preview first: 157), '...' ].
+	^ preview
 ]
 
 { #category : 'handling' }
@@ -417,46 +629,6 @@ PharoCAExternalProtocol >> helloResult [
 	} asDictionary
 ]
 
-{ #category : 'initialization' }
-PharoCAExternalProtocol >> initialize [
-	super initialize.
-	runs := Dictionary new.
-	runsMutex := Semaphore forMutualExclusion.
-	maxRetainedRuns := 100.
-	commandRegistry := PharoCACommandRegistry new.
-	sessionMutex := Semaphore forMutualExclusion.
-	subscriptions := Dictionary new.
-	subscriptionsMutex := Semaphore forMutualExclusion.
-	self registerDefaultCommands
-]
-
-{ #category : 'accessing' }
-PharoCAExternalProtocol >> maxRetainedRuns [ ^ maxRetainedRuns
-]
-
-{ #category : 'accessing' }
-PharoCAExternalProtocol >> maxRetainedRuns: anInteger [
-	anInteger > 0 ifFalse: [ Error signal: 'maxRetainedRuns must be greater than zero' ].
-	maxRetainedRuns := anInteger.
-	self pruneRetainedRuns
-]
-
-{ #category : 'protocol' }
-PharoCAExternalProtocol >> methodNames [
-	^ #(
-		'protocol.hello' 'state.snapshot' 'runtime.profile.get' 'runtime.profile.save' 'credentials.status' 'credentials.mapEnvironment'
-		'agents.list' 'agents.get' 'agents.create' 'agents.setDefault' 'agents.setModel' 'agents.setReasoningEffort'
-		'skills.list'
-		'inspect.open' 'ide.browse'
-		'models.list' 'models.get' 'models.register'
-		'providers.list' 'providers.get' 'providers.registerOpenAICompatible' 'providers.discoverModels'
-		'sessions.list' 'sessions.get' 'sessions.tree' 'sessions.selectEntry' 'sessions.new' 'sessions.resume' 'sessions.continue' 'sessions.fork' 'sessions.rename' 'sessions.archive' 'sessions.unarchive' 'sessions.delete'
-		'runs.start' 'runs.get' 'runs.review' 'changes.get' 'runs.events' 'runs.subscribe' 'subscriptions.get' 'subscriptions.cancel' 'runs.cancel' 'runs.steer' 'runs.followUp'
-		'checkpoints.list' 'checkpoints.create' 'checkpoints.planRollback' 'checkpoints.rollback'
-		'templates.list' 'templates.render' 'templates.run'
-		'commands.list' 'commands.complete' 'commands.invoke' 'commands.executeLine')
-]
-
 { #category : 'ide-navigation' }
 PharoCAExternalProtocol >> ideBrowse: params [
 	| kind className class side behavior selector browser |
@@ -498,6 +670,19 @@ PharoCAExternalProtocol >> ideBrowse: params [
 	} asDictionary
 ]
 
+{ #category : 'initialization' }
+PharoCAExternalProtocol >> initialize [
+	super initialize.
+	runs := Dictionary new.
+	runsMutex := Semaphore forMutualExclusion.
+	maxRetainedRuns := 100.
+	commandRegistry := PharoCACommandRegistry new.
+	sessionMutex := Semaphore forMutualExclusion.
+	subscriptions := Dictionary new.
+	subscriptionsMutex := Semaphore forMutualExclusion.
+	self registerDefaultCommands
+]
+
 { #category : 'inspection' }
 PharoCAExternalProtocol >> inspectOpen: params [
 	| kind target |
@@ -536,6 +721,57 @@ PharoCAExternalProtocol >> inspectTargetForKind: kind params: params [
 		checkpointId := self requiredString: 'checkpointId' from: params.
 		^ harness agent environment checkpointManager checkpointNamed: checkpointId ].
 	PharoCAProtocolError code: 'invalid_params' message: 'Unsupported inspector kind: ', kind
+]
+
+{ #category : 'commands-private' }
+PharoCAExternalProtocol >> maxIterationsCommand: params [
+	| argument agentId agent normalized value |
+	argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
+	agentId := self agentIdentifierFromParams: params required: false.
+	agent := harness agentManager agentNamed: agentId.
+	argument isEmpty ifFalse: [
+		normalized := argument asLowercase.
+		(#('off' 'none' 'unlimited') includes: normalized)
+			ifTrue: [ value := nil ]
+			ifFalse: [
+				[ value := argument asInteger ]
+					on: Error
+					do: [ :error | PharoCAProtocolError code: 'invalid_params' message: 'max-iterations must be off/unlimited or a positive integer' ].
+				value > 0 ifFalse: [
+					PharoCAProtocolError code: 'invalid_params' message: 'max-iterations must be off/unlimited or a positive integer' ] ].
+		agent configuration maxIterations: value ].
+	^ {
+		'agentId' -> agentId.
+		'maxIterations' -> agent configuration maxIterations.
+		'enabled' -> agent configuration maxIterations notNil
+	} asDictionary
+]
+
+{ #category : 'accessing' }
+PharoCAExternalProtocol >> maxRetainedRuns [ ^ maxRetainedRuns
+]
+
+{ #category : 'accessing' }
+PharoCAExternalProtocol >> maxRetainedRuns: anInteger [
+	anInteger > 0 ifFalse: [ Error signal: 'maxRetainedRuns must be greater than zero' ].
+	maxRetainedRuns := anInteger.
+	self pruneRetainedRuns
+]
+
+{ #category : 'protocol' }
+PharoCAExternalProtocol >> methodNames [
+	^ #(
+		'protocol.hello' 'state.snapshot' 'runtime.profile.get' 'runtime.profile.save' 'credentials.status' 'credentials.mapEnvironment'
+		'agents.list' 'agents.get' 'agents.create' 'agents.setDefault' 'agents.setModel' 'agents.setReasoningEffort'
+		'skills.list'
+		'inspect.open' 'ide.browse'
+		'models.list' 'models.get' 'models.register'
+		'providers.list' 'providers.get' 'providers.registerOpenAICompatible' 'providers.discoverModels'
+		'sessions.list' 'sessions.get' 'sessions.tree' 'sessions.selectEntry' 'sessions.new' 'sessions.resume' 'sessions.continue' 'sessions.fork' 'sessions.rename' 'sessions.archive' 'sessions.unarchive' 'sessions.delete'
+		'runs.start' 'runs.get' 'runs.review' 'changes.get' 'runs.events' 'runs.subscribe' 'subscriptions.get' 'subscriptions.cancel' 'runs.cancel' 'runs.steer' 'runs.followUp'
+		'checkpoints.list' 'checkpoints.create' 'checkpoints.planRollback' 'checkpoints.rollback'
+		'templates.list' 'templates.render' 'templates.run'
+		'commands.list' 'commands.complete' 'commands.invoke' 'commands.executeLine')
 ]
 
 { #category : 'models-private' }
@@ -583,6 +819,16 @@ PharoCAExternalProtocol >> providerDescriptorNamed: identifier [
 ]
 
 { #category : 'providers' }
+PharoCAExternalProtocol >> providersDiscoverModels: params [
+	| identifier |
+	identifier := self requiredString: 'providerId' from: params.
+	self providerDescriptorNamed: identifier.
+	[ ^ harness discoverModelsFromProviderNamed: identifier ]
+		on: Error
+		do: [ :error | PharoCAProtocolError code: 'model_discovery_failed' message: error description ]
+]
+
+{ #category : 'providers' }
 PharoCAExternalProtocol >> providersGet: params [
 	^ self providerDescriptorNamed: (self requiredString: 'providerId' from: params)
 ]
@@ -615,16 +861,6 @@ PharoCAExternalProtocol >> providersRegisterOpenAICompatible: params [
 	^ self providerDescriptorNamed: identifier
 ]
 
-{ #category : 'providers' }
-PharoCAExternalProtocol >> providersDiscoverModels: params [
-	| identifier |
-	identifier := self requiredString: 'providerId' from: params.
-	self providerDescriptorNamed: identifier.
-	[ ^ harness discoverModelsFromProviderNamed: identifier ]
-		on: Error
-		do: [ :error | PharoCAProtocolError code: 'model_discovery_failed' message: error description ]
-]
-
 { #category : 'runs-private' }
 PharoCAExternalProtocol >> pruneRetainedRuns [
 	| finished excess |
@@ -635,46 +871,6 @@ PharoCAExternalProtocol >> pruneRetainedRuns [
 			excess := runs size - maxRetainedRuns.
 			1 to: (excess min: finished size) do: [ :index | runs removeKey: (finished at: index) id ifAbsent: [ ] ] ]
 	] ensure: [ runsMutex signal ]
-]
-
-{ #category : 'commands-private' }
-PharoCAExternalProtocol >> skillsList: params [
-	| agentId agent session activeNames |
-	agentId := self agentIdentifierFromParams: params required: false.
-	agent := harness agentManager agentNamed: agentId.
-	session := (harness sessionManagerForAgentId: agentId) currentSession.
-	activeNames := session
-		ifNil: [ Set new ]
-		ifNotNil: [ (agent skillRegistry activeSkillNamesForSession: session) asSet ].
-	^ (agent skillRegistry skills collect: [ :skill |
-		| item |
-		item := skill asMetadataDictionary copy.
-		item at: 'active' put: (activeNames includes: skill name).
-		item ]) asArray
-]
-
-{ #category : 'commands-private' }
-PharoCAExternalProtocol >> maxIterationsCommand: params [
-	| argument agentId agent normalized value |
-	argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
-	agentId := self agentIdentifierFromParams: params required: false.
-	agent := harness agentManager agentNamed: agentId.
-	argument isEmpty ifFalse: [
-		normalized := argument asLowercase.
-		(#('off' 'none' 'unlimited') includes: normalized)
-			ifTrue: [ value := nil ]
-			ifFalse: [
-				[ value := argument asInteger ]
-					on: Error
-					do: [ :error | PharoCAProtocolError code: 'invalid_params' message: 'max-iterations must be off/unlimited or a positive integer' ].
-				value > 0 ifFalse: [
-					PharoCAProtocolError code: 'invalid_params' message: 'max-iterations must be off/unlimited or a positive integer' ] ].
-		agent configuration maxIterations: value ].
-	^ {
-		'agentId' -> agentId.
-		'maxIterations' -> agent configuration maxIterations.
-		'enabled' -> agent configuration maxIterations notNil
-	} asDictionary
 ]
 
 { #category : 'commands-private' }
@@ -811,6 +1007,56 @@ PharoCAExternalProtocol >> runsEvents: params [
 	} asDictionary
 ]
 
+{ #category : 'changes-030' }
+PharoCAExternalProtocol >> runsReview: params [
+	| run changes afterChangeId limit startIndex page hasMore scopeCounts kindCounts opaqueCount semanticCount revertedIds revertedCount |
+	run := self runNamed: (self requiredString: 'runId' from: params).
+	changes := run changes.
+	afterChangeId := params at: 'afterChangeId' ifAbsent: [ nil ].
+	afterChangeId ifNotNil: [ afterChangeId isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'afterChangeId must be a string or null' ] ].
+	limit := params at: 'limit' ifAbsent: [ 50 ].
+	(limit isInteger and: [ limit > 0 and: [ limit <= 200 ] ]) ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'limit must be between 1 and 200' ].
+	startIndex := 1.
+	afterChangeId ifNotNil: [
+		startIndex := changes findFirst: [ :each | each id = afterChangeId ].
+		startIndex = 0 ifTrue: [
+			PharoCAProtocolError
+				code: 'change_not_found'
+				message: 'Unknown change cursor for run: ', afterChangeId
+				details: ({ 'runId' -> run id. 'changeId' -> afterChangeId } asDictionary) ].
+		startIndex := startIndex + 1 ].
+	page := startIndex > changes size
+		ifTrue: [ #() ]
+		ifFalse: [ changes copyFrom: startIndex to: (changes size min: startIndex + limit - 1) ].
+	hasMore := startIndex + page size <= changes size.
+	scopeCounts := Dictionary new.
+	kindCounts := Dictionary new.
+	changes do: [ :record |
+		| scope kind |
+		scope := PharoCAChangeReview scopeFor: record.
+		kind := record kind asString.
+		scopeCounts at: scope put: (scopeCounts at: scope ifAbsent: [ 0 ]) + 1.
+		kindCounts at: kind put: (kindCounts at: kind ifAbsent: [ 0 ]) + 1 ].
+	opaqueCount := changes count: [ :record | (PharoCAChangeReview rollbackSafetyFor: record) = 'opaque' ].
+	semanticCount := changes count: [ :record | (PharoCAChangeReview rollbackSafetyFor: record) = 'semantic-candidate' ].
+	revertedIds := PharoCAChangeReview revertedChangeIdsForRun: run.
+	revertedCount := changes count: [ :record | revertedIds includes: record id ].
+	^ {
+		'runId' -> run id.
+		'sessionId' -> (run session ifNil: [ nil ] ifNotNil: [ run session id ]).
+		'status' -> run status asString.
+		'totalChangeCount' -> changes size.
+		'scopeCounts' -> scopeCounts.
+		'kindCounts' -> kindCounts.
+		'opaqueCount' -> opaqueCount.
+		'semanticRollbackCandidateCount' -> semanticCount.
+		'revertedCount' -> revertedCount.
+		'items' -> ((page collect: [ :record | PharoCAChangeReview summaryFor: record reverted: (revertedIds includes: record id) ]) asArray).
+		'hasMore' -> hasMore.
+		'nextChangeId' -> (page ifEmpty: [ afterChangeId ] ifNotEmpty: [ page last id ])
+	} asDictionary
+]
+
 { #category : 'runs' }
 PharoCAExternalProtocol >> runsStart: params eventsDo: eventBlock [
 	| prompt sessionId run session agentId manager agent userMessage attachments |
@@ -874,36 +1120,17 @@ PharoCAExternalProtocol >> runsSubscribe: params eventsDo: eventBlock [
 		yourself
 ]
 
-{ #category : 'runs-private' }
-PharoCAExternalProtocol >> signalReplayExpiredFor: run afterSequence: afterSequence [
-	| retention |
-	retention := run eventRetention.
-	PharoCAProtocolError
-		code: 'event_replay_expired'
-		message: 'Requested event cursor is older than the retained replay window'
-		details: ({
-			'runId' -> run id.
-			'requestedAfterSequence' -> afterSequence.
-			'earliestRetainedSequence' -> (retention at: 'earliestRetainedSequence').
-			'lastSequence' -> (retention at: 'lastSequence')
-		} asDictionary)
+{ #category : 'runtime-profile' }
+PharoCAExternalProtocol >> runtimeProfileGet [
+	^ harness runtimeProfileStatus
 ]
 
-{ #category : 'runs-private' }
-PharoCAExternalProtocol >> validateReplayCursor: afterSequence forRun: run [
-	(run eventReplaySnapshotAfterSequence: afterSequence) ifNotNil: [ ^ self ].
-	^ self signalReplayExpiredFor: run afterSequence: afterSequence
-]
-
-{ #category : 'subscriptions-private' }
-PharoCAExternalProtocol >> subscriptionSnapshot: subscription id: id run: run [
-	| result |
-	result := subscription asDictionary copy.
-	result
-		at: 'subscriptionId' put: id;
-		at: 'runId' put: run id;
-		at: 'earliestRetainedSequence' put: run earliestRetainedEventSequence.
-	^ result
+{ #category : 'runtime-profile' }
+PharoCAExternalProtocol >> runtimeProfileSave [
+	[ harness saveRuntimeProfile ]
+		on: Error
+		do: [ :error | PharoCAProtocolError code: 'runtime_profile_save_failed' message: error description ].
+	^ harness runtimeProfileStatus
 ]
 
 { #category : 'sessions-private' }
@@ -920,6 +1147,49 @@ PharoCAExternalProtocol >> sessionSnapshot: session name: name ephemeral: epheme
 		'entryCount' -> session entries size.
 		'currentLeafId' -> session currentLeafId
 	} asDictionary
+]
+
+{ #category : 'sessions-035' }
+PharoCAExternalProtocol >> sessionTreeBranchDepthsForEntries: entries childCounts: childCounts [
+	| depths |
+	depths := Dictionary new.
+	entries do: [ :each |
+		| depth parentDepth |
+		depth := each parentId
+			ifNil: [ 0 ]
+			ifNotNil: [
+				parentDepth := depths at: each parentId ifAbsent: [ 0 ].
+				parentDepth + (((childCounts at: each parentId ifAbsent: [ 0 ]) > 1) ifTrue: [ 1 ] ifFalse: [ 0 ]) ].
+		depths at: each id put: depth ].
+	^ depths
+]
+
+{ #category : 'sessions-035' }
+PharoCAExternalProtocol >> sessionTreeChildCountsForEntries: entries [
+	| counts |
+	counts := Dictionary new.
+	entries do: [ :each |
+		each parentId ifNotNil: [
+			counts
+				at: each parentId
+				put: (counts at: each parentId ifAbsent: [ 0 ]) + 1 ] ].
+	^ counts
+]
+
+{ #category : 'sessions-private-027' }
+PharoCAExternalProtocol >> sessionTreeEntrySnapshot: entry [
+	| result message |
+	result := {
+		'id' -> entry id.
+		'parentId' -> entry parentId.
+		'type' -> entry type asString.
+		'timestamp' -> entry timestamp asString
+	} asDictionary.
+	entry isMessage ifTrue: [
+		message := entry payload.
+		result at: 'role' put: message role asString.
+		result at: 'textPreview' put: (self externalTextPreviewForMessage: message) ].
+	^ result
 ]
 
 { #category : 'sessions' }
@@ -1047,10 +1317,102 @@ PharoCAExternalProtocol >> sessionsResume: params [
 	^ self sessionSnapshot: session name: manager currentName ephemeral: false
 ]
 
+{ #category : 'sessions-027' }
+PharoCAExternalProtocol >> sessionsSelectEntry: params [
+	| manager session sessionId entryId result descriptor |
+	manager := self sessionManagerFromParams: params.
+	sessionId := self requiredString: 'sessionId' from: params.
+	entryId := self requiredString: 'entryId' from: params.
+	session := manager sessionForId: sessionId.
+	self ensureSessionNotBusy: session.
+	self ensureEntryId: entryId existsInSession: session.
+	session := manager selectEntryId: entryId inSessionId: sessionId.
+	descriptor := [ harness sessionRepository descriptorForSessionId: session id workspace: harness workspace ]
+		on: Error
+		do: [ :error | nil ].
+	result := self sessionSnapshot: session
+		name: (descriptor ifNil: [ manager currentName ] ifNotNil: [ descriptor name ])
+		ephemeral: manager currentSessionIsEphemeral.
+	result
+		at: 'viewLeafId' put: entryId;
+		at: 'messages' put: ((session conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray).
+	^ result
+]
+
+{ #category : 'sessions-027' }
+PharoCAExternalProtocol >> sessionsTree: params [
+	| manager session afterEntryId limit entries startIndex endIndex page childCounts branchDepths items |
+	manager := self sessionManagerFromParams: params.
+	session := manager sessionForId: (self requiredString: 'sessionId' from: params).
+	afterEntryId := params at: 'afterEntryId' ifAbsent: [ nil ].
+	afterEntryId ifNotNil: [ afterEntryId isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'afterEntryId must be a string or null' ] ].
+	limit := params at: 'limit' ifAbsent: [ 100 ].
+	(limit isInteger and: [ limit > 0 and: [ limit <= 500 ] ]) ifFalse: [
+		PharoCAProtocolError code: 'invalid_params' message: 'limit must be between 1 and 500' ].
+	entries := session entries.
+	childCounts := self sessionTreeChildCountsForEntries: entries.
+	branchDepths := self sessionTreeBranchDepthsForEntries: entries childCounts: childCounts.
+	startIndex := 0.
+	afterEntryId ifNotNil: [
+		startIndex := entries findFirst: [ :each | each id = afterEntryId ].
+		startIndex = 0 ifTrue: [ self ensureEntryId: afterEntryId existsInSession: session ] ].
+	page := startIndex >= entries size
+		ifTrue: [ #() ]
+		ifFalse: [
+			endIndex := (startIndex + limit) min: entries size.
+			entries copyFrom: startIndex + 1 to: endIndex ].
+	items := page collect: [ :each |
+		| snapshot |
+		snapshot := self sessionTreeEntrySnapshot: each.
+		snapshot
+			at: 'childCount' put: (childCounts at: each id ifAbsent: [ 0 ]);
+			at: 'branchDepth' put: (branchDepths at: each id ifAbsent: [ 0 ]);
+			yourself ].
+	^ {
+		'sessionId' -> session id.
+		'items' -> items asArray.
+		'hasMore' -> (startIndex + page size < entries size).
+		'nextEntryId' -> (page ifEmpty: [ afterEntryId ] ifNotEmpty: [ page last id ]).
+		'totalEntryCount' -> entries size.
+		'currentLeafId' -> session currentLeafId
+	} asDictionary
+]
+
 { #category : 'sessions' }
 PharoCAExternalProtocol >> sessionsUnarchive: params [
 	(self sessionManagerFromParams: params) unarchiveSessionId: (self requiredString: 'sessionId' from: params).
 	^ true
+]
+
+{ #category : 'runs-private' }
+PharoCAExternalProtocol >> signalReplayExpiredFor: run afterSequence: afterSequence [
+	| retention |
+	retention := run eventRetention.
+	PharoCAProtocolError
+		code: 'event_replay_expired'
+		message: 'Requested event cursor is older than the retained replay window'
+		details: ({
+			'runId' -> run id.
+			'requestedAfterSequence' -> afterSequence.
+			'earliestRetainedSequence' -> (retention at: 'earliestRetainedSequence').
+			'lastSequence' -> (retention at: 'lastSequence')
+		} asDictionary)
+]
+
+{ #category : 'commands-private' }
+PharoCAExternalProtocol >> skillsList: params [
+	| agentId agent session activeNames |
+	agentId := self agentIdentifierFromParams: params required: false.
+	agent := harness agentManager agentNamed: agentId.
+	session := (harness sessionManagerForAgentId: agentId) currentSession.
+	activeNames := session
+		ifNil: [ Set new ]
+		ifNotNil: [ (agent skillRegistry activeSkillNamesForSession: session) asSet ].
+	^ (agent skillRegistry skills collect: [ :skill |
+		| item |
+		item := skill asMetadataDictionary copy.
+		item at: 'active' put: (activeNames includes: skill name).
+		item ]) asArray
 ]
 
 { #category : 'state' }
@@ -1066,14 +1428,15 @@ PharoCAExternalProtocol >> stateSnapshot [
 	} asDictionary
 ]
 
-{ #category : 'subscriptions' }
-PharoCAExternalProtocol >> subscriptionsGet: params [
-	| id subscription run |
-	id := self requiredString: 'subscriptionId' from: params.
-	subscriptionsMutex critical: [ subscription := subscriptions at: id ifAbsent: [ nil ] ].
-	subscription ifNil: [ PharoCAProtocolError code: 'subscription_not_found' message: 'Unknown subscription: ', id ].
-	run := subscription run.
-	^ self subscriptionSnapshot: subscription id: id run: run
+{ #category : 'subscriptions-private' }
+PharoCAExternalProtocol >> subscriptionSnapshot: subscription id: id run: run [
+	| result |
+	result := subscription asDictionary copy.
+	result
+		at: 'subscriptionId' put: id;
+		at: 'runId' put: run id;
+		at: 'earliestRetainedSequence' put: run earliestRetainedEventSequence.
+	^ result
 ]
 
 { #category : 'subscriptions' }
@@ -1085,6 +1448,16 @@ PharoCAExternalProtocol >> subscriptionsCancel: params [
 	subscription ifNil: [ PharoCAProtocolError code: 'subscription_not_found' message: 'Unknown subscription: ', id ].
 	subscription cancel.
 	^ true
+]
+
+{ #category : 'subscriptions' }
+PharoCAExternalProtocol >> subscriptionsGet: params [
+	| id subscription run |
+	id := self requiredString: 'subscriptionId' from: params.
+	subscriptionsMutex critical: [ subscription := subscriptions at: id ifAbsent: [ nil ] ].
+	subscription ifNil: [ PharoCAProtocolError code: 'subscription_not_found' message: 'Unknown subscription: ', id ].
+	run := subscription run.
+	^ self subscriptionSnapshot: subscription id: id run: run
 ]
 
 { #category : 'private-response' }
@@ -1137,6 +1510,23 @@ PharoCAExternalProtocol >> templatesRun: params eventsDo: eventBlock [
 	^ self runsStart: runParams eventsDo: eventBlock
 ]
 
+{ #category : 'attachments-031' }
+PharoCAExternalProtocol >> userMessageForPrompt: prompt attachments: attachments agent: agent [
+	| parts |
+	parts := OrderedCollection with: (PharoCALLMContentPart text: prompt).
+	parts addAll: (self attachmentPartsFrom: attachments forAgent: agent).
+	^ PharoCALLMMessage new
+		role: #user;
+		contentParts: parts;
+		yourself
+]
+
+{ #category : 'runs-private' }
+PharoCAExternalProtocol >> validateReplayCursor: afterSequence forRun: run [
+	(run eventReplaySnapshotAfterSequence: afterSequence) ifNotNil: [ ^ self ].
+	^ self signalReplayExpiredFor: run afterSequence: afterSequence
+]
+
 { #category : 'private-validation' }
 PharoCAExternalProtocol >> validateRequest: request [
 	request isDictionary ifFalse: [ PharoCAProtocolError code: 'invalid_request' message: 'Request must be an object' ].
@@ -1151,398 +1541,4 @@ PharoCAExternalProtocol >> validateRequest: request [
 		PharoCAProtocolError code: 'invalid_request' message: 'Method must be a non-empty string' ].
 	(request includesKey: 'params') ifTrue: [
 		(request at: 'params') isDictionary ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'params must be an object' ] ]
-]
-
-
-{ #category : 'sessions-private-027' }
-PharoCAExternalProtocol >> ensureEntryId: anEntryId existsInSession: aSession [
-	(aSession entries anySatisfy: [ :each | each id = anEntryId ]) ifFalse: [
-		PharoCAProtocolError
-			code: 'session_entry_not_found'
-			message: 'Unknown session entry: ', anEntryId
-			details: ({ 'sessionId' -> aSession id. 'entryId' -> anEntryId } asDictionary) ].
-	^ anEntryId
-]
-
-{ #category : 'sessions-private-027' }
-PharoCAExternalProtocol >> ensureSessionNotBusy: aSession [
-	| active |
-	active := self activeRunForSessionId: aSession id.
-	active ifNotNil: [
-		PharoCAProtocolError
-			code: 'session_busy'
-			message: 'Session has an active run'
-			details: ({ 'sessionId' -> aSession id. 'runId' -> active id } asDictionary) ].
-	^ aSession
-]
-
-{ #category : 'sessions-private-027' }
-PharoCAExternalProtocol >> sessionTreeEntrySnapshot: entry [
-	| result message |
-	result := {
-		'id' -> entry id.
-		'parentId' -> entry parentId.
-		'type' -> entry type asString.
-		'timestamp' -> entry timestamp asString
-	} asDictionary.
-	entry isMessage ifTrue: [
-		message := entry payload.
-		result at: 'role' put: message role asString.
-		result at: 'textPreview' put: (self externalTextPreviewForMessage: message) ].
-	^ result
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol >> externalTextPreviewForMessage: message [
-	| stream attachmentNames preview |
-	attachmentNames := OrderedCollection new.
-	stream := String new writeStream.
-	message contentParts do: [ :part |
-		| metadata name |
-		metadata := part metadata.
-		(metadata at: 'attachment' ifAbsent: [ false ])
-			ifTrue: [
-				name := metadata at: 'name' ifAbsent: [ 'attachment' ].
-				(attachmentNames includes: name) ifFalse: [ attachmentNames add: name ] ]
-			ifFalse: [ part isText ifTrue: [ stream nextPutAll: part value ] ] ].
-	attachmentNames do: [ :name |
-		stream nextPutAll: ' [attached: '; nextPutAll: name; nextPut: $] ].
-	preview := stream contents.
-	preview size > 160 ifTrue: [ preview := (preview first: 157), '...' ].
-	^ preview
-]
-
-{ #category : 'sessions-035' }
-PharoCAExternalProtocol >> sessionTreeBranchDepthsForEntries: entries childCounts: childCounts [
-	| depths |
-	depths := Dictionary new.
-	entries do: [ :each |
-		| depth parentDepth |
-		depth := each parentId
-			ifNil: [ 0 ]
-			ifNotNil: [
-				parentDepth := depths at: each parentId ifAbsent: [ 0 ].
-				parentDepth + (((childCounts at: each parentId ifAbsent: [ 0 ]) > 1) ifTrue: [ 1 ] ifFalse: [ 0 ]) ].
-		depths at: each id put: depth ].
-	^ depths
-]
-
-{ #category : 'sessions-035' }
-PharoCAExternalProtocol >> sessionTreeChildCountsForEntries: entries [
-	| counts |
-	counts := Dictionary new.
-	entries do: [ :each |
-		each parentId ifNotNil: [
-			counts
-				at: each parentId
-				put: (counts at: each parentId ifAbsent: [ 0 ]) + 1 ] ].
-	^ counts
-]
-
-{ #category : 'sessions-027' }
-PharoCAExternalProtocol >> sessionsTree: params [
-	| manager session afterEntryId limit entries startIndex endIndex page childCounts branchDepths items |
-	manager := self sessionManagerFromParams: params.
-	session := manager sessionForId: (self requiredString: 'sessionId' from: params).
-	afterEntryId := params at: 'afterEntryId' ifAbsent: [ nil ].
-	afterEntryId ifNotNil: [ afterEntryId isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'afterEntryId must be a string or null' ] ].
-	limit := params at: 'limit' ifAbsent: [ 100 ].
-	(limit isInteger and: [ limit > 0 and: [ limit <= 500 ] ]) ifFalse: [
-		PharoCAProtocolError code: 'invalid_params' message: 'limit must be between 1 and 500' ].
-	entries := session entries.
-	childCounts := self sessionTreeChildCountsForEntries: entries.
-	branchDepths := self sessionTreeBranchDepthsForEntries: entries childCounts: childCounts.
-	startIndex := 0.
-	afterEntryId ifNotNil: [
-		startIndex := entries findFirst: [ :each | each id = afterEntryId ].
-		startIndex = 0 ifTrue: [ self ensureEntryId: afterEntryId existsInSession: session ] ].
-	page := startIndex >= entries size
-		ifTrue: [ #() ]
-		ifFalse: [
-			endIndex := (startIndex + limit) min: entries size.
-			entries copyFrom: startIndex + 1 to: endIndex ].
-	items := page collect: [ :each |
-		| snapshot |
-		snapshot := self sessionTreeEntrySnapshot: each.
-		snapshot
-			at: 'childCount' put: (childCounts at: each id ifAbsent: [ 0 ]);
-			at: 'branchDepth' put: (branchDepths at: each id ifAbsent: [ 0 ]);
-			yourself ].
-	^ {
-		'sessionId' -> session id.
-		'items' -> items asArray.
-		'hasMore' -> (startIndex + page size < entries size).
-		'nextEntryId' -> (page ifEmpty: [ afterEntryId ] ifNotEmpty: [ page last id ]).
-		'totalEntryCount' -> entries size.
-		'currentLeafId' -> session currentLeafId
-	} asDictionary
-]
-
-{ #category : 'sessions-027' }
-PharoCAExternalProtocol >> sessionsSelectEntry: params [
-	| manager session sessionId entryId result descriptor |
-	manager := self sessionManagerFromParams: params.
-	sessionId := self requiredString: 'sessionId' from: params.
-	entryId := self requiredString: 'entryId' from: params.
-	session := manager sessionForId: sessionId.
-	self ensureSessionNotBusy: session.
-	self ensureEntryId: entryId existsInSession: session.
-	session := manager selectEntryId: entryId inSessionId: sessionId.
-	descriptor := [ harness sessionRepository descriptorForSessionId: session id workspace: harness workspace ]
-		on: Error
-		do: [ :error | nil ].
-	result := self sessionSnapshot: session
-		name: (descriptor ifNil: [ manager currentName ] ifNotNil: [ descriptor name ])
-		ephemeral: manager currentSessionIsEphemeral.
-	result
-		at: 'viewLeafId' put: entryId;
-		at: 'messages' put: ((session conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray).
-	^ result
-]
-
-
-{ #category : 'runtime-profile' }
-PharoCAExternalProtocol >> runtimeProfileGet [
-	^ harness runtimeProfileStatus
-]
-
-{ #category : 'runtime-profile' }
-PharoCAExternalProtocol >> runtimeProfileSave [
-	[ harness saveRuntimeProfile ]
-		on: Error
-		do: [ :error | PharoCAProtocolError code: 'runtime_profile_save_failed' message: error description ].
-	^ harness runtimeProfileStatus
-]
-
-{ #category : 'credentials' }
-PharoCAExternalProtocol >> credentialsStatus [
-	^ harness providerRegistry credentialResolver descriptionDictionary
-]
-
-{ #category : 'credentials' }
-PharoCAExternalProtocol >> credentialsMapEnvironment: params [
-	| credentialName environmentVariable |
-	credentialName := self requiredString: 'credentialName' from: params.
-	environmentVariable := self requiredString: 'environmentVariable' from: params.
-	harness providerRegistry credentialResolver map: credentialName toEnvironmentVariable: environmentVariable.
-	^ self credentialsStatus
-]
-
-
-{ #category : 'changes-030' }
-PharoCAExternalProtocol >> changesGet: params [
-	| run changeId change maxCharacters detail revertedIds |
-	run := self runNamed: (self requiredString: 'runId' from: params).
-	changeId := self requiredString: 'changeId' from: params.
-	change := run changes detect: [ :each | each id = changeId ] ifNone: [ nil ].
-	change ifNil: [
-		PharoCAProtocolError
-			code: 'change_not_found'
-			message: 'Unknown change for run: ', changeId
-			details: ({ 'runId' -> run id. 'changeId' -> changeId } asDictionary) ].
-	maxCharacters := params at: 'maxDiffCharacters' ifAbsent: [ PharoCAChangeReview defaultMaximumDiffCharacters ].
-	(maxCharacters isInteger and: [ maxCharacters >= 256 and: [ maxCharacters <= PharoCAChangeReview maximumDiffCharacters ] ])
-		ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'maxDiffCharacters must be between 256 and ', PharoCAChangeReview maximumDiffCharacters asString ].
-	detail := PharoCAChangeReview detailFor: change maxDiffCharacters: maxCharacters.
-	revertedIds := PharoCAChangeReview revertedChangeIdsForRun: run.
-	detail at: 'reverted' put: (revertedIds includes: change id).
-	^ detail
-]
-
-{ #category : 'changes-030' }
-PharoCAExternalProtocol >> runsReview: params [
-	| run changes afterChangeId limit startIndex page hasMore scopeCounts kindCounts opaqueCount semanticCount revertedIds revertedCount |
-	run := self runNamed: (self requiredString: 'runId' from: params).
-	changes := run changes.
-	afterChangeId := params at: 'afterChangeId' ifAbsent: [ nil ].
-	afterChangeId ifNotNil: [ afterChangeId isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'afterChangeId must be a string or null' ] ].
-	limit := params at: 'limit' ifAbsent: [ 50 ].
-	(limit isInteger and: [ limit > 0 and: [ limit <= 200 ] ]) ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'limit must be between 1 and 200' ].
-	startIndex := 1.
-	afterChangeId ifNotNil: [
-		startIndex := changes findFirst: [ :each | each id = afterChangeId ].
-		startIndex = 0 ifTrue: [
-			PharoCAProtocolError
-				code: 'change_not_found'
-				message: 'Unknown change cursor for run: ', afterChangeId
-				details: ({ 'runId' -> run id. 'changeId' -> afterChangeId } asDictionary) ].
-		startIndex := startIndex + 1 ].
-	page := startIndex > changes size
-		ifTrue: [ #() ]
-		ifFalse: [ changes copyFrom: startIndex to: (changes size min: startIndex + limit - 1) ].
-	hasMore := startIndex + page size <= changes size.
-	scopeCounts := Dictionary new.
-	kindCounts := Dictionary new.
-	changes do: [ :record |
-		| scope kind |
-		scope := PharoCAChangeReview scopeFor: record.
-		kind := record kind asString.
-		scopeCounts at: scope put: (scopeCounts at: scope ifAbsent: [ 0 ]) + 1.
-		kindCounts at: kind put: (kindCounts at: kind ifAbsent: [ 0 ]) + 1 ].
-	opaqueCount := changes count: [ :record | (PharoCAChangeReview rollbackSafetyFor: record) = 'opaque' ].
-	semanticCount := changes count: [ :record | (PharoCAChangeReview rollbackSafetyFor: record) = 'semantic-candidate' ].
-	revertedIds := PharoCAChangeReview revertedChangeIdsForRun: run.
-	revertedCount := changes count: [ :record | revertedIds includes: record id ].
-	^ {
-		'runId' -> run id.
-		'sessionId' -> (run session ifNil: [ nil ] ifNotNil: [ run session id ]).
-		'status' -> run status asString.
-		'totalChangeCount' -> changes size.
-		'scopeCounts' -> scopeCounts.
-		'kindCounts' -> kindCounts.
-		'opaqueCount' -> opaqueCount.
-		'semanticRollbackCandidateCount' -> semanticCount.
-		'revertedCount' -> revertedCount.
-		'items' -> ((page collect: [ :record | PharoCAChangeReview summaryFor: record reverted: (revertedIds includes: record id) ]) asArray).
-		'hasMore' -> hasMore.
-		'nextChangeId' -> (page ifEmpty: [ afterChangeId ] ifNotEmpty: [ page last id ])
-	} asDictionary
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol class >> maximumAttachmentCount [
-	^ 8
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol class >> maximumAttachmentNameCharacters [
-	^ 256
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol class >> maximumImageAttachmentCharacters [
-	"Encoded URL characters. Kept below the 8 MiB WebSocket message ceiling so JSON overhead cannot consume the entire transport budget."
-	^ 4 * 1024 * 1024
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol class >> maximumTextAttachmentBytes [
-	^ 256 * 1024
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol class >> maximumTotalAttachmentCharacters [
-	^ 6 * 1024 * 1024
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol >> attachmentMetadataKind: kind name: name mimeType: mimeType size: size [
-	^ {
-		'attachment' -> true.
-		'kind' -> kind.
-		'name' -> name.
-		'mimeType' -> mimeType.
-		'size' -> size
-	} asDictionary
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol >> attachmentNameFrom: attachment [
-	| name |
-	name := self requiredString: 'name' from: attachment.
-	name size > self class maximumAttachmentNameCharacters ifTrue: [
-		PharoCAProtocolError code: 'invalid_params' message: 'Attachment name is too long' ].
-	^ name
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol >> attachmentPartsFrom: attachments forAgent: agent [
-	| parts totalCharacters |
-	attachments ifNil: [ ^ #() ].
-	attachments isArray ifFalse: [
-		PharoCAProtocolError code: 'invalid_params' message: 'attachments must be an array' ].
-	attachments size > self class maximumAttachmentCount ifTrue: [
-		PharoCAProtocolError
-			code: 'attachment_limit_exceeded'
-			message: 'At most ', self class maximumAttachmentCount asString, ' attachments are allowed' ].
-	parts := OrderedCollection new.
-	totalCharacters := 0.
-	attachments do: [ :attachment |
-		| kind name mimeType text url part size label |
-		attachment isDictionary ifFalse: [
-			PharoCAProtocolError code: 'invalid_params' message: 'Each attachment must be an object' ].
-		kind := self requiredString: 'kind' from: attachment.
-		name := self attachmentNameFrom: attachment.
-		mimeType := attachment at: 'mimeType' ifAbsent: [ kind = 'image' ifTrue: [ 'image/unknown' ] ifFalse: [ 'text/plain' ] ].
-		(mimeType isString and: [ mimeType trimBoth isNotEmpty ]) ifFalse: [
-			PharoCAProtocolError code: 'invalid_params' message: 'mimeType must be a non-empty string' ].
-		kind = 'text'
-			ifTrue: [
-				text := attachment at: 'text' ifAbsent: [ PharoCAProtocolError code: 'invalid_params' message: 'Text attachment requires text' ].
-				text isString ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'Attachment text must be a string' ].
-				size := text utf8Encoded size.
-				size > self class maximumTextAttachmentBytes ifTrue: [
-					PharoCAProtocolError code: 'attachment_too_large' message: 'Text attachment exceeds 256 KiB' ].
-				totalCharacters := totalCharacters + text size.
-				label := 'Attached text file: ', name, ' (', mimeType, ')', String lf,
-					'--- BEGIN ATTACHMENT ---', String lf, text, String lf, '--- END ATTACHMENT ---'.
-				part := PharoCALLMContentPart text: label.
-				part metadata: (self attachmentMetadataKind: 'text' name: name mimeType: mimeType size: size).
-				parts add: part ]
-			ifFalse: [
-				kind = 'image' ifFalse: [
-					PharoCAProtocolError code: 'invalid_params' message: 'Unsupported attachment kind: ', kind ].
-				agent model supportsImages ifFalse: [
-					PharoCAProtocolError
-						code: 'model_capability_mismatch'
-						message: 'Selected model does not advertise image support'
-						details: ({ 'modelId' -> agent model name. 'capability' -> 'images' } asDictionary) ].
-				url := self requiredString: 'url' from: attachment.
-				((url beginsWith: 'https://') or: [ (url beginsWith: 'http://') or: [ url beginsWith: 'data:image/' ] ]) ifFalse: [
-					PharoCAProtocolError code: 'invalid_params' message: 'Image attachment URL must be http(s) or a data:image URL' ].
-				url size > self class maximumImageAttachmentCharacters ifTrue: [
-					PharoCAProtocolError code: 'attachment_too_large' message: 'Encoded image attachment exceeds 4 MiB' ].
-				(url beginsWith: 'data:image/') ifTrue: [
-					| markerIndex dataMimeType |
-					markerIndex := url findString: ';base64,' startingAt: 1.
-					markerIndex = 0 ifTrue: [
-						PharoCAProtocolError code: 'invalid_params' message: 'Image data URL must use base64 encoding' ].
-					dataMimeType := url copyFrom: 6 to: markerIndex - 1.
-					(#('image/png' 'image/jpeg' 'image/gif' 'image/webp') includes: dataMimeType) ifFalse: [
-						PharoCAProtocolError code: 'invalid_params' message: 'Unsupported image data URL media type: ', dataMimeType ].
-					(mimeType ~= 'image/unknown' and: [ mimeType ~= dataMimeType ]) ifTrue: [
-						PharoCAProtocolError code: 'invalid_params' message: 'Image attachment mimeType does not match data URL media type' ] ].
-				totalCharacters := totalCharacters + url size.
-				label := PharoCALLMContentPart text: 'Attached image: ', name, ' (', mimeType, ')'.
-				label metadata: (self attachmentMetadataKind: 'imageLabel' name: name mimeType: mimeType size: url size).
-				parts add: label.
-				part := PharoCALLMContentPart imageURL: url.
-				part metadata: (self attachmentMetadataKind: 'image' name: name mimeType: mimeType size: url size).
-				parts add: part ].
-		totalCharacters > self class maximumTotalAttachmentCharacters ifTrue: [
-			PharoCAProtocolError code: 'attachment_limit_exceeded' message: 'Combined attachment payload exceeds 6 MiB' ] ].
-	^ parts asArray
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol >> userMessageForPrompt: prompt attachments: attachments agent: agent [
-	| parts |
-	parts := OrderedCollection with: (PharoCALLMContentPart text: prompt).
-	parts addAll: (self attachmentPartsFrom: attachments forAgent: agent).
-	^ PharoCALLMMessage new
-		role: #user;
-		contentParts: parts;
-		yourself
-]
-
-{ #category : 'attachments-031' }
-PharoCAExternalProtocol >> externalMessageDictionaryFor: message [
-	| result |
-	result := message asDictionary copy.
-	result at: 'contentParts' put: ((message contentParts collect: [ :part |
-		| dictionary metadata name kind |
-		dictionary := part asDictionary copy.
-		metadata := part metadata.
-		(metadata at: 'attachment' ifAbsent: [ false ])
-			ifTrue: [
-				name := metadata at: 'name' ifAbsent: [ 'attachment' ].
-				kind := metadata at: 'kind' ifAbsent: [ part type asString ].
-				dictionary at: 'value' put: '[', kind, ' attachment: ', name, ']'.
-				dictionary at: 'omitted' put: true ]
-			ifFalse: [
-				(part type = #imageURL and: [ part value isString and: [ part value beginsWith: 'data:image/' ] ]) ifTrue: [
-					dictionary at: 'value' put: '[inline image data omitted]'.
-					dictionary at: 'omitted' put: true ] ].
-		dictionary ]) asArray).
-	^ result
 ]

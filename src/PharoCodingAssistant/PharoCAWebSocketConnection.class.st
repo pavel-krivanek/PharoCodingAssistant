@@ -1,4 +1,6 @@
-"Minimal RFC 6455 text WebSocket connection used by the static browser UI. It depends only on classes already present in the Pharo image."
+"
+Minimal RFC 6455 text WebSocket connection used by the static browser UI. It depends only on classes already present in the Pharo image.
+"
 Class {
 	#name : 'PharoCAWebSocketConnection',
 	#superclass : 'Object',
@@ -25,46 +27,18 @@ PharoCAWebSocketConnection class >> on: aProtocol [
 	^ self new protocol: aProtocol; yourself
 ]
 
-{ #category : 'initialization' }
-PharoCAWebSocketConnection >> initialize [
-	super initialize.
-	writeMutex := Semaphore forMutualExclusion.
-	closed := false.
-	maximumMessageBytes := self class defaultMaximumMessageBytes.
-	subscriptionIds := Set new
-]
-
-{ #category : 'accessing' }
-PharoCAWebSocketConnection >> maximumMessageBytes [
-	^ maximumMessageBytes
-]
-
-{ #category : 'accessing' }
-PharoCAWebSocketConnection >> maximumMessageBytes: anInteger [
-	anInteger > 0 ifFalse: [ Error signal: 'maximumMessageBytes must be greater than zero' ].
-	maximumMessageBytes := anInteger
-]
-
-{ #category : 'accessing' }
-PharoCAWebSocketConnection >> protocol: anObject [
-	protocol := anObject
-]
-
-{ #category : 'running' }
-PharoCAWebSocketConnection >> runOn: aStream [
-	stream := aStream.
-	[
-		[
-			[ closed ] whileFalse: [
-				| message |
-				message := self nextTextMessage.
-				message ifNil: [ closed := true ] ifNotNil: [ self handleTextMessage: message ] ]
-		] on: Error do: [ :error |
-			closed ifFalse: [ [ self sendCloseCode: 1002 reason: 'Protocol error' ] on: Error do: [ :ignored | ] ] ]
-	] ensure: [
-		closed := true.
-		self cancelOwnedSubscriptions.
-		[ stream close ] on: Error do: [ :ignored | ] ]
+{ #category : 'subscriptions' }
+PharoCAWebSocketConnection >> cancelOwnedSubscriptions [
+	subscriptionIds copy do: [ :id |
+		| request |
+		request := {
+			'protocolVersion' -> protocol class protocolVersion.
+			'id' -> UUID new asString.
+			'method' -> 'subscriptions.cancel'.
+			'params' -> ({ 'subscriptionId' -> id } asDictionary)
+		} asDictionary.
+		[ protocol handleRequest: request ] on: Error do: [ :ignored | ] ].
+	subscriptionIds removeAll
 ]
 
 { #category : 'handling' }
@@ -84,54 +58,24 @@ PharoCAWebSocketConnection >> handleTextMessage: text [
 		self sendJSON: (self transportErrorFor: error) ]
 ]
 
-{ #category : 'subscriptions' }
-PharoCAWebSocketConnection >> shouldForwardEventsForRequest: request [
-	| method |
-	request isDictionary ifFalse: [ ^ false ].
-	method := request at: 'method' ifAbsent: [ '' ].
-	^ method = 'runs.subscribe'
+{ #category : 'initialization' }
+PharoCAWebSocketConnection >> initialize [
+	super initialize.
+	writeMutex := Semaphore forMutualExclusion.
+	closed := false.
+	maximumMessageBytes := self class defaultMaximumMessageBytes.
+	subscriptionIds := Set new
 ]
 
-{ #category : 'subscriptions' }
-PharoCAWebSocketConnection >> rememberSubscriptionFromRequest: request response: response [
-	| method result id |
-	(request isDictionary and: [ response isDictionary ]) ifFalse: [ ^ self ].
-	(response at: 'ok' ifAbsent: [ false ]) ifFalse: [ ^ self ].
-	method := request at: 'method' ifAbsent: [ '' ].
-	method = 'runs.subscribe' ifFalse: [ ^ self ].
-	result := response at: 'result' ifAbsent: [ nil ].
-	result isDictionary ifFalse: [ ^ self ].
-	id := result at: 'subscriptionId' ifAbsent: [ nil ].
-	id ifNotNil: [ subscriptionIds add: id ]
+{ #category : 'accessing' }
+PharoCAWebSocketConnection >> maximumMessageBytes [
+	^ maximumMessageBytes
 ]
 
-{ #category : 'subscriptions' }
-PharoCAWebSocketConnection >> cancelOwnedSubscriptions [
-	subscriptionIds copy do: [ :id |
-		| request |
-		request := {
-			'protocolVersion' -> protocol class protocolVersion.
-			'id' -> UUID new asString.
-			'method' -> 'subscriptions.cancel'.
-			'params' -> ({ 'subscriptionId' -> id } asDictionary)
-		} asDictionary.
-		[ protocol handleRequest: request ] on: Error do: [ :ignored | ] ].
-	subscriptionIds removeAll
-]
-
-{ #category : 'errors' }
-PharoCAWebSocketConnection >> transportErrorFor: error [
-	^ {
-		'protocolVersion' -> protocol class protocolVersion.
-		'type' -> 'response'.
-		'id' -> nil.
-		'ok' -> false.
-		'error' -> ({
-			'code' -> 'invalid_json'.
-			'message' -> error description.
-			'details' -> nil
-		} asDictionary)
-	} asDictionary
+{ #category : 'accessing' }
+PharoCAWebSocketConnection >> maximumMessageBytes: anInteger [
+	anInteger > 0 ifFalse: [ Error signal: 'maximumMessageBytes must be greater than zero' ].
+	maximumMessageBytes := anInteger
 ]
 
 { #category : 'receiving' }
@@ -166,6 +110,22 @@ PharoCAWebSocketConnection >> nextTextMessage [
 	] repeat
 ]
 
+{ #category : 'accessing' }
+PharoCAWebSocketConnection >> protocol: anObject [
+	protocol := anObject
+]
+
+{ #category : 'receiving' }
+PharoCAWebSocketConnection >> readBytes: count [
+	| bytes value |
+	bytes := ByteArray new: count.
+	1 to: count do: [ :index |
+		value := stream next.
+		value ifNil: [ Error signal: 'Unexpected end of WebSocket frame' ].
+		bytes at: index put: value ].
+	^ bytes
+]
+
 { #category : 'receiving' }
 PharoCAWebSocketConnection >> readFrame [
 	| first second fin opcode masked lengthCode length mask payload |
@@ -196,17 +156,6 @@ PharoCAWebSocketConnection >> readFrame [
 ]
 
 { #category : 'receiving' }
-PharoCAWebSocketConnection >> readBytes: count [
-	| bytes value |
-	bytes := ByteArray new: count.
-	1 to: count do: [ :index |
-		value := stream next.
-		value ifNil: [ Error signal: 'Unexpected end of WebSocket frame' ].
-		bytes at: index put: value ].
-	^ bytes
-]
-
-{ #category : 'receiving' }
 PharoCAWebSocketConnection >> readUnsignedIntegerBytes: count [
 	| value |
 	value := 0.
@@ -218,15 +167,34 @@ PharoCAWebSocketConnection >> readUnsignedIntegerBytes: count [
 	^ value
 ]
 
-{ #category : 'sending' }
-PharoCAWebSocketConnection >> sendJSON: dictionary [
-	closed ifTrue: [ ^ self ].
-	self sendText: (STONJSON toString: dictionary)
+{ #category : 'subscriptions' }
+PharoCAWebSocketConnection >> rememberSubscriptionFromRequest: request response: response [
+	| method result id |
+	(request isDictionary and: [ response isDictionary ]) ifFalse: [ ^ self ].
+	(response at: 'ok' ifAbsent: [ false ]) ifFalse: [ ^ self ].
+	method := request at: 'method' ifAbsent: [ '' ].
+	method = 'runs.subscribe' ifFalse: [ ^ self ].
+	result := response at: 'result' ifAbsent: [ nil ].
+	result isDictionary ifFalse: [ ^ self ].
+	id := result at: 'subscriptionId' ifAbsent: [ nil ].
+	id ifNotNil: [ subscriptionIds add: id ]
 ]
 
-{ #category : 'sending' }
-PharoCAWebSocketConnection >> sendText: aString [
-	self sendFrameOpcode: 1 payload: aString utf8Encoded
+{ #category : 'running' }
+PharoCAWebSocketConnection >> runOn: aStream [
+	stream := aStream.
+	[
+		[
+			[ closed ] whileFalse: [
+				| message |
+				message := self nextTextMessage.
+				message ifNil: [ closed := true ] ifNotNil: [ self handleTextMessage: message ] ]
+		] on: Error do: [ :error |
+			closed ifFalse: [ [ self sendCloseCode: 1002 reason: 'Protocol error' ] on: Error do: [ :ignored | ] ] ]
+	] ensure: [
+		closed := true.
+		self cancelOwnedSubscriptions.
+		[ stream close ] on: Error do: [ :ignored | ] ]
 ]
 
 { #category : 'sending' }
@@ -261,6 +229,40 @@ PharoCAWebSocketConnection >> sendFrameOpcode: opcode payload: payload [
 		stream nextPutAll: header contents.
 		stream nextPutAll: payload.
 		stream flush ]
+]
+
+{ #category : 'sending' }
+PharoCAWebSocketConnection >> sendJSON: dictionary [
+	closed ifTrue: [ ^ self ].
+	self sendText: (STONJSON toString: dictionary)
+]
+
+{ #category : 'sending' }
+PharoCAWebSocketConnection >> sendText: aString [
+	self sendFrameOpcode: 1 payload: aString utf8Encoded
+]
+
+{ #category : 'subscriptions' }
+PharoCAWebSocketConnection >> shouldForwardEventsForRequest: request [
+	| method |
+	request isDictionary ifFalse: [ ^ false ].
+	method := request at: 'method' ifAbsent: [ '' ].
+	^ method = 'runs.subscribe'
+]
+
+{ #category : 'errors' }
+PharoCAWebSocketConnection >> transportErrorFor: error [
+	^ {
+		'protocolVersion' -> protocol class protocolVersion.
+		'type' -> 'response'.
+		'id' -> nil.
+		'ok' -> false.
+		'error' -> ({
+			'code' -> 'invalid_json'.
+			'message' -> error description.
+			'details' -> nil
+		} asDictionary)
+	} asDictionary
 ]
 
 { #category : 'sending' }

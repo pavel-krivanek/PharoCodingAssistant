@@ -1,8 +1,14 @@
-"Result of a before-tool interception hook. A decision either allows one invocation (possibly rewritten) or rejects it with a canonical tool result."
+"
+Result of a before-tool interception hook. A decision either allows one invocation (possibly rewritten) or rejects it with a canonical tool result.
+"
 Class {
 	#name : 'PharoCAExtensionToolDecision',
 	#superclass : 'Object',
-	#instVars : [ 'action', 'invocation', 'result' ],
+	#instVars : [
+		'action',
+		'invocation',
+		'result'
+	],
 	#category : 'PharoCodingAssistant-Extensions',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Extensions'
@@ -27,18 +33,33 @@ PharoCAExtensionToolDecision class >> rejectType: aType message: aMessage detail
 ]
 
 { #category : 'accessing' }
-PharoCAExtensionToolDecision >> action [ ^ action ]
+PharoCAExtensionToolDecision >> action [ ^ action
+]
+
 { #category : 'accessing' }
-PharoCAExtensionToolDecision >> action: aSymbol [ action := aSymbol ]
+PharoCAExtensionToolDecision >> action: aSymbol [ action := aSymbol
+]
+
 { #category : 'testing' }
-PharoCAExtensionToolDecision >> allowed [ ^ action = #allow ]
+PharoCAExtensionToolDecision >> allowed [ ^ action = #allow
+]
+
 { #category : 'accessing' }
-PharoCAExtensionToolDecision >> invocation [ ^ invocation ]
+PharoCAExtensionToolDecision >> invocation [ ^ invocation
+]
+
 { #category : 'accessing' }
-PharoCAExtensionToolDecision >> invocation: anInvocation [ invocation := anInvocation ]
+PharoCAExtensionToolDecision >> invocation: anInvocation [ invocation := anInvocation
+]
+
 { #category : 'testing' }
-PharoCAExtensionToolDecision >> rejected [ ^ action = #reject ]
+PharoCAExtensionToolDecision >> rejected [ ^ action = #reject
+]
+
 { #category : 'accessing' }
-PharoCAExtensionToolDecision >> result [ ^ result ]
+PharoCAExtensionToolDecision >> result [ ^ result
+]
+
 { #category : 'accessing' }
-PharoCAExtensionToolDecision >> result: anObject [ result := anObject ]
+PharoCAExtensionToolDecision >> result: anObject [ result := anObject
+]

@@ -1,4 +1,6 @@
-"Removes a class from the system. Disabled by default, but journal-aware if enabled explicitly later."
+"
+Removes a class from the system. Disabled by default, but journal-aware if enabled explicitly later.
+"
 Class {
 	#name : 'PharoCAToolRemoveClass',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolRemoveClass class >> capability [ ^ #destructive
+]
 
 { #category : 'execution' }
 PharoCAToolRemoveClass class >> execute: args [
@@ -29,14 +35,13 @@ PharoCAToolRemoveClass class >> execute: args context: context [
 	^ { 'status' -> 'ok' } asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolRemoveClass class >> isEnabled [ ^ false ]
-
-{ #category : 'definition' }
-PharoCAToolRemoveClass class >> capability [ ^ #destructive ]
-
 { #category : 'execution' }
-PharoCAToolRemoveClass class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolRemoveClass class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolRemoveClass class >> isEnabled [ ^ false
+]
 
 { #category : 'definition' }
 PharoCAToolRemoveClass class >> llmDefinition [
@@ -47,4 +52,5 @@ PharoCAToolRemoveClass class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolRemoveClass class >> toolName [ ^ #remove_class ]
+PharoCAToolRemoveClass class >> toolName [ ^ #remove_class
+]

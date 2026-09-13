@@ -1,8 +1,16 @@
-"Provider-neutral description of one model-requested tool call."
+"
+Provider-neutral description of one model-requested tool call.
+"
 Class {
 	#name : 'PharoCAToolInvocation',
 	#superclass : 'Object',
-	#instVars : [ 'id', 'name', 'argumentsJSON', 'index', 'preExecutionResult' ],
+	#instVars : [
+		'id',
+		'name',
+		'argumentsJSON',
+		'index',
+		'preExecutionResult'
+	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
@@ -19,37 +27,12 @@ PharoCAToolInvocation class >> id: anId name: aName argumentsJSON: json index: a
 ]
 
 { #category : 'accessing' }
-PharoCAToolInvocation >> argumentsJSON [ ^ argumentsJSON ]
+PharoCAToolInvocation >> argumentsJSON [ ^ argumentsJSON
+]
 
 { #category : 'accessing' }
-PharoCAToolInvocation >> argumentsJSON: aString [ argumentsJSON := aString ]
-
-{ #category : 'accessing' }
-PharoCAToolInvocation >> id [ ^ id ]
-
-{ #category : 'accessing' }
-PharoCAToolInvocation >> id: anObject [ id := anObject ]
-
-{ #category : 'accessing' }
-PharoCAToolInvocation >> index [ ^ index ]
-
-{ #category : 'accessing' }
-PharoCAToolInvocation >> index: anInteger [ index := anInteger ]
-
-{ #category : 'accessing' }
-PharoCAToolInvocation >> name [ ^ name ]
-
-{ #category : 'accessing' }
-PharoCAToolInvocation >> name: aString [ name := aString ]
-
-{ #category : 'interception' }
-PharoCAToolInvocation >> preExecutionResult [ ^ preExecutionResult ]
-
-{ #category : 'interception' }
-PharoCAToolInvocation >> preExecutionResult: aResult [ preExecutionResult := aResult ]
-
-{ #category : 'testing' }
-PharoCAToolInvocation >> isPreRejected [ ^ preExecutionResult notNil ]
+PharoCAToolInvocation >> argumentsJSON: aString [ argumentsJSON := aString
+]
 
 { #category : 'copying' }
 PharoCAToolInvocation >> copyWithName: aName argumentsJSON: aJSONString [
@@ -58,4 +41,40 @@ PharoCAToolInvocation >> copyWithName: aName argumentsJSON: aJSONString [
 		name: aName
 		argumentsJSON: aJSONString
 		index: index
+]
+
+{ #category : 'accessing' }
+PharoCAToolInvocation >> id [ ^ id
+]
+
+{ #category : 'accessing' }
+PharoCAToolInvocation >> id: anObject [ id := anObject
+]
+
+{ #category : 'accessing' }
+PharoCAToolInvocation >> index [ ^ index
+]
+
+{ #category : 'accessing' }
+PharoCAToolInvocation >> index: anInteger [ index := anInteger
+]
+
+{ #category : 'testing' }
+PharoCAToolInvocation >> isPreRejected [ ^ preExecutionResult notNil
+]
+
+{ #category : 'accessing' }
+PharoCAToolInvocation >> name [ ^ name
+]
+
+{ #category : 'accessing' }
+PharoCAToolInvocation >> name: aString [ name := aString
+]
+
+{ #category : 'interception' }
+PharoCAToolInvocation >> preExecutionResult [ ^ preExecutionResult
+]
+
+{ #category : 'interception' }
+PharoCAToolInvocation >> preExecutionResult: aResult [ preExecutionResult := aResult
 ]

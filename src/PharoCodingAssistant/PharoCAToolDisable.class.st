@@ -1,4 +1,6 @@
-"Deactivates a lazily exposed tool pack for the current durable session. The catalog pack is intentionally permanent so the model can always recover tools."
+"
+Deactivates a lazily exposed tool pack for the current durable session. The catalog pack is intentionally permanent so the model can always recover tools.
+"
 Class {
 	#name : 'PharoCAToolDisable',
 	#superclass : 'PharoCATool',
@@ -8,27 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolDisable class >> capability [ ^ #session ]
-
-{ #category : 'execution' }
-PharoCAToolDisable class >> executionMode [ ^ #sequential ]
-
-{ #category : 'definition' }
-PharoCAToolDisable class >> toolPack [ ^ #catalog ]
-
-{ #category : 'definition' }
-PharoCAToolDisable class >> toolName [ ^ #tool_disable ]
-
-{ #category : 'definition' }
-PharoCAToolDisable class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tool_disable'
-		description: 'Deactivates a named tool pack for this session. The catalog pack itself cannot be disabled. The change affects the next model request.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> { 'pack' -> { 'type' -> 'string' } asDictionary } asDictionary.
-			'required' -> #(pack)
-		} asDictionary
+PharoCAToolDisable class >> capability [ ^ #session
 ]
 
 { #category : 'definition' }
@@ -55,4 +37,28 @@ PharoCAToolDisable class >> execute: args context: aContext [
 		'activePacks' -> (registry activePackNamesForSession: run session).
 		'removedOnNextModelRequest' -> true
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolDisable class >> executionMode [ ^ #sequential
+]
+
+{ #category : 'definition' }
+PharoCAToolDisable class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tool_disable'
+		description: 'Deactivates a named tool pack for this session. The catalog pack itself cannot be disabled. The change affects the next model request.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> { 'pack' -> { 'type' -> 'string' } asDictionary } asDictionary.
+			'required' -> #(pack)
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolDisable class >> toolName [ ^ #tool_disable
+]
+
+{ #category : 'definition' }
+PharoCAToolDisable class >> toolPack [ ^ #catalog
 ]

@@ -1,4 +1,6 @@
-"Formats Pharo method or expression source through the native Opal AST formatter without mutating the image."
+"
+Formats Pharo method or expression source through the native Opal AST formatter without mutating the image.
+"
 Class {
 	#name : 'PharoCAToolFormatCode',
 	#superclass : 'PharoCATool',
@@ -8,29 +10,7 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolFormatCode class >> toolName [ ^ #format_code ]
-
-{ #category : 'definition' }
-PharoCAToolFormatCode class >> capability [ ^ #coding ]
-
-{ #category : 'execution' }
-PharoCAToolFormatCode class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolFormatCode class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'format_code'
-		description: 'Formats Pharo method or expression source with the image native Opal formatter. Read-only; returns bounded formatted text.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'source' -> { 'type' -> 'string'. 'maxLength' -> 50000 } asDictionary.
-				'kind' -> { 'type' -> 'string'. 'enum' -> #('method' 'expression') } asDictionary.
-				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('source')
-		} asDictionary
+PharoCAToolFormatCode class >> capability [ ^ #coding
 ]
 
 { #category : 'execution' }
@@ -65,4 +45,29 @@ PharoCAToolFormatCode class >> execute: args context: context [
 	} asDictionary.
 	kind = 'method' ifTrue: [ result at: 'selector' put: ast selector asString ].
 	^ result
+]
+
+{ #category : 'execution' }
+PharoCAToolFormatCode class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolFormatCode class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'format_code'
+		description: 'Formats Pharo method or expression source with the image native Opal formatter. Read-only; returns bounded formatted text.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'source' -> { 'type' -> 'string'. 'maxLength' -> 50000 } asDictionary.
+				'kind' -> { 'type' -> 'string'. 'enum' -> #('method' 'expression') } asDictionary.
+				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('source')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolFormatCode class >> toolName [ ^ #format_code
 ]

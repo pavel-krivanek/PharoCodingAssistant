@@ -1,48 +1,34 @@
-"One immutable-ish discovery snapshot for a workspace. It contains declarative resources, resolved settings, executable extensions allowed by trust, and diagnostics."
+"
+One immutable-ish discovery snapshot for a workspace. It contains declarative resources, resolved settings, executable extensions allowed by trust, and diagnostics.
+"
 Class {
 	#name : 'PharoCAWorkspaceResources',
 	#superclass : 'Object',
-	#instVars : [ 'workspace', 'settings', 'instructions', 'skillsByName', 'templatesByName', 'extensions', 'diagnostics' ],
+	#instVars : [
+		'workspace',
+		'settings',
+		'instructions',
+		'skillsByName',
+		'templatesByName',
+		'extensions',
+		'diagnostics'
+	],
 	#category : 'PharoCodingAssistant-Workspace',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Workspace'
 }
 
-{ #category : 'initialization' }
-PharoCAWorkspaceResources >> initialize [
-	super initialize.
-	instructions := OrderedCollection new.
-	skillsByName := Dictionary new.
-	templatesByName := Dictionary new.
-	extensions := OrderedCollection new.
-	diagnostics := OrderedCollection new
+{ #category : 'adding' }
+PharoCAWorkspaceResources >> addDiagnostic: aDiagnostic [ diagnostics add: aDiagnostic
 ]
 
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> workspace [ ^ workspace ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> workspace: anObject [ workspace := anObject ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> settings [ ^ settings ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> settings: anObject [ settings := anObject ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> instructions [ ^ instructions asArray ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> skills [ ^ (skillsByName keys sorted collect: [ :key | skillsByName at: key ]) asArray ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> templates [ ^ (templatesByName keys sorted collect: [ :key | templatesByName at: key ]) asArray ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> extensions [ ^ extensions asArray ]
-{ #category : 'accessing' }
-PharoCAWorkspaceResources >> diagnostics [ ^ diagnostics asArray ]
+{ #category : 'adding' }
+PharoCAWorkspaceResources >> addExtension: anExtension [ extensions add: anExtension
+]
 
 { #category : 'adding' }
-PharoCAWorkspaceResources >> addInstruction: aSource [ instructions add: aSource ]
-{ #category : 'adding' }
-PharoCAWorkspaceResources >> addExtension: anExtension [ extensions add: anExtension ]
-{ #category : 'adding' }
-PharoCAWorkspaceResources >> addDiagnostic: aDiagnostic [ diagnostics add: aDiagnostic ]
+PharoCAWorkspaceResources >> addInstruction: aSource [ instructions add: aSource
+]
 
 { #category : 'adding' }
 PharoCAWorkspaceResources >> addSkill: aSkill scope: scope [
@@ -85,8 +71,53 @@ PharoCAWorkspaceResources >> asDictionary [
 	} asDictionary
 ]
 
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> diagnostics [ ^ diagnostics asArray
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> extensions [ ^ extensions asArray
+]
+
+{ #category : 'initialization' }
+PharoCAWorkspaceResources >> initialize [
+	super initialize.
+	instructions := OrderedCollection new.
+	skillsByName := Dictionary new.
+	templatesByName := Dictionary new.
+	extensions := OrderedCollection new.
+	diagnostics := OrderedCollection new
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> instructions [ ^ instructions asArray
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> settings [ ^ settings
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> settings: anObject [ settings := anObject
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> skills [ ^ (skillsByName keys sorted collect: [ :key | skillsByName at: key ]) asArray
+]
 
 { #category : 'accessing' }
 PharoCAWorkspaceResources >> templateNamed: aName ifAbsent: aBlock [
 	^ templatesByName at: aName asString ifAbsent: aBlock
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> templates [ ^ (templatesByName keys sorted collect: [ :key | templatesByName at: key ]) asArray
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> workspace [ ^ workspace
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceResources >> workspace: anObject [ workspace := anObject
 ]

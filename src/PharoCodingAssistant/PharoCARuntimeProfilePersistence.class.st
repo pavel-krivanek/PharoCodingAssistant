@@ -1,4 +1,6 @@
-"Versioned JSON persistence for reconstructible, non-secret runtime control-plane configuration. Secret values and executable provider factories are intentionally outside this format."
+"
+Versioned JSON persistence for reconstructible, non-secret runtime control-plane configuration. Secret values and executable provider factories are intentionally outside this format.
+"
 Class {
 	#name : 'PharoCARuntimeProfilePersistence',
 	#superclass : 'Object',
@@ -17,17 +19,9 @@ PharoCARuntimeProfilePersistence class >> formatName [
 	^ 'PharoCodingAssistantRuntimeProfile'
 ]
 
-{ #category : 'serializing' }
-PharoCARuntimeProfilePersistence >> stringForProfileDictionary: aDictionary [
-	aDictionary isDictionary ifFalse: [ Error signal: 'Runtime profile must be a dictionary' ].
-	^ [ STONJSON toString: ({
-		'format' -> self class formatName.
-		'version' -> self class currentVersion.
-		'savedAt' -> DateAndTime now asString.
-		'profile' -> aDictionary
-	} asDictionary) ]
-		on: Error
-		do: [ :error | Error signal: 'Runtime profile contains non-JSON-persistable state: ', error description ]
+{ #category : 'files' }
+PharoCARuntimeProfilePersistence >> loadProfileFrom: aFileReference [
+	^ self profileDictionaryFromString: aFileReference contents
 ]
 
 { #category : 'deserializing' }
@@ -44,11 +38,6 @@ PharoCARuntimeProfilePersistence >> profileDictionaryFromString: aString [
 	profile := object at: 'profile' ifAbsent: [ Error signal: 'Runtime profile has no profile object' ].
 	profile isDictionary ifFalse: [ Error signal: 'Runtime profile field must be an object' ].
 	^ profile
-]
-
-{ #category : 'files' }
-PharoCARuntimeProfilePersistence >> loadProfileFrom: aFileReference [
-	^ self profileDictionaryFromString: aFileReference contents
 ]
 
 { #category : 'files' }
@@ -69,4 +58,17 @@ PharoCARuntimeProfilePersistence >> saveProfileDictionary: aDictionary to: targe
 		target exists ifFalse: [ backup exists ifTrue: [ backup moveTo: target ] ].
 		error pass ].
 	^ target
+]
+
+{ #category : 'serializing' }
+PharoCARuntimeProfilePersistence >> stringForProfileDictionary: aDictionary [
+	aDictionary isDictionary ifFalse: [ Error signal: 'Runtime profile must be a dictionary' ].
+	^ [ STONJSON toString: ({
+		'format' -> self class formatName.
+		'version' -> self class currentVersion.
+		'savedAt' -> DateAndTime now asString.
+		'profile' -> aDictionary
+	} asDictionary) ]
+		on: Error
+		do: [ :error | Error signal: 'Runtime profile contains non-JSON-persistable state: ', error description ]
 ]

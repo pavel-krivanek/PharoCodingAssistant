@@ -1,29 +1,20 @@
-"Registry/parser for immediate harness commands. The registry is transport-neutral; CLI, JSONL and web UIs can expose the same command metadata."
+"
+Registry/parser for immediate harness commands. The registry is transport-neutral; CLI, JSONL and web UIs can expose the same command metadata.
+"
 Class {
 	#name : 'PharoCACommandRegistry',
 	#superclass : 'Object',
-	#instVars : [ 'commands' ],
+	#instVars : [
+		'commands'
+	],
 	#category : 'PharoCodingAssistant-Protocol',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Protocol'
 }
 
-{ #category : 'initialization' }
-PharoCACommandRegistry >> initialize [
-	super initialize.
-	commands := Dictionary new
-]
-
-{ #category : 'registration' }
-PharoCACommandRegistry >> register: aCommand [
-	(commands includesKey: aCommand name) ifTrue: [ Error signal: 'Duplicate command: ', aCommand name ].
-	commands at: aCommand name put: aCommand.
-	^ aCommand
-]
-
-{ #category : 'registration' }
-PharoCACommandRegistry >> unregisterNamed: aName [
-	commands removeKey: aName asString ifAbsent: [ ]
+{ #category : 'converting' }
+PharoCACommandRegistry >> asArray [
+	^ (self commands collect: [ :each | each asDictionary ]) asArray
 ]
 
 { #category : 'accessing' }
@@ -35,11 +26,6 @@ PharoCACommandRegistry >> commandNamed: aName [
 { #category : 'accessing' }
 PharoCACommandRegistry >> commands [
 	^ (commands keys sorted collect: [ :key | commands at: key ]) asArray
-]
-
-{ #category : 'executing' }
-PharoCACommandRegistry >> invokeNamed: aName params: aDictionary [
-	^ (self commandNamed: aName) executeWith: aDictionary
 ]
 
 { #category : 'executing' }
@@ -66,7 +52,25 @@ PharoCACommandRegistry >> executeLine: aString params: baseParams [
 	^ self invokeNamed: name params: params
 ]
 
-{ #category : 'converting' }
-PharoCACommandRegistry >> asArray [
-	^ (self commands collect: [ :each | each asDictionary ]) asArray
+{ #category : 'initialization' }
+PharoCACommandRegistry >> initialize [
+	super initialize.
+	commands := Dictionary new
+]
+
+{ #category : 'executing' }
+PharoCACommandRegistry >> invokeNamed: aName params: aDictionary [
+	^ (self commandNamed: aName) executeWith: aDictionary
+]
+
+{ #category : 'registration' }
+PharoCACommandRegistry >> register: aCommand [
+	(commands includesKey: aCommand name) ifTrue: [ Error signal: 'Duplicate command: ', aCommand name ].
+	commands at: aCommand name put: aCommand.
+	^ aCommand
+]
+
+{ #category : 'registration' }
+PharoCACommandRegistry >> unregisterNamed: aName [
+	commands removeKey: aName asString ifAbsent: [ ]
 ]

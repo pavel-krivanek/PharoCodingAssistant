@@ -23,6 +23,11 @@ PharoCALLMProvider >> completeRequest: aRequest [
 	^ self streamRequest: aRequest eventsDo: [ :event | ]
 ]
 
+{ #category : 'model-discovery' }
+PharoCALLMProvider >> discoverModels [
+	Error signal: 'Provider does not support model discovery: ', self providerId
+]
+
 { #category : 'initialization' }
 PharoCALLMProvider >> initialize [
 	super initialize.
@@ -117,9 +122,3 @@ PharoCALLMProvider >> streamRequest: aRequest eventsDo: aBlock cancellation: aCa
 PharoCALLMProvider >> supportsModelDiscovery [
 	^ false
 ]
-
-{ #category : 'model-discovery' }
-PharoCALLMProvider >> discoverModels [
-	Error signal: 'Provider does not support model discovery: ', self providerId
-]
-

@@ -1,4 +1,6 @@
-"Built-in domain knowledge adapted from ChatPharo's MIT-licensed AI-ChatPharo-Skills package. The bodies are deliberately concise, verification-oriented rewrites rather than verbatim copies."
+"
+Built-in domain knowledge adapted from ChatPharo's MIT-licensed AI-ChatPharo-Skills package. The bodies are deliberately concise, verification-oriented rewrites rather than verbatim copies.
+"
 Class {
 	#name : 'PharoCABuiltinSkills',
 	#superclass : 'Object',
@@ -13,22 +15,34 @@ PharoCABuiltinSkills class >> all [
 ]
 
 { #category : 'skills' }
-PharoCABuiltinSkills class >> smalltalkCore [
+PharoCABuiltinSkills class >> bloc [
 	^ (PharoCASkill
-		named: 'Smalltalk Core'
-		description: 'Always-active Pharo/Smalltalk language fundamentals: message precedence, blocks/parentheses, temporaries, Points, class/instance side, processes and SUnit basics.'
-		instructions: self smalltalkCoreInstructions)
-		keywords: #(Smalltalk Pharo syntax precedence unary binary keyword block temporary Point SUnit TestCase classSide instanceSide);
-		embeddedInSystemPrompt: true;
+		named: 'Bloc'
+		description: 'Bloc scene-graph/vector UI concepts: elements, layouts, constraints, events, text, spaces and custom drawing; optional package.'
+		instructions: self blocInstructions)
+		keywords: #(Bloc BlElement BlSpace BlTextElement BlLinearLayout BlFrameLayout BlGridLayout BlClickEvent BlBorder BlRoundedRectangleGeometry constraintsDo openInNewSpace RopedText scenegraph Skia);
 		scope: #builtin;
 		yourself
 ]
 
 { #category : 'instructions-private' }
-PharoCABuiltinSkills class >> smalltalkCoreInstructions [
-	^ '## Smalltalk Core
+PharoCABuiltinSkills class >> blocInstructions [
+	^ '## Bloc UI
 
-Precedence is unary, then binary, then keyword; `(...)` groups expressions and `[...]` creates blocks. Slots/instance variables do not synthesize accessor methods: inside the class use the bare slot name, while `object slotName` requires a compiled accessor. Use `self selector` for a unary send. Handle exceptions with `[ risky ] on: Error do: [ :ex | ... ]`. DoIts support `| temporaries |` and multiple statements, but evaluation returns only the final expression. Construct Points as `x @ y`. Respect instance/class side diagnostics. Prefer structured tools over reflection DoIts. SUnit subclasses `TestCase`. After relevant tests pass, finish unless a concrete defect remains.'
+Bloc is an optional low-level scene-graph/vector UI framework. **Do not assume it is installed.** In the supplied base Pharo 14 image `BlElement` is absent. Before writing Bloc code, use code browsing/search to verify `BlElement` and the relevant Bloc packages/classes are loaded. If they are absent, report that fact or use the project''s actual UI framework instead of inventing selectors.
+
+When Bloc is installed, its core model is a tree of elements (commonly rooted in a space). Elements own geometry/appearance, children, layout constraints and event handlers. Typical work therefore follows this order:
+1. create/configure elements;
+2. compose them as parent/children;
+3. choose a layout and constraints rather than manually calculating every position;
+4. attach narrowly scoped event handlers;
+5. open/show through a space or the project''s established host.
+
+Common concepts in Bloc versions include `BlElement`, `BlTextElement`, `BlSpace`, linear/frame/grid layouts, constraints, borders/backgrounds, rounded geometry, rich `RopedText`, and mouse/click events. These APIs are version-sensitive, so treat the names as discovery anchors, not permission to guess exact selectors.
+
+For custom drawing, first inspect subclasses already present in the loaded Bloc version and follow their canvas protocol. For interaction, verify the exact event classes and propagation model before implementing drag/hover/click behavior. After structural or visual changes, request layout/redraw through the API used by that Bloc version rather than forcing Morphic refresh behavior onto Bloc.
+
+Prefer a higher-level framework (for example Spec2) for ordinary forms/dialogs unless the project already uses Bloc or needs its scene-graph/rendering capabilities.'
 ]
 
 { #category : 'skills' }
@@ -78,6 +92,73 @@ Collection transforms often preserve the receiver species when sensible; do not 
 For incremental text construction prefer `String streamContents:` rather than repeated concatenation in a loop. Use read/write streams when sequential consumption or production is the natural abstraction.
 
 Before introducing a custom loop or collection class, search the existing protocol for a selector that expresses the operation directly.'
+]
+
+{ #category : 'skills' }
+PharoCABuiltinSkills class >> roassal [
+	^ (PharoCASkill
+		named: 'Roassal'
+		description: 'Roassal visualization: canvases, shapes/models, layouts, interactions, edges and charts.'
+		instructions: self roassalInstructions)
+		keywords: #(Roassal RSCanvas RSShape RSBox RSEllipse RSLabel RSLine RSGroup RSGridLayout RSTreeLayout RSForceBasedLayout RSChart RSLinePlot RSBarPlot RSScatterPlot RSDraggable RSPopup RSCanvasController visualization chart graph diagram);
+		scope: #builtin;
+		yourself
+]
+
+{ #category : 'instructions-private' }
+PharoCABuiltinSkills class >> roassalInstructions [
+	^ '## Roassal Visualization
+
+Use this skill when the task is a visualization, chart or interactive diagram. The supplied Pharo 14 image contains Roassal classes including `RSCanvas`, `RSBox`, `RSEllipse`, `RSLabel`, `RSLine`, common layouts and `RSChart`. Inspect exact selectors for advanced builders/interactions because Roassal APIs evolve.
+
+### Basic model
+A canvas owns shapes. Shapes can carry a domain `model`; keep that association when interactions or labels need to map back to domain objects.
+
+```smalltalk
+canvas := RSCanvas new.
+shapes := values collect: [ :value |
+    RSBox new
+        size: 20;
+        model: value;
+        yourself ].
+canvas addAll: shapes.
+RSGridLayout on: shapes.
+```
+
+Open a canvas only when an actual UI result is desired; tests and data preparation should normally avoid opening windows.
+
+### Shapes and layout
+Choose shapes (`RSBox`, `RSEllipse`, `RSLabel`, lines/edges, composites/groups) based on semantics, then apply a layout to the collection rather than manually assigning positions. Useful discovery anchors include grid, tree, force-based, circle, horizontal/vertical-line and flow layouts. Verify the exact layout protocol in the running image before using configuration selectors.
+
+### Graphs and edges
+Keep node shapes associated with models. Prefer Roassal builders when the installed version provides an appropriate builder; otherwise construct edges from the actual node shapes. Apply graph layouts only after node/edge relationships are established.
+
+### Interactions
+Roassal commonly supports click/hover events and attachable interactions such as dragging, popups, highlighting, zooming and panning. Event/interaction selectors are version-sensitive: browse the installed classes before emitting code. Event handlers should update the affected model/shape and request the framework''s normal refresh rather than rebuilding the whole canvas unnecessarily.
+
+### Charts
+For line/bar/scatter charts, inspect `RSChart` and the installed plot classes first. Separate data transformation from chart construction so tests can verify the data independently of UI rendering.
+
+Prefer existing visualization conventions in the target package over introducing a new style or interaction model.'
+]
+
+{ #category : 'skills' }
+PharoCABuiltinSkills class >> smalltalkCore [
+	^ (PharoCASkill
+		named: 'Smalltalk Core'
+		description: 'Always-active Pharo/Smalltalk language fundamentals: message precedence, blocks/parentheses, temporaries, Points, class/instance side, processes and SUnit basics.'
+		instructions: self smalltalkCoreInstructions)
+		keywords: #(Smalltalk Pharo syntax precedence unary binary keyword block temporary Point SUnit TestCase classSide instanceSide);
+		embeddedInSystemPrompt: true;
+		scope: #builtin;
+		yourself
+]
+
+{ #category : 'instructions-private' }
+PharoCABuiltinSkills class >> smalltalkCoreInstructions [
+	^ '## Smalltalk Core
+
+Precedence is unary, then binary, then keyword; `(...)` groups expressions and `[...]` creates blocks. Slots/instance variables do not synthesize accessor methods: inside the class use the bare slot name, while `object slotName` requires a compiled accessor. Use `self selector` for a unary send. Handle exceptions with `[ risky ] on: Error do: [ :ex | ... ]`. DoIts support `| temporaries |` and multiple statements, but evaluation returns only the final expression. Construct Points as `x @ y`. Respect instance/class side diagnostics. Prefer structured tools over reflection DoIts. SUnit subclasses `TestCase`. After relevant tests pass, finish unless a concrete defect remains.'
 ]
 
 { #category : 'skills' }
@@ -137,83 +218,4 @@ Connect events once; avoid installing duplicate handlers during refresh. UI muta
 
 ### Verification
 Spec2 evolves. Before emitting unfamiliar code, browse/search the concrete presenter class and selector in the running image. Actual working methods in the target image are authoritative over stale comments. Reuse an existing presenter pattern from the target package when one exists. After the minimal code compiles, write a focused SUnit regression for behavior. Enable `ui` only when visual verification is needed, then use `ui_list_windows`/`ui_screenshot` instead of adapter/reflection DoIts. Do not manually re-run Spec2 lifecycle hooks during verification.'
-]
-
-{ #category : 'skills' }
-PharoCABuiltinSkills class >> bloc [
-	^ (PharoCASkill
-		named: 'Bloc'
-		description: 'Bloc scene-graph/vector UI concepts: elements, layouts, constraints, events, text, spaces and custom drawing; optional package.'
-		instructions: self blocInstructions)
-		keywords: #(Bloc BlElement BlSpace BlTextElement BlLinearLayout BlFrameLayout BlGridLayout BlClickEvent BlBorder BlRoundedRectangleGeometry constraintsDo openInNewSpace RopedText scenegraph Skia);
-		scope: #builtin;
-		yourself
-]
-
-{ #category : 'instructions-private' }
-PharoCABuiltinSkills class >> blocInstructions [
-	^ '## Bloc UI
-
-Bloc is an optional low-level scene-graph/vector UI framework. **Do not assume it is installed.** In the supplied base Pharo 14 image `BlElement` is absent. Before writing Bloc code, use code browsing/search to verify `BlElement` and the relevant Bloc packages/classes are loaded. If they are absent, report that fact or use the project''s actual UI framework instead of inventing selectors.
-
-When Bloc is installed, its core model is a tree of elements (commonly rooted in a space). Elements own geometry/appearance, children, layout constraints and event handlers. Typical work therefore follows this order:
-1. create/configure elements;
-2. compose them as parent/children;
-3. choose a layout and constraints rather than manually calculating every position;
-4. attach narrowly scoped event handlers;
-5. open/show through a space or the project''s established host.
-
-Common concepts in Bloc versions include `BlElement`, `BlTextElement`, `BlSpace`, linear/frame/grid layouts, constraints, borders/backgrounds, rounded geometry, rich `RopedText`, and mouse/click events. These APIs are version-sensitive, so treat the names as discovery anchors, not permission to guess exact selectors.
-
-For custom drawing, first inspect subclasses already present in the loaded Bloc version and follow their canvas protocol. For interaction, verify the exact event classes and propagation model before implementing drag/hover/click behavior. After structural or visual changes, request layout/redraw through the API used by that Bloc version rather than forcing Morphic refresh behavior onto Bloc.
-
-Prefer a higher-level framework (for example Spec2) for ordinary forms/dialogs unless the project already uses Bloc or needs its scene-graph/rendering capabilities.'
-]
-
-{ #category : 'skills' }
-PharoCABuiltinSkills class >> roassal [
-	^ (PharoCASkill
-		named: 'Roassal'
-		description: 'Roassal visualization: canvases, shapes/models, layouts, interactions, edges and charts.'
-		instructions: self roassalInstructions)
-		keywords: #(Roassal RSCanvas RSShape RSBox RSEllipse RSLabel RSLine RSGroup RSGridLayout RSTreeLayout RSForceBasedLayout RSChart RSLinePlot RSBarPlot RSScatterPlot RSDraggable RSPopup RSCanvasController visualization chart graph diagram);
-		scope: #builtin;
-		yourself
-]
-
-{ #category : 'instructions-private' }
-PharoCABuiltinSkills class >> roassalInstructions [
-	^ '## Roassal Visualization
-
-Use this skill when the task is a visualization, chart or interactive diagram. The supplied Pharo 14 image contains Roassal classes including `RSCanvas`, `RSBox`, `RSEllipse`, `RSLabel`, `RSLine`, common layouts and `RSChart`. Inspect exact selectors for advanced builders/interactions because Roassal APIs evolve.
-
-### Basic model
-A canvas owns shapes. Shapes can carry a domain `model`; keep that association when interactions or labels need to map back to domain objects.
-
-```smalltalk
-canvas := RSCanvas new.
-shapes := values collect: [ :value |
-    RSBox new
-        size: 20;
-        model: value;
-        yourself ].
-canvas addAll: shapes.
-RSGridLayout on: shapes.
-```
-
-Open a canvas only when an actual UI result is desired; tests and data preparation should normally avoid opening windows.
-
-### Shapes and layout
-Choose shapes (`RSBox`, `RSEllipse`, `RSLabel`, lines/edges, composites/groups) based on semantics, then apply a layout to the collection rather than manually assigning positions. Useful discovery anchors include grid, tree, force-based, circle, horizontal/vertical-line and flow layouts. Verify the exact layout protocol in the running image before using configuration selectors.
-
-### Graphs and edges
-Keep node shapes associated with models. Prefer Roassal builders when the installed version provides an appropriate builder; otherwise construct edges from the actual node shapes. Apply graph layouts only after node/edge relationships are established.
-
-### Interactions
-Roassal commonly supports click/hover events and attachable interactions such as dragging, popups, highlighting, zooming and panning. Event/interaction selectors are version-sensitive: browse the installed classes before emitting code. Event handlers should update the affected model/shape and request the framework''s normal refresh rather than rebuilding the whole canvas unnecessarily.
-
-### Charts
-For line/bar/scatter charts, inspect `RSChart` and the installed plot classes first. Separate data transformation from chart construction so tests can verify the data independently of UI rendering.
-
-Prefer existing visualization conventions in the target package over introducing a new style or interaction model.'
 ]

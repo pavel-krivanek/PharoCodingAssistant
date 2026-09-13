@@ -1,4 +1,6 @@
-"Creates a workspace-relative directory tree after canonical path validation."
+"
+Creates a workspace-relative directory tree after canonical path validation.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceCreateDirectory',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,11 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceCreateDirectory class >> toolName [ ^ #workspace_create_directory ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceCreateDirectory class >> capability [ ^ #coding ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceCreateDirectory class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolWorkspaceCreateDirectory class >> capability [ ^ #coding
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceCreateDirectory class >> execute: args context: context [
@@ -36,6 +35,10 @@ PharoCAToolWorkspaceCreateDirectory class >> execute: args context: context [
 	^ { 'path' -> portablePath. 'created' -> existed not } asDictionary
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceCreateDirectory class >> executionMode [ ^ #exclusiveMutation
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceCreateDirectory class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -46,4 +49,8 @@ PharoCAToolWorkspaceCreateDirectory class >> llmDefinition [
 			'properties' -> { 'path' -> { 'type' -> 'string' } asDictionary } asDictionary.
 			'required' -> { 'path' }
 		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceCreateDirectory class >> toolName [ ^ #workspace_create_directory
 ]

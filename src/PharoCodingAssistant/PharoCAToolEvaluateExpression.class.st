@@ -6,36 +6,20 @@ Class {
 	#tag : 'Tools-Pharo'
 }
 
-{ #category : 'definition' }
-PharoCAToolEvaluateExpression class >> toolName [ ^ #evaluate_expression ]
-{ #category : 'definition' }
-PharoCAToolEvaluateExpression class >> toolPack [ ^ #execution ]
-{ #category : 'definition' }
-PharoCAToolEvaluateExpression class >> capability [ ^ #evaluation ]
-{ #category : 'execution' }
-PharoCAToolEvaluateExpression class >> executionMode [ ^ #exclusiveMutation ]
-
-{ #category : 'definition' }
-PharoCAToolEvaluateExpression class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'evaluate_expression'
-		description: 'Evaluates one complete Pharo DoIt/expression with OpalEvaluator and returns timing, class, bounded printString, and a live-object handle. Explicit | x y | temporaries and multiple statements are supported within this call; temporaries do not persist across calls.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> { 'code' -> { 'type' -> 'string'. 'maxLength' -> 50000 } asDictionary } asDictionary.
-			'required' -> #('code')
-		} asDictionary
-]
-
-{ #category : 'execution' }
-PharoCAToolEvaluateExpression class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
-
 { #category : 'private' }
 PharoCAToolEvaluateExpression class >> boundedPrintStringOf: object [
 	| printed |
 	printed := [ object printString ] on: Error do: [ :error | '<printString failed: ', error description, '>' ].
 	printed size > 1000 ifTrue: [ ^ (printed first: 1000), '…' ].
 	^ printed
+]
+
+{ #category : 'definition' }
+PharoCAToolEvaluateExpression class >> capability [ ^ #evaluation
+]
+
+{ #category : 'execution' }
+PharoCAToolEvaluateExpression class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
 ]
 
 { #category : 'execution' }
@@ -61,4 +45,28 @@ PharoCAToolEvaluateExpression class >> execute: args context: context [
 		'printString' -> (self boundedPrintStringOf: object).
 		'elapsedMs' -> elapsed
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolEvaluateExpression class >> executionMode [ ^ #exclusiveMutation
+]
+
+{ #category : 'definition' }
+PharoCAToolEvaluateExpression class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'evaluate_expression'
+		description: 'Evaluates one complete Pharo DoIt/expression with OpalEvaluator and returns timing, class, bounded printString, and a live-object handle. Explicit | x y | temporaries and multiple statements are supported within this call; temporaries do not persist across calls.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> { 'code' -> { 'type' -> 'string'. 'maxLength' -> 50000 } asDictionary } asDictionary.
+			'required' -> #('code')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolEvaluateExpression class >> toolName [ ^ #evaluate_expression
+]
+
+{ #category : 'definition' }
+PharoCAToolEvaluateExpression class >> toolPack [ ^ #execution
 ]

@@ -7,23 +7,6 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergRepositoryInfo class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' } PharoCAToolIcebergRepositoryInfo class >> toolName [ ^ #iceberg_repository_info ]
-
-{ #category : 'definition' }
-PharoCAToolIcebergRepositoryInfo class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'iceberg_repository_info'
-		description: 'Returns native Iceberg repository metadata, current branch/head, modification state, and registered package/remote counts.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> { 'repository' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary } asDictionary.
-			'required' -> #('repository')
-		} asDictionary
-]
-
-{ #category : 'execution' }
 PharoCAToolIcebergRepositoryInfo class >> execute: args [
 	| repository result valid |
 	repository := self repositoryNamed: (args at: 'repository').
@@ -38,4 +21,24 @@ PharoCAToolIcebergRepositoryInfo class >> execute: args [
 			at: 'remoteCount' put: repository remotes size;
 			at: 'branchCount' put: repository allBranches size ].
 	^ result asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergRepositoryInfo class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergRepositoryInfo class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'iceberg_repository_info'
+		description: 'Returns native Iceberg repository metadata, current branch/head, modification state, and registered package/remote counts.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> { 'repository' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary } asDictionary.
+			'required' -> #('repository')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergRepositoryInfo class >> toolName [ ^ #iceberg_repository_info
 ]

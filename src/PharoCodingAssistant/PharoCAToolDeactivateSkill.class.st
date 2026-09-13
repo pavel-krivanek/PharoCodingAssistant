@@ -1,4 +1,6 @@
-"Deactivates a skill for the current session so its instructions stop consuming future model context."
+"
+Deactivates a skill for the current session so its instructions stop consuming future model context.
+"
 Class {
 	#name : 'PharoCAToolDeactivateSkill',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Skills'
 }
+
+{ #category : 'definition' }
+PharoCAToolDeactivateSkill class >> capability [ ^ #session
+]
 
 { #category : 'definition' }
 PharoCAToolDeactivateSkill class >> execute: args [
@@ -26,11 +32,9 @@ PharoCAToolDeactivateSkill class >> execute: args context: aContext [
 	} asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolDeactivateSkill class >> capability [ ^ #session ]
-
 { #category : 'execution' }
-PharoCAToolDeactivateSkill class >> executionMode [ ^ #sequential ]
+PharoCAToolDeactivateSkill class >> executionMode [ ^ #sequential
+]
 
 { #category : 'definition' }
 PharoCAToolDeactivateSkill class >> llmDefinition [
@@ -41,4 +45,5 @@ PharoCAToolDeactivateSkill class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolDeactivateSkill class >> toolName [ ^ #deactivate_skill ]
+PharoCAToolDeactivateSkill class >> toolName [ ^ #deactivate_skill
+]

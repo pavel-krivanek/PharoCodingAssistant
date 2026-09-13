@@ -1,4 +1,6 @@
-"Reads bounded text ranges from a workspace file and returns a content hash for stale-write protection."
+"
+Reads bounded text ranges from a workspace file and returns a content hash for stale-write protection.
+"
 Class {
 	#name : 'PharoCAToolWorkspaceReadFile',
 	#superclass : 'PharoCAWorkspaceTool',
@@ -8,13 +10,8 @@ Class {
 }
 
 { #category : 'definition' }
-PharoCAToolWorkspaceReadFile class >> toolName [ ^ #workspace_read_file ]
-{ #category : 'definition' }
-PharoCAToolWorkspaceReadFile class >> capability [ ^ #inspection ]
-{ #category : 'execution' }
-PharoCAToolWorkspaceReadFile class >> executionMode [ ^ #parallelSafe ]
-{ #category : 'defaults' }
-PharoCAToolWorkspaceReadFile class >> maximumReadableCharacters [ ^ 5242880 ]
+PharoCAToolWorkspaceReadFile class >> capability [ ^ #inspection
+]
 
 { #category : 'execution' }
 PharoCAToolWorkspaceReadFile class >> execute: args context: context [
@@ -34,6 +31,10 @@ PharoCAToolWorkspaceReadFile class >> execute: args context: context [
 	^ page
 ]
 
+{ #category : 'execution' }
+PharoCAToolWorkspaceReadFile class >> executionMode [ ^ #parallelSafe
+]
+
 { #category : 'definition' }
 PharoCAToolWorkspaceReadFile class >> llmDefinition [
 	^ PharoCALLMToolDefinition
@@ -48,4 +49,12 @@ PharoCAToolWorkspaceReadFile class >> llmDefinition [
 			} asDictionary.
 			'required' -> { 'path' }
 		} asDictionary
+]
+
+{ #category : 'defaults' }
+PharoCAToolWorkspaceReadFile class >> maximumReadableCharacters [ ^ 5242880
+]
+
+{ #category : 'definition' }
+PharoCAToolWorkspaceReadFile class >> toolName [ ^ #workspace_read_file
 ]

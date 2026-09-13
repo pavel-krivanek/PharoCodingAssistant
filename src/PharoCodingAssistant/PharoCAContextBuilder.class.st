@@ -1,8 +1,13 @@
-"Builds a bounded provider context from a lossless session branch. Older turns may be omitted or represented by an optional externally produced summary; the durable session is never mutated."
+"
+Builds a bounded provider context from a lossless session branch. Older turns may be omitted or represented by an optional externally produced summary; the durable session is never mutated.
+"
 Class {
 	#name : 'PharoCAContextBuilder',
 	#superclass : 'Object',
-	#instVars : [ 'tokenEstimator', 'policy' ],
+	#instVars : [
+		'tokenEstimator',
+		'policy'
+	],
 	#category : 'PharoCodingAssistant-Context',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Context'
@@ -161,15 +166,24 @@ PharoCAContextBuilder >> normalizedMessagesFrom: messages [
 ]
 
 { #category : 'accessing' }
-PharoCAContextBuilder >> policy [ ^ policy ]
+PharoCAContextBuilder >> policy [ ^ policy
+]
+
 { #category : 'accessing' }
-PharoCAContextBuilder >> policy: aPolicy [ policy := aPolicy ]
+PharoCAContextBuilder >> policy: aPolicy [ policy := aPolicy
+]
+
 { #category : 'private' }
-PharoCAContextBuilder >> roleOf: aMessage [ ^ aMessage role ]
+PharoCAContextBuilder >> roleOf: aMessage [ ^ aMessage role
+]
+
 { #category : 'accessing' }
-PharoCAContextBuilder >> tokenEstimator [ ^ tokenEstimator ]
+PharoCAContextBuilder >> tokenEstimator [ ^ tokenEstimator
+]
+
 { #category : 'accessing' }
-PharoCAContextBuilder >> tokenEstimator: anEstimator [ tokenEstimator := anEstimator ]
+PharoCAContextBuilder >> tokenEstimator: anEstimator [ tokenEstimator := anEstimator
+]
 
 { #category : 'private' }
 PharoCAContextBuilder >> turnsFrom: messages [

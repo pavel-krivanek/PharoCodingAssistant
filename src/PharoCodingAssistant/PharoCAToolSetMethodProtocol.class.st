@@ -1,4 +1,6 @@
-"Reclassifies an existing method into a protocol without recompiling its source."
+"
+Reclassifies an existing method into a protocol without recompiling its source.
+"
 Class {
 	#name : 'PharoCAToolSetMethodProtocol',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolSetMethodProtocol class >> capability [ ^ #coding
+]
 
 { #category : 'execution' }
 PharoCAToolSetMethodProtocol class >> execute: args [
@@ -50,11 +56,9 @@ PharoCAToolSetMethodProtocol class >> execute: args context: context [
 	} asDictionary
 ]
 
-{ #category : 'definition' }
-PharoCAToolSetMethodProtocol class >> capability [ ^ #coding ]
-
 { #category : 'execution' }
-PharoCAToolSetMethodProtocol class >> executionMode [ ^ #exclusiveMutation ]
+PharoCAToolSetMethodProtocol class >> executionMode [ ^ #exclusiveMutation
+]
 
 { #category : 'definition' }
 PharoCAToolSetMethodProtocol class >> llmDefinition [
@@ -74,4 +78,5 @@ PharoCAToolSetMethodProtocol class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolSetMethodProtocol class >> toolName [ ^ #set_method_protocol ]
+PharoCAToolSetMethodProtocol class >> toolName [ ^ #set_method_protocol
+]

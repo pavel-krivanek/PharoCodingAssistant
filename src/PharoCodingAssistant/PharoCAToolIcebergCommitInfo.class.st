@@ -7,9 +7,18 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergCommitInfo class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolIcebergCommitInfo class >> execute: args [
+	| repository commit |
+	repository := self repositoryNamed: (args at: 'repository').
+	self requireValidRepository: repository.
+	commit := repository lookupCommit: (args at: 'commit') ifAbsent: [
+		Error signal: 'Iceberg commit not found: ', (args at: 'commit') ].
+	^ { 'repository' -> repository name. 'commit' -> (self commitSummaryFor: commit) } asDictionary
+]
 
-{ #category : 'definition' } PharoCAToolIcebergCommitInfo class >> toolName [ ^ #iceberg_commit_info ]
+{ #category : 'execution' }
+PharoCAToolIcebergCommitInfo class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
 PharoCAToolIcebergCommitInfo class >> llmDefinition [
@@ -26,12 +35,6 @@ PharoCAToolIcebergCommitInfo class >> llmDefinition [
 		} asDictionary
 ]
 
-{ #category : 'execution' }
-PharoCAToolIcebergCommitInfo class >> execute: args [
-	| repository commit |
-	repository := self repositoryNamed: (args at: 'repository').
-	self requireValidRepository: repository.
-	commit := repository lookupCommit: (args at: 'commit') ifAbsent: [
-		Error signal: 'Iceberg commit not found: ', (args at: 'commit') ].
-	^ { 'repository' -> repository name. 'commit' -> (self commitSummaryFor: commit) } asDictionary
+{ #category : 'definition' }
+PharoCAToolIcebergCommitInfo class >> toolName [ ^ #iceberg_commit_info
 ]

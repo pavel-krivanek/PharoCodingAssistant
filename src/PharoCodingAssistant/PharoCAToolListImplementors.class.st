@@ -1,4 +1,6 @@
-"Lists classes and methods that implement a given selector. Results are normalized, sorted, and cursor-paginated."
+"
+Lists classes and methods that implement a given selector. Results are normalized, sorted, and cursor-paginated.
+"
 Class {
 	#name : 'PharoCAToolListImplementors',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolListImplementors class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolListImplementors class >> execute: args [
@@ -33,15 +39,6 @@ PharoCAToolListImplementors class >> execute: args [
 	} asDictionary
 ]
 
-{ #category : 'private' }
-PharoCAToolListImplementors class >> sortKeyFor: item [
-	^ (item at: 'className'), '|', (item at: 'side'), '|', (item at: 'selector')
-]
-
-
-{ #category : 'definition' }
-PharoCAToolListImplementors class >> capability [ ^ #inspection ]
-
 { #category : 'execution' }
 PharoCAToolListImplementors class >> executionMode [
 	^ #parallelSafe
@@ -53,6 +50,11 @@ PharoCAToolListImplementors class >> llmDefinition [
 		name: 'list_implementors'
 		description: 'Lists classes/methods implementing a selector. Results are deterministic and cursor-paginated.'
 		parameters: { 'properties' -> { 'selector' -> { 'type' -> 'string' } asDictionary. 'limit' -> { 'minimum' -> 1. 'maximum' -> 200. 'type' -> 'integer' } asDictionary. 'cursor' -> { 'type' -> 'string' } asDictionary } asDictionary. 'required' -> { 'selector' }. 'type' -> 'object' } asDictionary
+]
+
+{ #category : 'private' }
+PharoCAToolListImplementors class >> sortKeyFor: item [
+	^ (item at: 'className'), '|', (item at: 'side'), '|', (item at: 'selector')
 ]
 
 { #category : 'definition' }

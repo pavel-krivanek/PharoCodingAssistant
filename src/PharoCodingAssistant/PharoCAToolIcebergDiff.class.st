@@ -7,9 +7,27 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergDiff class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolIcebergDiff class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
+]
 
-{ #category : 'definition' } PharoCAToolIcebergDiff class >> toolName [ ^ #iceberg_diff ]
+{ #category : 'execution' }
+PharoCAToolIcebergDiff class >> execute: args context: context [
+	| repository changes state page |
+	repository := self repositoryNamed: (args at: 'repository').
+	self requireValidRepository: repository.
+	changes := self changesForRepository: repository includeDefinitions: true context: context.
+	state := (SHA256 hashMessage: (STONJSON toString: changes)) hex.
+	page := PharoCAToolPagination pageItems: changes arguments: args scope: 'iceberg_diff|', repository name, '|', state.
+	^ {
+		'repository' -> repository name.
+		'changes' -> (page at: 'items').
+		'page' -> (page at: 'page')
+	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergDiff class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
 PharoCAToolIcebergDiff class >> llmDefinition [
@@ -27,20 +45,6 @@ PharoCAToolIcebergDiff class >> llmDefinition [
 		} asDictionary
 ]
 
-{ #category : 'execution' }
-PharoCAToolIcebergDiff class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
-
-{ #category : 'execution' }
-PharoCAToolIcebergDiff class >> execute: args context: context [
-	| repository changes state page |
-	repository := self repositoryNamed: (args at: 'repository').
-	self requireValidRepository: repository.
-	changes := self changesForRepository: repository includeDefinitions: true context: context.
-	state := (SHA256 hashMessage: (STONJSON toString: changes)) hex.
-	page := PharoCAToolPagination pageItems: changes arguments: args scope: 'iceberg_diff|', repository name, '|', state.
-	^ {
-		'repository' -> repository name.
-		'changes' -> (page at: 'items').
-		'page' -> (page at: 'page')
-	} asDictionary
+{ #category : 'definition' }
+PharoCAToolIcebergDiff class >> toolName [ ^ #iceberg_diff
 ]

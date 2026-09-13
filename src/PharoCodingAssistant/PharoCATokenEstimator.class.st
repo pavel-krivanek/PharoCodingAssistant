@@ -1,4 +1,6 @@
-"Conservative provider-independent token estimator. Models may supply a more accurate estimator through PharoCAModel>>tokenEstimator:."
+"
+Conservative provider-independent token estimator. Models may supply a more accurate estimator through PharoCAModel>>tokenEstimator:.
+"
 Class {
 	#name : 'PharoCATokenEstimator',
 	#superclass : 'Object',
@@ -6,6 +8,24 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Context'
 }
+
+{ #category : 'estimating-031' }
+PharoCATokenEstimator >> estimateContentPart: aPart [
+	aPart type = #text ifTrue: [ ^ self estimateString: aPart value ].
+	(#(#imageURL #imageArtifact) includes: aPart type) ifTrue: [ ^ self imageContentTokens ].
+	^ self estimateObject: aPart asDictionary
+]
+
+{ #category : 'estimating-031' }
+PharoCATokenEstimator >> estimateMessage: aMessage [
+	| total |
+	total := self estimateString: aMessage role asString.
+	aMessage contentParts do: [ :part | total := total + (self estimateContentPart: part) ].
+	aMessage reasoning isEmpty ifFalse: [ total := total + (self estimateString: aMessage reasoning) ].
+	aMessage toolCallId ifNotNil: [ :toolCallId | total := total + (self estimateString: toolCallId) ].
+	aMessage toolCalls do: [ :call | total := total + (self estimateObject: call) ].
+	^ total
+]
 
 { #category : 'estimating' }
 PharoCATokenEstimator >> estimateMessages: messages [
@@ -38,32 +58,13 @@ PharoCATokenEstimator >> estimateString: aString [
 	^ ((aString size + 2) // 3) max: 1
 ]
 
-{ #category : 'configuration' }
-PharoCATokenEstimator >> messageOverheadTokens [
-	^ 4
-]
-
-
-{ #category : 'estimating-031' }
-PharoCATokenEstimator >> estimateContentPart: aPart [
-	aPart type = #text ifTrue: [ ^ self estimateString: aPart value ].
-	(#(#imageURL #imageArtifact) includes: aPart type) ifTrue: [ ^ self imageContentTokens ].
-	^ self estimateObject: aPart asDictionary
-]
-
-{ #category : 'estimating-031' }
-PharoCATokenEstimator >> estimateMessage: aMessage [
-	| total |
-	total := self estimateString: aMessage role asString.
-	aMessage contentParts do: [ :part | total := total + (self estimateContentPart: part) ].
-	aMessage reasoning isEmpty ifFalse: [ total := total + (self estimateString: aMessage reasoning) ].
-	aMessage toolCallId ifNotNil: [ :toolCallId | total := total + (self estimateString: toolCallId) ].
-	aMessage toolCalls do: [ :call | total := total + (self estimateObject: call) ].
-	^ total
-]
-
 { #category : 'configuration-031' }
 PharoCATokenEstimator >> imageContentTokens [
 	"Provider-neutral conservative placeholder. Image token accounting depends on provider detail/tiling rules; most importantly, transport base64 bytes are not language-model text tokens."
 	^ 2048
+]
+
+{ #category : 'configuration' }
+PharoCATokenEstimator >> messageOverheadTokens [
+	^ 4
 ]

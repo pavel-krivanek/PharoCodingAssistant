@@ -1,4 +1,6 @@
-"Factory for the canonical JSON-safe result envelope used at the model/tool boundary."
+"
+Factory for the canonical JSON-safe result envelope used at the model/tool boundary.
+"
 Class {
 	#name : 'PharoCAToolResult',
 	#superclass : 'Object',
@@ -6,14 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools'
 }
-
-{ #category : 'instance creation' }
-PharoCAToolResult class >> success: anObject [
-	^ {
-		'ok' -> true.
-		'result' -> anObject
-	} asDictionary
-]
 
 { #category : 'instance creation' }
 PharoCAToolResult class >> errorType: aType message: aMessage [
@@ -31,5 +25,13 @@ PharoCAToolResult class >> errorType: aType message: aMessage details: details [
 	^ {
 		'ok' -> false.
 		'error' -> error
+	} asDictionary
+]
+
+{ #category : 'instance creation' }
+PharoCAToolResult class >> success: anObject [
+	^ {
+		'ok' -> true.
+		'result' -> anObject
 	} asDictionary
 ]

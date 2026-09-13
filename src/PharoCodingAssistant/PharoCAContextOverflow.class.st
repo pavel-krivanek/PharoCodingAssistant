@@ -1,4 +1,6 @@
-"Raised before a provider request when mandatory context cannot fit inside the configured model window."
+"
+Raised before a provider request when mandatory context cannot fit inside the configured model window.
+"
 Class {
 	#name : 'PharoCAContextOverflow',
 	#superclass : 'Error',

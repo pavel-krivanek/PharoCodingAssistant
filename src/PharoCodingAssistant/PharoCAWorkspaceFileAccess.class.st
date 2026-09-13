@@ -1,8 +1,13 @@
-"Bounded, workspace-confined filesystem service shared by workspace tools. It centralizes hashing and crash-safe text writes."
+"
+Bounded, workspace-confined filesystem service shared by workspace tools. It centralizes hashing and crash-safe text writes.
+"
 Class {
 	#name : 'PharoCAWorkspaceFileAccess',
 	#superclass : 'Object',
-	#instVars : [ 'workspace', 'resolver' ],
+	#instVars : [
+		'workspace',
+		'resolver'
+	],
 	#category : 'PharoCodingAssistant-Workspace',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Workspace'
@@ -11,33 +16,6 @@ Class {
 { #category : 'instance creation' }
 PharoCAWorkspaceFileAccess class >> on: aWorkspace [
 	^ self new workspace: aWorkspace; yourself
-]
-
-{ #category : 'accessing' }
-PharoCAWorkspaceFileAccess >> workspace [ ^ workspace ]
-
-{ #category : 'accessing' }
-PharoCAWorkspaceFileAccess >> workspace: aWorkspace [
-	workspace := aWorkspace.
-	resolver := PharoCAWorkspacePathResolver on: aWorkspace
-]
-
-{ #category : 'accessing' }
-PharoCAWorkspaceFileAccess >> resolver [ ^ resolver ]
-
-{ #category : 'reading' }
-PharoCAWorkspaceFileAccess >> textAt: aPathString [
-	^ (resolver resolveExistingFile: aPathString) contents
-]
-
-{ #category : 'hashing' }
-PharoCAWorkspaceFileAccess >> sha256ForText: aString [
-	^ (SHA256 hashMessage: aString) hex
-]
-
-{ #category : 'hashing' }
-PharoCAWorkspaceFileAccess >> sha256At: aPathString [
-	^ self sha256ForText: (self textAt: aPathString)
 ]
 
 { #category : 'writing' }
@@ -72,4 +50,33 @@ PharoCAWorkspaceFileAccess >> metadataFor: aFileReference [
 		'size' -> (aFileReference isFile ifTrue: [ aFileReference size ] ifFalse: [ nil ]).
 		'modifiedAt' -> ([ aFileReference modificationTime asString ] on: Error do: [ :error | nil ])
 	} asDictionary
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceFileAccess >> resolver [ ^ resolver
+]
+
+{ #category : 'hashing' }
+PharoCAWorkspaceFileAccess >> sha256At: aPathString [
+	^ self sha256ForText: (self textAt: aPathString)
+]
+
+{ #category : 'hashing' }
+PharoCAWorkspaceFileAccess >> sha256ForText: aString [
+	^ (SHA256 hashMessage: aString) hex
+]
+
+{ #category : 'reading' }
+PharoCAWorkspaceFileAccess >> textAt: aPathString [
+	^ (resolver resolveExistingFile: aPathString) contents
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceFileAccess >> workspace [ ^ workspace
+]
+
+{ #category : 'accessing' }
+PharoCAWorkspaceFileAccess >> workspace: aWorkspace [
+	workspace := aWorkspace.
+	resolver := PharoCAWorkspacePathResolver on: aWorkspace
 ]

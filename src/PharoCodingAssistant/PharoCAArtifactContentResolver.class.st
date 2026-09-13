@@ -1,12 +1,26 @@
-"Projects ephemeral imageArtifact content parts to provider-ready data URLs only at the wire boundary. Canonical sessions keep opaque descriptors; image bytes and base64 never enter durable conversation or run-event state."
+"
+Projects ephemeral imageArtifact content parts to provider-ready data URLs only at the wire boundary. Canonical sessions keep opaque descriptors; image bytes and base64 never enter durable conversation or run-event state.
+"
 Class {
 	#name : 'PharoCAArtifactContentResolver',
 	#superclass : 'Object',
-	#instVars : [ 'artifactStore', 'maximumImagesPerToolResult', 'maximumModelImageBytes' ],
+	#instVars : [
+		'artifactStore',
+		'maximumImagesPerToolResult',
+		'maximumModelImageBytes'
+	],
 	#category : 'PharoCodingAssistant-Artifacts',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Artifacts'
 }
+
+{ #category : 'defaults' }
+PharoCAArtifactContentResolver class >> defaultMaximumImagesPerToolResult [ ^ 4
+]
+
+{ #category : 'defaults' }
+PharoCAArtifactContentResolver class >> defaultMaximumModelImageBytes [ ^ 6 * 1024 * 1024
+]
 
 { #category : 'instance creation' }
 PharoCAArtifactContentResolver class >> on: aStore [
@@ -14,38 +28,38 @@ PharoCAArtifactContentResolver class >> on: aStore [
 ]
 
 { #category : 'defaults' }
-PharoCAArtifactContentResolver class >> defaultMaximumImagesPerToolResult [ ^ 4 ]
-{ #category : 'defaults' }
-PharoCAArtifactContentResolver class >> defaultMaximumModelImageBytes [ ^ 6 * 1024 * 1024 ]
-{ #category : 'defaults' }
 PharoCAArtifactContentResolver class >> supportedImageMimeTypes [
 	^ #('image/png' 'image/jpeg' 'image/gif' 'image/webp')
 ]
 
-{ #category : 'initialization' }
-PharoCAArtifactContentResolver >> initialize [
-	super initialize.
-	maximumImagesPerToolResult := self class defaultMaximumImagesPerToolResult.
-	maximumModelImageBytes := self class defaultMaximumModelImageBytes
+{ #category : 'tool-results-private' }
+PharoCAArtifactContentResolver >> artifact: artifact isImageOwnedByInvocation: invocation run: run owner: owner [
+	(self class supportedImageMimeTypes includes: artifact mimeType) ifFalse: [ ^ false ].
+	(owner at: 'toolCallId' ifAbsent: [ nil ]) = invocation id ifFalse: [ ^ false ].
+	run ifNotNil: [
+		(owner at: 'runId' ifAbsent: [ nil ]) = run id ifFalse: [ ^ false ].
+		run session ifNotNil: [ :session |
+			(owner at: 'sessionId' ifAbsent: [ nil ]) = session id ifFalse: [ ^ false ] ] ].
+	^ true
 ]
 
 { #category : 'accessing' }
-PharoCAArtifactContentResolver >> artifactStore [ ^ artifactStore ]
-{ #category : 'accessing' }
-PharoCAArtifactContentResolver >> artifactStore: aStore [ artifactStore := aStore ]
-{ #category : 'accessing' }
-PharoCAArtifactContentResolver >> maximumImagesPerToolResult [ ^ maximumImagesPerToolResult ]
-{ #category : 'accessing' }
-PharoCAArtifactContentResolver >> maximumImagesPerToolResult: anInteger [
-	(anInteger isInteger and: [ anInteger between: 1 and: 16 ]) ifFalse: [ Error signal: 'maximumImagesPerToolResult must be between 1 and 16' ].
-	maximumImagesPerToolResult := anInteger
+PharoCAArtifactContentResolver >> artifactStore [ ^ artifactStore
 ]
+
 { #category : 'accessing' }
-PharoCAArtifactContentResolver >> maximumModelImageBytes [ ^ maximumModelImageBytes ]
-{ #category : 'accessing' }
-PharoCAArtifactContentResolver >> maximumModelImageBytes: anInteger [
-	(anInteger isInteger and: [ anInteger > 0 ]) ifFalse: [ Error signal: 'maximumModelImageBytes must be a positive integer' ].
-	maximumModelImageBytes := anInteger
+PharoCAArtifactContentResolver >> artifactStore: aStore [ artifactStore := aStore
+]
+
+{ #category : 'tool-results-private' }
+PharoCAArtifactContentResolver >> collectArtifactDescriptorsFrom: object into: descriptors depth: depth [
+	depth > 8 ifTrue: [ ^ self ].
+	object isDictionary ifTrue: [
+		((object includesKey: 'artifactId') and: [ object includesKey: 'mimeType' ]) ifTrue: [ descriptors add: object ].
+		object valuesDo: [ :value | self collectArtifactDescriptorsFrom: value into: descriptors depth: depth + 1 ].
+		^ self ].
+	((object isCollection and: [ object isString not ]) and: [ (object isKindOf: ByteArray) not ]) ifTrue: [
+		object do: [ :value | self collectArtifactDescriptorsFrom: value into: descriptors depth: depth + 1 ] ]
 ]
 
 { #category : 'tool-results' }
@@ -69,31 +83,31 @@ PharoCAArtifactContentResolver >> contentPartsForToolResult: result json: result
 	^ parts asArray
 ]
 
-{ #category : 'tool-results-private' }
-PharoCAArtifactContentResolver >> collectArtifactDescriptorsFrom: object into: descriptors depth: depth [
-	depth > 8 ifTrue: [ ^ self ].
-	object isDictionary ifTrue: [
-		((object includesKey: 'artifactId') and: [ object includesKey: 'mimeType' ]) ifTrue: [ descriptors add: object ].
-		object valuesDo: [ :value | self collectArtifactDescriptorsFrom: value into: descriptors depth: depth + 1 ].
-		^ self ].
-	((object isCollection and: [ object isString not ]) and: [ (object isKindOf: ByteArray) not ]) ifTrue: [
-		object do: [ :value | self collectArtifactDescriptorsFrom: value into: descriptors depth: depth + 1 ] ]
+{ #category : 'initialization' }
+PharoCAArtifactContentResolver >> initialize [
+	super initialize.
+	maximumImagesPerToolResult := self class defaultMaximumImagesPerToolResult.
+	maximumModelImageBytes := self class defaultMaximumModelImageBytes
 ]
 
-{ #category : 'tool-results-private' }
-PharoCAArtifactContentResolver >> artifact: artifact isImageOwnedByInvocation: invocation run: run owner: owner [
-	(self class supportedImageMimeTypes includes: artifact mimeType) ifFalse: [ ^ false ].
-	(owner at: 'toolCallId' ifAbsent: [ nil ]) = invocation id ifFalse: [ ^ false ].
-	run ifNotNil: [
-		(owner at: 'runId' ifAbsent: [ nil ]) = run id ifFalse: [ ^ false ].
-		run session ifNotNil: [ :session |
-			(owner at: 'sessionId' ifAbsent: [ nil ]) = session id ifFalse: [ ^ false ] ] ].
-	^ true
+{ #category : 'accessing' }
+PharoCAArtifactContentResolver >> maximumImagesPerToolResult [ ^ maximumImagesPerToolResult
 ]
 
-{ #category : 'resolving' }
-PharoCAArtifactContentResolver >> resolvedMessages: messages forModel: model [
-	^ messages collect: [ :message | self resolvedMessage: message forModel: model ]
+{ #category : 'accessing' }
+PharoCAArtifactContentResolver >> maximumImagesPerToolResult: anInteger [
+	(anInteger isInteger and: [ anInteger between: 1 and: 16 ]) ifFalse: [ Error signal: 'maximumImagesPerToolResult must be between 1 and 16' ].
+	maximumImagesPerToolResult := anInteger
+]
+
+{ #category : 'accessing' }
+PharoCAArtifactContentResolver >> maximumModelImageBytes [ ^ maximumModelImageBytes
+]
+
+{ #category : 'accessing' }
+PharoCAArtifactContentResolver >> maximumModelImageBytes: anInteger [
+	(anInteger isInteger and: [ anInteger > 0 ]) ifFalse: [ Error signal: 'maximumModelImageBytes must be a positive integer' ].
+	maximumModelImageBytes := anInteger
 ]
 
 { #category : 'resolving' }
@@ -109,6 +123,11 @@ PharoCAArtifactContentResolver >> resolvedMessage: message forModel: model [
 	resolved := message copy.
 	resolved contentParts: parts asArray.
 	^ resolved
+]
+
+{ #category : 'resolving' }
+PharoCAArtifactContentResolver >> resolvedMessages: messages forModel: model [
+	^ messages collect: [ :message | self resolvedMessage: message forModel: model ]
 ]
 
 { #category : 'resolving-private' }

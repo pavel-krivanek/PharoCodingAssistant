@@ -7,9 +7,19 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergBranches class >> executionMode [ ^ #parallelSafe ]
+PharoCAToolIcebergBranches class >> execute: args [
+	| repository items page state |
+	repository := self repositoryNamed: (args at: 'repository').
+	self requireValidRepository: repository.
+	items := ((repository allBranches collect: [ :branch | self branchSummaryFor: branch ]) asSortedCollection: [ :a :b | (a at: 'fullName') <= (b at: 'fullName') ]) asArray.
+	state := (SHA256 hashMessage: (STONJSON toString: items)) hex.
+	page := PharoCAToolPagination pageItems: items arguments: args scope: 'iceberg_branches|', repository name, '|', state.
+	^ { 'repository' -> repository name. 'branches' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+]
 
-{ #category : 'definition' } PharoCAToolIcebergBranches class >> toolName [ ^ #iceberg_branches ]
+{ #category : 'execution' }
+PharoCAToolIcebergBranches class >> executionMode [ ^ #parallelSafe
+]
 
 { #category : 'definition' }
 PharoCAToolIcebergBranches class >> llmDefinition [
@@ -27,13 +37,6 @@ PharoCAToolIcebergBranches class >> llmDefinition [
 		} asDictionary
 ]
 
-{ #category : 'execution' }
-PharoCAToolIcebergBranches class >> execute: args [
-	| repository items page state |
-	repository := self repositoryNamed: (args at: 'repository').
-	self requireValidRepository: repository.
-	items := ((repository allBranches collect: [ :branch | self branchSummaryFor: branch ]) asSortedCollection: [ :a :b | (a at: 'fullName') <= (b at: 'fullName') ]) asArray.
-	state := (SHA256 hashMessage: (STONJSON toString: items)) hex.
-	page := PharoCAToolPagination pageItems: items arguments: args scope: 'iceberg_branches|', repository name, '|', state.
-	^ { 'repository' -> repository name. 'branches' -> (page at: 'items'). 'page' -> (page at: 'page') } asDictionary
+{ #category : 'definition' }
+PharoCAToolIcebergBranches class >> toolName [ ^ #iceberg_branches
 ]

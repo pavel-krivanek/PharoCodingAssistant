@@ -7,28 +7,8 @@ Class {
 }
 
 { #category : 'execution' }
-PharoCAToolIcebergLog class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' } PharoCAToolIcebergLog class >> toolName [ ^ #iceberg_log ]
-
-{ #category : 'definition' }
-PharoCAToolIcebergLog class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'iceberg_log'
-		description: 'Reads commit history from the repository HEAD using Iceberg''s native commit walk. History traversal is hard-bounded to 1001 commits and results are paginated.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'repository' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('repository')
-		} asDictionary
+PharoCAToolIcebergLog class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited
 ]
-
-{ #category : 'execution' }
-PharoCAToolIcebergLog class >> execute: args [ ^ self execute: args context: PharoCAToolExecutionContext unlimited ]
 
 { #category : 'execution' }
 PharoCAToolIcebergLog class >> execute: args context: context [
@@ -56,4 +36,28 @@ PharoCAToolIcebergLog class >> execute: args context: context [
 		'commits' -> (page at: 'items').
 		'page' -> (page at: 'page')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolIcebergLog class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergLog class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'iceberg_log'
+		description: 'Reads commit history from the repository HEAD using Iceberg''s native commit walk. History traversal is hard-bounded to 1001 commits and results are paginated.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'repository' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'limit' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 100 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('repository')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolIcebergLog class >> toolName [ ^ #iceberg_log
 ]

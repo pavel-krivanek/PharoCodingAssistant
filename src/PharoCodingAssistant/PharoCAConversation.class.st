@@ -1,8 +1,13 @@
-"A branch-local view of canonical provider-neutral LLM messages backed by an append-only PharoCASession tree."
+"
+A branch-local view of canonical provider-neutral LLM messages backed by an append-only PharoCASession tree.
+"
 Class {
 	#name : 'PharoCAConversation',
 	#superclass : 'Object',
-	#instVars : [ 'session', 'leafId' ],
+	#instVars : [
+		'session',
+		'leafId'
+	],
 	#category : 'PharoCodingAssistant-Core',
 	#package : 'PharoCodingAssistant',
 	#tag : 'Core'
@@ -19,38 +24,40 @@ PharoCAConversation >> addAssistantMessage: aMessage [
 ]
 
 { #category : 'adding' }
-PharoCAConversation >> addCompactionSnapshot: aDictionary [ ^ self appendEntryType: #compaction payload: aDictionary ]
-{ #category : 'adding' }
-PharoCAConversation >> addConfigurationSnapshot: aDictionary [ ^ self appendEntryType: #configuration payload: aDictionary ]
-{ #category : 'adding' }
-PharoCAConversation >> addModelSnapshot: aDictionary [ ^ self appendEntryType: #model payload: aDictionary ]
-
-{ #category : 'adding' }
-PharoCAConversation >> addSystem: aString [ ^ self appendEntryType: #message payload: (PharoCALLMMessage system: aString) ]
-{ #category : 'adding' }
-PharoCAConversation >> addUser: aString [ ^ self appendEntryType: #message payload: (PharoCALLMMessage user: aString) ]
-
-{ #category : 'adding' }
-PharoCAConversation >> addUserMessage: aMessage [
-	(aMessage isKindOf: PharoCALLMMessage) ifFalse: [ Error signal: 'User message must be a PharoCALLMMessage' ].
-	aMessage role = #user ifFalse: [ Error signal: 'User message role must be #user' ].
-	^ self appendEntryType: #message payload: aMessage
+PharoCAConversation >> addCompactionSnapshot: aDictionary [ ^ self appendEntryType: #compaction payload: aDictionary
 ]
+
+{ #category : 'adding' }
+PharoCAConversation >> addConfigurationSnapshot: aDictionary [ ^ self appendEntryType: #configuration payload: aDictionary
+]
+
+{ #category : 'adding' }
+PharoCAConversation >> addModelSnapshot: aDictionary [ ^ self appendEntryType: #model payload: aDictionary
+]
+
+{ #category : 'adding' }
+PharoCAConversation >> addSystem: aString [ ^ self appendEntryType: #message payload: (PharoCALLMMessage system: aString)
+]
+
 { #category : 'adding' }
 PharoCAConversation >> addToolResultId: toolCallId content: aString [
 	^ self appendEntryType: #message payload: (PharoCALLMMessage toolResultId: toolCallId content: aString)
 ]
-
 
 { #category : 'adding' }
 PharoCAConversation >> addToolResultId: toolCallId contentParts: parts [
 	^ self appendEntryType: #message payload: (PharoCALLMMessage toolResultId: toolCallId contentParts: parts)
 ]
 
-{ #category : 'private' }
-PharoCAConversation >> canonicalMessageFrom: anObject [
-	(anObject isKindOf: PharoCALLMMessage) ifTrue: [ ^ anObject ].
-	Error signal: 'Conversation messages must be PharoCALLMMessage instances'
+{ #category : 'adding' }
+PharoCAConversation >> addUser: aString [ ^ self appendEntryType: #message payload: (PharoCALLMMessage user: aString)
+]
+
+{ #category : 'adding' }
+PharoCAConversation >> addUserMessage: aMessage [
+	(aMessage isKindOf: PharoCALLMMessage) ifFalse: [ Error signal: 'User message must be a PharoCALLMMessage' ].
+	aMessage role = #user ifFalse: [ Error signal: 'User message role must be #user' ].
+	^ self appendEntryType: #message payload: aMessage
 ]
 
 { #category : 'private' }
@@ -64,9 +71,18 @@ PharoCAConversation >> appendEntryType: aType payload: aPayload [
 ]
 
 { #category : 'converting' }
-PharoCAConversation >> asArray [ ^ self messages asArray ]
+PharoCAConversation >> asArray [ ^ self messages asArray
+]
+
 { #category : 'branching' }
-PharoCAConversation >> branchAtEntryId: anEntryId [ ^ session conversationAt: anEntryId ]
+PharoCAConversation >> branchAtEntryId: anEntryId [ ^ session conversationAt: anEntryId
+]
+
+{ #category : 'private' }
+PharoCAConversation >> canonicalMessageFrom: anObject [
+	(anObject isKindOf: PharoCALLMMessage) ifTrue: [ ^ anObject ].
+	Error signal: 'Conversation messages must be PharoCALLMMessage instances'
+]
 
 { #category : 'adding' }
 PharoCAConversation >> ensureSystem: aString [
@@ -76,7 +92,8 @@ PharoCAConversation >> ensureSystem: aString [
 ]
 
 { #category : 'accessing' }
-PharoCAConversation >> entries [ ^ session entriesEndingAt: leafId ]
+PharoCAConversation >> entries [ ^ session entriesEndingAt: leafId
+]
 
 { #category : 'initialization' }
 PharoCAConversation >> initialize [
@@ -86,14 +103,25 @@ PharoCAConversation >> initialize [
 ]
 
 { #category : 'accessing' }
-PharoCAConversation >> leafId [ ^ leafId ]
+PharoCAConversation >> leafId [ ^ leafId
+]
+
 { #category : 'private' }
-PharoCAConversation >> leafId: anEntryId [ leafId := anEntryId ]
+PharoCAConversation >> leafId: anEntryId [ leafId := anEntryId
+]
+
 { #category : 'accessing' }
-PharoCAConversation >> messages [ ^ session messagesEndingAt: leafId ]
+PharoCAConversation >> messages [ ^ session messagesEndingAt: leafId
+]
+
 { #category : 'accessing' }
-PharoCAConversation >> session [ ^ session ]
+PharoCAConversation >> session [ ^ session
+]
+
 { #category : 'private' }
-PharoCAConversation >> session: aSession [ session := aSession ]
+PharoCAConversation >> session: aSession [ session := aSession
+]
+
 { #category : 'accessing' }
-PharoCAConversation >> size [ ^ self messages size ]
+PharoCAConversation >> size [ ^ self messages size
+]

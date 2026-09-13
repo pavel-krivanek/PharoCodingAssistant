@@ -1,4 +1,6 @@
-"Side-effect-conscious presentation for inspection tools. It deliberately avoids sending arbitrary domain messages such as size or printString to general objects."
+"
+Side-effect-conscious presentation for inspection tools. It deliberately avoids sending arbitrary domain messages such as size or printString to general objects.
+"
 Class {
 	#name : 'PharoCAObjectPresenter',
 	#superclass : 'Object',

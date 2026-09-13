@@ -1,4 +1,6 @@
-"Serializes a live class through Pharo's native TonelWriter without modifying the image or filesystem."
+"
+Serializes a live class through Pharo's native TonelWriter without modifying the image or filesystem.
+"
 Class {
 	#name : 'PharoCAToolTonelSerializeClass',
 	#superclass : 'PharoCATonelTool',
@@ -6,28 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
-
-{ #category : 'execution' }
-PharoCAToolTonelSerializeClass class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolTonelSerializeClass class >> toolName [ ^ #tonel_serialize_class ]
-
-{ #category : 'definition' }
-PharoCAToolTonelSerializeClass class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tonel_serialize_class'
-		description: 'Serializes a live class with Pharo''s native TonelWriter. The text result is character-paginated and no file is written.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'className' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('className')
-		} asDictionary
-]
 
 { #category : 'execution' }
 PharoCAToolTonelSerializeClass class >> execute: args [
@@ -54,4 +34,28 @@ PharoCAToolTonelSerializeClass class >> execute: args context: context [
 		'text' -> (page at: 'text').
 		'range' -> (page at: 'range')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolTonelSerializeClass class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelSerializeClass class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tonel_serialize_class'
+		description: 'Serializes a live class with Pharo''s native TonelWriter. The text result is character-paginated and no file is written.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'className' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('className')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelSerializeClass class >> toolName [ ^ #tonel_serialize_class
 ]

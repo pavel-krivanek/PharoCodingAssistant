@@ -1,4 +1,6 @@
-"Exports one live class as canonical native Tonel text, with character pagination."
+"
+Exports one live class as canonical native Tonel text, with character pagination.
+"
 Class {
 	#name : 'PharoCAToolTonelExportClass',
 	#superclass : 'PharoCATonelTool',
@@ -6,28 +8,6 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
-
-{ #category : 'execution' }
-PharoCAToolTonelExportClass class >> executionMode [ ^ #parallelSafe ]
-
-{ #category : 'definition' }
-PharoCAToolTonelExportClass class >> toolName [ ^ #tonel_export_class ]
-
-{ #category : 'definition' }
-PharoCAToolTonelExportClass class >> llmDefinition [
-	^ PharoCALLMToolDefinition
-		name: 'tonel_export_class'
-		description: 'Exports one live class through Pharo''s native TonelWriter and returns canonical Tonel text with character pagination.'
-		parameters: {
-			'type' -> 'object'.
-			'properties' -> {
-				'className' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
-				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
-				'cursor' -> { 'type' -> 'string' } asDictionary
-			} asDictionary.
-			'required' -> #('className')
-		} asDictionary
-]
 
 { #category : 'execution' }
 PharoCAToolTonelExportClass class >> execute: args [
@@ -48,4 +28,28 @@ PharoCAToolTonelExportClass class >> execute: args [
 		'text' -> (page at: 'text').
 		'range' -> (page at: 'range')
 	} asDictionary
+]
+
+{ #category : 'execution' }
+PharoCAToolTonelExportClass class >> executionMode [ ^ #parallelSafe
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelExportClass class >> llmDefinition [
+	^ PharoCALLMToolDefinition
+		name: 'tonel_export_class'
+		description: 'Exports one live class through Pharo''s native TonelWriter and returns canonical Tonel text with character pagination.'
+		parameters: {
+			'type' -> 'object'.
+			'properties' -> {
+				'className' -> { 'type' -> 'string'. 'minLength' -> 1 } asDictionary.
+				'maxCharacters' -> { 'type' -> 'integer'. 'minimum' -> 1. 'maximum' -> 16000 } asDictionary.
+				'cursor' -> { 'type' -> 'string' } asDictionary
+			} asDictionary.
+			'required' -> #('className')
+		} asDictionary
+]
+
+{ #category : 'definition' }
+PharoCAToolTonelExportClass class >> toolName [ ^ #tonel_export_class
 ]

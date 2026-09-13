@@ -1,4 +1,6 @@
-"Provides a bounded character range of the class definition string for a given class name."
+"
+Provides a bounded character range of the class definition string for a given class name.
+"
 Class {
 	#name : 'PharoCAToolGetClassDefinition',
 	#superclass : 'PharoCATool',
@@ -6,6 +8,10 @@ Class {
 	#package : 'PharoCodingAssistant',
 	#tag : 'Tools-Pharo'
 }
+
+{ #category : 'definition' }
+PharoCAToolGetClassDefinition class >> capability [ ^ #inspection
+]
 
 { #category : 'definition' }
 PharoCAToolGetClassDefinition class >> execute: args [
@@ -31,10 +37,6 @@ PharoCAToolGetClassDefinition class >> execute: args context: context [
 	^ result
 ]
 
-
-{ #category : 'definition' }
-PharoCAToolGetClassDefinition class >> capability [ ^ #inspection ]
-
 { #category : 'execution' }
 PharoCAToolGetClassDefinition class >> executionMode [
 	^ #parallelSafe
@@ -49,4 +51,5 @@ PharoCAToolGetClassDefinition class >> llmDefinition [
 ]
 
 { #category : 'definition' }
-PharoCAToolGetClassDefinition class >> toolName [ ^ #get_class_definition ]
+PharoCAToolGetClassDefinition class >> toolName [ ^ #get_class_definition
+]

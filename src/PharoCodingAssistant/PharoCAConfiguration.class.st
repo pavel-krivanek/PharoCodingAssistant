@@ -15,6 +15,19 @@ Class {
 	#tag : 'Core'
 }
 
+{ #category : 'converting' }
+PharoCAConfiguration >> asDictionary [
+	^ {
+		'baseUrl' -> baseUrl.
+		'modelName' -> modelName.
+		'maxIterations' -> maxIterations.
+		'timeout' -> timeout.
+		'temperature' -> temperature.
+		'systemPrompt' -> systemPrompt.
+		'toolTimeoutMilliseconds' -> toolTimeoutMilliseconds
+	} asDictionary
+]
+
 { #category : 'accessing' }
 PharoCAConfiguration >> baseUrl [
 	^ baseUrl
@@ -87,17 +100,6 @@ PharoCAConfiguration >> temperature: aNumber [
 ]
 
 { #category : 'accessing' }
-PharoCAConfiguration >> toolTimeoutMilliseconds [
-	^ toolTimeoutMilliseconds
-]
-
-{ #category : 'accessing' }
-PharoCAConfiguration >> toolTimeoutMilliseconds: milliseconds [
-	(milliseconds isNil or: [ milliseconds > 0 ]) ifFalse: [ self error: 'Tool timeout must be positive or nil' ].
-	toolTimeoutMilliseconds := milliseconds
-]
-
-{ #category : 'accessing' }
 PharoCAConfiguration >> timeout [
 	^ timeout
 ]
@@ -107,15 +109,13 @@ PharoCAConfiguration >> timeout: seconds [
 	timeout := seconds
 ]
 
-{ #category : 'converting' }
-PharoCAConfiguration >> asDictionary [
-	^ {
-		'baseUrl' -> baseUrl.
-		'modelName' -> modelName.
-		'maxIterations' -> maxIterations.
-		'timeout' -> timeout.
-		'temperature' -> temperature.
-		'systemPrompt' -> systemPrompt.
-		'toolTimeoutMilliseconds' -> toolTimeoutMilliseconds
-	} asDictionary
+{ #category : 'accessing' }
+PharoCAConfiguration >> toolTimeoutMilliseconds [
+	^ toolTimeoutMilliseconds
+]
+
+{ #category : 'accessing' }
+PharoCAConfiguration >> toolTimeoutMilliseconds: milliseconds [
+	(milliseconds isNil or: [ milliseconds > 0 ]) ifFalse: [ self error: 'Tool timeout must be positive or nil' ].
+	toolTimeoutMilliseconds := milliseconds
 ]
