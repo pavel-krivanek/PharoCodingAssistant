@@ -15,14 +15,14 @@ $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $ProfileRoot = (Resolve-Path $ProfileRoot).Path
 if ([string]::IsNullOrWhiteSpace($RunsRoot)) { $RunsRoot = Join-Path (Join-Path $repository 'benchmark') 'runs' }
-if ($SkillModes -eq 'both') { $SkillModes = 'normal,preloaded' }
+$effectiveSkillModes = if ($SkillModes -eq 'both') { 'normal,preloaded' } else { $SkillModes }
 
 $env:PCA_BENCH_REPOSITORY = $repository
 $env:PCA_BENCH_VM = $Vm
 $env:PCA_BENCH_BASE_IMAGE = $BaseImage
 $env:PCA_BENCH_PROFILE_ROOT = $ProfileRoot
 $env:PCA_BENCH_RUNS = $RunsRoot
-$env:PCA_BENCH_SKILL_MODES = $SkillModes
+$env:PCA_BENCH_SKILL_MODES = $effectiveSkillModes
 $env:PCA_BENCH_TASKS = $Tasks
 $env:PCA_BENCH_TIMEOUT = [string]$TimeoutSeconds
 $env:PCA_BENCH_EVALUATOR_TIMEOUT = [string]$EvaluatorTimeoutSeconds
