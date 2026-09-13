@@ -21,7 +21,8 @@ if ($stderrParent) { New-Item -ItemType Directory -Force -Path $stderrParent | O
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $Vm
-$psi.Arguments = "--headless `"$Image`" st `"$evaluatorScript`""
+$psi.Arguments = "`"$Image`" st --quit `"$evaluatorScript`""
+$psi.WorkingDirectory = Split-Path -Parent $Vm
 $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
 $psi.RedirectStandardOutput = $true

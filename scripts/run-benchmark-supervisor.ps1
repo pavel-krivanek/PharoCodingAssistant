@@ -27,5 +27,13 @@ if (-not [string]::IsNullOrWhiteSpace($EvaluatorPlanRoot)) {
     Remove-Item Env:PCA_BENCH_EVALUATORS -ErrorAction SilentlyContinue
 }
 
-& $Vm --headless $BaseImage st (Join-Path $repository 'scripts\run-benchmark-supervisor.st')
-exit $LASTEXITCODE
+$script = Join-Path $repository 'scripts\run-benchmark-supervisor.st'
+$vmDirectory = Split-Path -Parent $Vm
+Push-Location $vmDirectory
+try {
+    & $Vm $BaseImage st --quit $script
+    $exitCode = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+exit $exitCode

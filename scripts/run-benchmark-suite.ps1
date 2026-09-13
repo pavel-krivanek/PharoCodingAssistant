@@ -29,5 +29,13 @@ $env:PCA_BENCH_EVALUATOR_TIMEOUT = [string]$EvaluatorTimeoutSeconds
 if (-not [string]::IsNullOrWhiteSpace($EvaluatorPlanRoot)) { $env:PCA_BENCH_EVALUATORS = (Resolve-Path $EvaluatorPlanRoot).Path } else { Remove-Item Env:PCA_BENCH_EVALUATORS -ErrorAction SilentlyContinue }
 if (-not [string]::IsNullOrWhiteSpace($Output)) { $env:PCA_BENCH_SUITE_OUTPUT = $Output } else { Remove-Item Env:PCA_BENCH_SUITE_OUTPUT -ErrorAction SilentlyContinue }
 
-& $Vm --headless $BaseImage st (Join-Path $repository 'scripts\run-benchmark-suite.st')
-exit $LASTEXITCODE
+$script = Join-Path $repository 'scripts\run-benchmark-suite.st'
+$vmDirectory = Split-Path -Parent $Vm
+Push-Location $vmDirectory
+try {
+    & $Vm $BaseImage st --quit $script
+    $exitCode = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+exit $exitCode
