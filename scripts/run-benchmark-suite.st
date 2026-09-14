@@ -1,5 +1,5 @@
 "Headless full-suite entry point. Configuration is supplied through environment variables by the platform wrapper."
-| environment repoRoot src vmPath imagePath runsRoot evaluatorRoot evaluatorTimeout profileRoot timeout taskIds skillModeText skillModes tasks supervisor suiteRunner summary output supervisorClass suiteClass catalogClass writerClass |
+| environment repoRoot src vmPath imagePath runsRoot evaluatorRoot evaluatorTimeout profileRoot timeout verbosity taskIds skillModeText skillModes tasks supervisor suiteRunner summary output supervisorClass suiteClass catalogClass writerClass |
 environment := OSEnvironment current.
 repoRoot := (environment at: 'PCA_BENCH_REPOSITORY' ifAbsent: [ FileLocator workingDirectory fullName ]) asFileReference.
 src := repoRoot / 'src'.
@@ -12,6 +12,7 @@ evaluatorRoot := environment at: 'PCA_BENCH_EVALUATORS' ifAbsent: [ nil ].
 evaluatorTimeout := (environment at: 'PCA_BENCH_EVALUATOR_TIMEOUT' ifAbsent: [ '120' ]) asInteger.
 profileRoot := environment at: 'PCA_BENCH_PROFILE_ROOT' ifAbsent: [ nil ].
 timeout := (environment at: 'PCA_BENCH_TIMEOUT' ifAbsent: [ '900' ]) asInteger.
+verbosity := (environment at: 'PCA_BENCH_VERBOSITY' ifAbsent: [ '0' ]) asInteger.
 taskIds := environment at: 'PCA_BENCH_TASKS' ifAbsent: [ '' ].
 skillModeText := environment at: 'PCA_BENCH_SKILL_MODES' ifAbsent: [ 'normal' ].
 skillModes := (skillModeText findTokens: ',') collect: [ :each | each trimBoth asSymbol ].
@@ -29,10 +30,12 @@ supervisor := supervisorClass new
 	runsRoot: runsRoot;
 	timeoutSeconds: timeout;
 	evaluatorTimeoutSeconds: evaluatorTimeout;
+	verbosity: verbosity;
 	yourself.
 evaluatorRoot ifNotNil: [ supervisor evaluationPlansRoot: evaluatorRoot asFileReference ].
 profileRoot ifNotNil: [ supervisor profileRoot: profileRoot asFileReference ].
 suiteRunner := suiteClass on: supervisor.
+suiteRunner verbosity: verbosity.
 summary := suiteRunner runTasks: tasks skillModes: skillModes.
 output := environment at: 'PCA_BENCH_SUITE_OUTPUT' ifAbsent: [
 	(runsRoot / ('suite-', DateAndTime now asUnixTime asString, '.json')) fullName ].

@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCABenchmarkRunner',
 	#superclass : 'Object',
-	#instVars : [ 'harness', 'skillMode' ],
+	#instVars : [ 'harness', 'skillMode', 'verbosity' ],
 	#category : 'PharoCodingAssistant-Benchmarks-Running',
 	#package : 'PharoCodingAssistant-Benchmarks',
 	#tag : 'Running'
@@ -16,7 +16,8 @@ PharoCABenchmarkRunner class >> on: aHarness [
 { #category : 'initialization' }
 PharoCABenchmarkRunner >> initialize [
 	super initialize.
-	skillMode := #normal
+	skillMode := #normal.
+	verbosity := 0
 ]
 { #category : 'accessing' }
 PharoCABenchmarkRunner >> harness: anObject [ harness := anObject ]
@@ -28,6 +29,15 @@ PharoCABenchmarkRunner >> skillMode: aSymbol [
 	skillMode := aSymbol
 ]
 
+
+
+{ #category : 'accessing' }
+PharoCABenchmarkRunner >> verbosity [ ^ verbosity ]
+{ #category : 'accessing' }
+PharoCABenchmarkRunner >> verbosity: anInteger [
+	(anInteger between: 0 and: 3) ifFalse: [ Error signal: 'Benchmark verbosity must be between 0 and 3' ].
+	verbosity := anInteger
+]
 
 { #category : 'reporting' }
 PharoCABenchmarkRunner >> effectiveModelConfiguration [
@@ -54,13 +64,15 @@ PharoCABenchmarkRunner >> effectiveModelConfiguration [
 
 { #category : 'running' }
 PharoCABenchmarkRunner >> runTask: aTask [
-	| result run session agent previousLimit |
+	| result run session agent previousLimit reporter |
+	reporter := PharoCABenchmarkConsoleReporter verbosity: verbosity.
 	result := PharoCABenchmarkResult new
 		taskId: aTask id;
 		skillMode: skillMode;
 		startedAt: DateAndTime now;
 		modelConfiguration: self effectiveModelConfiguration;
 		yourself.
+	reporter taskStarted: aTask skillMode: skillMode.
 	[
 		[
 			session := harness newEphemeralSessionNamed: 'benchmark-', aTask id.
@@ -69,7 +81,8 @@ PharoCABenchmarkRunner >> runTask: aTask [
 			aTask maxIterations ifNotNil: [ agent configuration maxIterations: aTask maxIterations ].
 			skillMode = #preloaded ifTrue: [
 				aTask skillNames do: [ :name | agent activateSkillNamed: name forSession: session ] ].
-			run := harness run: aTask prompt.
+			run := harness start: aTask prompt eventsDo: [ :event | reporter consume: event ].
+			run wait.
 			result
 				status: run status;
 				answer: run answer;
@@ -83,6 +96,8 @@ PharoCABenchmarkRunner >> runTask: aTask [
 		(previousLimit isNil and: [ agent notNil ])
 			ifTrue: [ agent configuration maxIterations: nil ]
 			ifFalse: [ (agent notNil and: [ previousLimit notNil ]) ifTrue: [ agent configuration maxIterations: previousLimit ] ].
-		result finishedAt: DateAndTime now ].
+		result finishedAt: DateAndTime now.
+		reporter taskFinished: result.
+		reporter close ].
 	^ result
 ]

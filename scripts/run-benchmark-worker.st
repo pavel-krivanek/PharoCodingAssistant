@@ -1,6 +1,6 @@
 "Disposable headless benchmark worker. The supervisor owns this process and its files.
 Environment variables are supplied by the platform-specific worker launcher."
-| environment repoRoot src taskId outputPath skillMode workspacePath profileRoot workspace harness runner result probe probeSleep workspaceClass harnessClass runnerClass catalogClass writerClass resourceLoaderClass |
+| environment repoRoot src taskId outputPath skillMode workspacePath profileRoot verbosity workspace harness runner result probe probeSleep workspaceClass harnessClass runnerClass catalogClass writerClass resourceLoaderClass |
 environment := OSEnvironment current.
 repoRoot := (environment at: 'PCA_BENCH_REPOSITORY') asFileReference.
 taskId := environment at: 'PCA_BENCH_TASK'.
@@ -10,6 +10,7 @@ workspacePath := environment at: 'PCA_BENCH_WORKSPACE'.
 profileRoot := environment at: 'PCA_BENCH_PROFILE_ROOT' ifAbsent: [ nil ].
 probe := environment at: 'PCA_BENCH_INFRASTRUCTURE_PROBE' ifAbsent: [ '0' ].
 probeSleep := (environment at: 'PCA_BENCH_INFRASTRUCTURE_PROBE_SLEEP_SECONDS' ifAbsent: [ '0' ]) asInteger.
+verbosity := (environment at: 'PCA_BENCH_VERBOSITY' ifAbsent: [ '0' ]) asInteger.
 
 "A tiny process/isolation probe used by infrastructure tests. It deliberately does not load PCA or call an LLM.
 Keep normal worker initialization in the opposite branch: after a saved probe image is restarted,
@@ -49,7 +50,7 @@ probe = '1'
 			harness resourceLoader: (resourceLoaderClass new globalRoot: profileRoot asFileReference; yourself) ].
 		harness reloadResources.
 		runner := runnerClass on: harness.
-		runner skillMode: skillMode.
+		runner skillMode: skillMode; verbosity: verbosity.
 		result := runner runTask: (catalogClass taskNamed: taskId).
 		writerClass writeResult: result to: outputPath.
 

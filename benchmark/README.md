@@ -65,6 +65,20 @@ The Linux worker wrapper uses GNU `timeout` when available and has a shell watch
 
 The PowerShell worker uses `System.Diagnostics.Process`, asynchronously drains stdout/stderr, and kills the worker when the timeout expires.
 
+
+## Console verbosity
+
+Benchmark console output is controlled by verbosity level `0..3` and is written by the Pharo benchmark code through `Stdio stdout`:
+
+- `0` — quiet agent execution; only files/results are produced;
+- `1` — suite/task lifecycle and final per-task status/score;
+- `2` — level 1 plus worker/evaluator lifecycle, model-request iterations, active skills and tool start/completion events;
+- `3` — level 2 plus live streamed assistant text, reasoning deltas and tool-call deltas.
+
+On Windows pass `-Verbosity 0`, `1`, `2`, or `3` to `run-benchmark-suite.ps1` / `run-benchmark-supervisor.ps1`. The top-level `run-pca-benchmark.ps1` propagates the same level through the entire process tree. At verbosity 2 or 3 worker stdout is inherited so `Stdio stdout` reaches the launching console while the task is running rather than being shown only after process exit.
+
+All benchmark VM invocations on both Windows and Linux explicitly pass `--headless`; there is no UI-capable Windows fallback. If the supplied VM cannot execute the benchmark with `--headless`, preparation fails instead of silently starting a GUI image.
+
 ## Benchmark task set 004
 
 The catalog intentionally begins below the difficulty of typical coding-agent benchmarks so small/local models remain measurable. Task set 004 contains **51 tasks**. In addition to the basic, Collections, standard-library, SUnit, exception, concurrency, Announcer, reflection, refactoring and headless Spec2 coverage from earlier sets, it now includes:
@@ -168,9 +182,10 @@ The worker records the **effective** provider id/class, endpoint, model id, cont
     -BaseImage C:\Pharo14\Pharo14.image `
     -ProfileRoot C:\PCA-Benchmark-Profiles\qwen38-q4 `
     -EvaluatorPlanRoot D:\Private\PCAEvaluators `
-    -SkillModes both
+    -SkillModes both `
+    -Verbosity 2
 ```
 
-`both` means all tasks run in `normal` mode and tasks that declare relevant skills are additionally run in `preloaded` mode. Preloaded duplicates are skipped for tasks with no declared skills. Use `-Tasks "basic-001-expression,collections-001-select-even"` for a subset, `-TimeoutSeconds` for slow local models, and `-Output` to choose the aggregate JSON file.
+`both` means all tasks run in `normal` mode and tasks that declare relevant skills are additionally run in `preloaded` mode. Preloaded duplicates are skipped for tasks with no declared skills. Use `-Tasks "basic-001-expression,collections-001-select-even"` for a subset, `-TimeoutSeconds` for slow local models, `-Verbosity 0..3` for console detail, and `-Output` to choose the aggregate JSON file.
 
 The suite report contains per-run paths/results, per-mode average scores and a paired `skillDelta` calculated only from skill-sensitive tasks that have both normal and preloaded scores.

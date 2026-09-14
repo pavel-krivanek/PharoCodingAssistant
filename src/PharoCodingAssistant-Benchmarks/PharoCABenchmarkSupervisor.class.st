@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCABenchmarkSupervisor',
 	#superclass : 'Object',
-	#instVars : [ 'repositoryRoot', 'vmExecutable', 'baseImage', 'runsRoot', 'timeoutSeconds', 'launcher', 'evaluatorLauncher', 'evaluationPlansRoot', 'evaluatorTimeoutSeconds', 'profileRoot' ],
+	#instVars : [ 'repositoryRoot', 'vmExecutable', 'baseImage', 'runsRoot', 'timeoutSeconds', 'launcher', 'evaluatorLauncher', 'evaluationPlansRoot', 'evaluatorTimeoutSeconds', 'profileRoot', 'verbosity' ],
 	#category : 'PharoCodingAssistant-Benchmarks-Supervision',
 	#package : 'PharoCodingAssistant-Benchmarks',
 	#tag : 'Supervision'
@@ -13,6 +13,7 @@ PharoCABenchmarkSupervisor >> initialize [
 	super initialize.
 	timeoutSeconds := 900.
 	evaluatorTimeoutSeconds := 120.
+	verbosity := 0.
 	runsRoot := FileLocator workingDirectory / 'benchmark' / 'runs'.
 	launcher := PharoCABenchmarkWorkerLauncher new.
 	evaluatorLauncher := PharoCABenchmarkEvaluatorLauncher new
@@ -46,6 +47,20 @@ PharoCABenchmarkSupervisor >> runsRoot: aFileReference [ runsRoot := aFileRefere
 PharoCABenchmarkSupervisor >> profileRoot [ ^ profileRoot ]
 { #category : 'accessing' }
 PharoCABenchmarkSupervisor >> profileRoot: aFileReferenceOrNil [ profileRoot := aFileReferenceOrNil ifNotNil: [ aFileReferenceOrNil asFileReference ] ]
+{ #category : 'accessing' }
+PharoCABenchmarkSupervisor >> verbosity [ ^ verbosity ]
+{ #category : 'accessing' }
+PharoCABenchmarkSupervisor >> verbosity: anInteger [
+	(anInteger between: 0 and: 3) ifFalse: [ Error signal: 'Benchmark verbosity must be between 0 and 3' ].
+	verbosity := anInteger
+]
+
+{ #category : 'reporting' }
+PharoCABenchmarkSupervisor >> report: aString minimumVerbosity: requiredVerbosity [
+	verbosity < requiredVerbosity ifTrue: [ ^ self ].
+	Stdio stdout nextPutAll: aString; lf; flush
+]
+
 { #category : 'accessing' }
 PharoCABenchmarkSupervisor >> timeoutSeconds: anInteger [ timeoutSeconds := anInteger ]
 { #category : 'accessing' }
@@ -85,8 +100,10 @@ PharoCABenchmarkSupervisor >> runTask: aTask skillMode: aSkillMode [
 	| run journal exitCode |
 	run := self prepareRunFor: aTask skillMode: aSkillMode.
 	journal := PharoCABenchmarkJournal on: run journalFile runId: run runId.
+	self report: '[supervisor] run ', run runId, ' worker starting' minimumVerbosity: 2.
 	journal appendEvent: #workerStarting details: Dictionary new.
 	exitCode := launcher launch: run.
+	self report: '[supervisor] run ', run runId, ' worker exit=', exitCode asString minimumVerbosity: 2.
 	journal appendEvent: #workerExited details: { 'exitCode' -> exitCode } asDictionary.
 	run hasWorkerResult ifFalse: [
 		self synthesizeTerminalResultFor: run exitCode: exitCode.
@@ -122,8 +139,10 @@ PharoCABenchmarkSupervisor >> evaluateRun: aRun workerExitCode: workerExitCode j
 		journal appendEvent: #evaluationSkipped details: { 'reason' -> 'planMissing' } asDictionary.
 		^ self ].
 	aRun workerImage copyTo: aRun evaluatorImage.
+	self report: '[supervisor] run ', aRun runId, ' evaluator starting' minimumVerbosity: 2.
 	journal appendEvent: #evaluatorStarting details: Dictionary new.
 	exitCode := evaluatorLauncher launch: aRun planFile: planFile timeoutSeconds: evaluatorTimeoutSeconds.
+	self report: '[supervisor] run ', aRun runId, ' evaluator exit=', exitCode asString minimumVerbosity: 2.
 	journal appendEvent: #evaluatorExited details: { 'exitCode' -> exitCode } asDictionary.
 	aRun hasEvaluation ifFalse: [
 		self synthesizeEvaluatorFailureFor: aRun exitCode: exitCode.

@@ -14,6 +14,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $workerScript = Join-Path $Repository 'scripts\run-benchmark-worker.st'
+$verbosity = if ([string]::IsNullOrWhiteSpace($env:PCA_BENCH_VERBOSITY)) { 0 } else { [int]$env:PCA_BENCH_VERBOSITY }
+$liveStdout = $verbosity -ge 2
 
 $stdoutParent = Split-Path -Parent $Stdout
 $stderrParent = Split-Path -Parent $Stderr
@@ -22,17 +24,19 @@ if ($stderrParent) { New-Item -ItemType Directory -Force -Path $stderrParent | O
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $Vm
-$psi.Arguments = "`"$Image`" st --quit `"$workerScript`""
+# All worker VMs are explicitly headless. Never fall back to a UI-capable invocation.
+$psi.Arguments = "--headless `"$Image`" st --quit `"$workerScript`""
 $psi.WorkingDirectory = Split-Path -Parent $Vm
 $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
-$psi.RedirectStandardOutput = $true
+$psi.RedirectStandardOutput = -not $liveStdout
 $psi.RedirectStandardError = $true
 $psi.EnvironmentVariables['PCA_BENCH_REPOSITORY'] = $Repository
 $psi.EnvironmentVariables['PCA_BENCH_TASK'] = $Task
 $psi.EnvironmentVariables['PCA_BENCH_OUTPUT'] = $Output
 $psi.EnvironmentVariables['PCA_BENCH_SKILL_MODE'] = $SkillMode
 $psi.EnvironmentVariables['PCA_BENCH_WORKSPACE'] = $Workspace
+if ($liveStdout) { $psi.EnvironmentVariables['PCA_BENCH_STDOUT_LOG'] = $Stdout } else { $psi.EnvironmentVariables.Remove('PCA_BENCH_STDOUT_LOG') }
 if (-not [string]::IsNullOrWhiteSpace($ProfileRoot)) {
     $psi.EnvironmentVariables['PCA_BENCH_PROFILE_ROOT'] = $ProfileRoot
 } else {
@@ -46,19 +50,22 @@ if (-not [string]::IsNullOrWhiteSpace($ProfileRoot)) {
 $process = New-Object System.Diagnostics.Process
 $process.StartInfo = $psi
 if (-not $process.Start()) { exit 125 }
-
-$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+$stdoutTask = if ($psi.RedirectStandardOutput) { $process.StandardOutput.ReadToEndAsync() } else { $null }
 $stderrTask = $process.StandardError.ReadToEndAsync()
 
-if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+$timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
+if ($timedOut) {
     try { $process.Kill() } catch { }
     $process.WaitForExit()
-    [System.IO.File]::WriteAllText($Stdout, $stdoutTask.Result)
-    [System.IO.File]::WriteAllText($Stderr, $stderrTask.Result)
-    exit 124
+} else {
+    $process.WaitForExit()
 }
 
-$process.WaitForExit()
-[System.IO.File]::WriteAllText($Stdout, $stdoutTask.Result)
+if ($psi.RedirectStandardOutput) {
+    [System.IO.File]::WriteAllText($Stdout, $stdoutTask.Result)
+} elseif (-not (Test-Path -LiteralPath $Stdout)) {
+    [System.IO.File]::WriteAllText($Stdout, '')
+}
 [System.IO.File]::WriteAllText($Stderr, $stderrTask.Result)
+if ($timedOut) { exit 124 }
 exit $process.ExitCode

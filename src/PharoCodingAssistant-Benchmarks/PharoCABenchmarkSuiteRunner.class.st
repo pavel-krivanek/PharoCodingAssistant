@@ -2,7 +2,7 @@
 Class {
 	#name : 'PharoCABenchmarkSuiteRunner',
 	#superclass : 'Object',
-	#instVars : [ 'supervisor' ],
+	#instVars : [ 'supervisor', 'verbosity' ],
 	#category : 'PharoCodingAssistant-Benchmarks-Supervision',
 	#package : 'PharoCodingAssistant-Benchmarks',
 	#tag : 'Supervision'
@@ -15,6 +15,30 @@ PharoCABenchmarkSuiteRunner class >> on: aSupervisor [
 
 { #category : 'accessing' }
 PharoCABenchmarkSuiteRunner >> supervisor: anObject [ supervisor := anObject ]
+
+
+{ #category : 'initialization' }
+PharoCABenchmarkSuiteRunner >> initialize [
+	super initialize.
+	verbosity := 0
+]
+
+{ #category : 'accessing' }
+PharoCABenchmarkSuiteRunner >> verbosity [ ^ verbosity ]
+
+{ #category : 'accessing' }
+PharoCABenchmarkSuiteRunner >> verbosity: anInteger [
+	(anInteger between: 0 and: 3) ifFalse: [ Error signal: 'Benchmark verbosity must be between 0 and 3' ].
+	verbosity := anInteger
+]
+
+{ #category : 'reporting' }
+PharoCABenchmarkSuiteRunner >> report: aString minimumVerbosity: requiredVerbosity [
+	verbosity < requiredVerbosity ifTrue: [ ^ self ].
+	Stdio stdout nextPutAll: aString; lf; flush
+]
+
+
 
 { #category : 'private' }
 PharoCABenchmarkSuiteRunner >> dictionaryFrom: aFile ifAbsent: absentBlock [
@@ -85,15 +109,23 @@ PharoCABenchmarkSuiteRunner >> skillDeltaFor: entries [
 
 { #category : 'running' }
 PharoCABenchmarkSuiteRunner >> runTasks: tasks skillModes: skillModes [
-	| started entries modes finished |
+	| started entries modes finished run entry |
 	started := DateAndTime now.
 	entries := OrderedCollection new.
 	modes := skillModes collect: [ :each | each asSymbol ].
+	self report: '[suite] starting ', tasks size asString, ' task(s), modes=', (', ' join: (modes collect: [ :each | each asString ])) minimumVerbosity: 1.
 	tasks do: [ :task |
 		modes do: [ :mode |
 			(mode = #preloaded and: [ task skillNames isEmpty ]) ifFalse: [
-				entries add: (self entryFor: (supervisor runTask: task skillMode: mode)) ] ] ].
+				self report: '[suite] ', task id, ' [', mode asString, '] starting' minimumVerbosity: 1.
+				run := supervisor runTask: task skillMode: mode.
+				entry := self entryFor: run.
+				entries add: entry.
+				self report: '[suite] ', task id, ' [', mode asString, '] status=', (entry at: 'status') asString,
+					' outcome=', ((entry at: 'outcome') ifNil: [ 'n/a' ]) asString,
+					' score=', ((entry at: 'score') ifNil: [ 'n/a' ]) asString minimumVerbosity: 1 ] ] ].
 	finished := DateAndTime now.
+	self report: '[suite] finished in ', (finished - started) asMilliSeconds asString, ' ms' minimumVerbosity: 1.
 	^ {
 		'taskSetVersion' -> PharoCABenchmarkCatalog taskSetVersion.
 		'startedAt' -> started printString.

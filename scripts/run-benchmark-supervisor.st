@@ -9,8 +9,9 @@ Environment:
   PCA_BENCH_PROFILE_ROOT  isolated PCA runtime/settings profile root (optional)
   PCA_BENCH_TIMEOUT       seconds (default 900)
   PCA_BENCH_EVALUATORS    hidden evaluator-plan directory (optional)
-  PCA_BENCH_EVALUATOR_TIMEOUT seconds (default 120)"
-| environment repoRoot src taskId skillMode vmPath imagePath runsRoot timeout evaluatorRoot evaluatorTimeout profileRoot supervisor run supervisorClass catalogClass |
+  PCA_BENCH_EVALUATOR_TIMEOUT seconds (default 120)
+  PCA_BENCH_VERBOSITY     0..3 (default 0)"
+| environment repoRoot src taskId skillMode vmPath imagePath runsRoot timeout evaluatorRoot evaluatorTimeout profileRoot verbosity supervisor run supervisorClass catalogClass |
 environment := OSEnvironment current.
 repoRoot := (environment at: 'PCA_BENCH_REPOSITORY' ifAbsent: [ FileLocator workingDirectory fullName ]) asFileReference.
 src := repoRoot / 'src'.
@@ -26,6 +27,7 @@ timeout := (environment at: 'PCA_BENCH_TIMEOUT' ifAbsent: [ '900' ]) asInteger.
 evaluatorRoot := environment at: 'PCA_BENCH_EVALUATORS' ifAbsent: [ nil ].
 evaluatorTimeout := (environment at: 'PCA_BENCH_EVALUATOR_TIMEOUT' ifAbsent: [ '120' ]) asInteger.
 profileRoot := environment at: 'PCA_BENCH_PROFILE_ROOT' ifAbsent: [ nil ].
+verbosity := (environment at: 'PCA_BENCH_VERBOSITY' ifAbsent: [ '0' ]) asInteger.
 supervisorClass := Smalltalk globals at: #PharoCABenchmarkSupervisor.
 catalogClass := Smalltalk globals at: #PharoCABenchmarkCatalog.
 
@@ -36,6 +38,7 @@ supervisor := supervisorClass new
 	runsRoot: runsRoot;
 	timeoutSeconds: timeout;
 	evaluatorTimeoutSeconds: evaluatorTimeout;
+	verbosity: verbosity;
 	yourself.
 evaluatorRoot ifNotNil: [ supervisor evaluationPlansRoot: evaluatorRoot asFileReference ].
 profileRoot ifNotNil: [ supervisor profileRoot: profileRoot asFileReference ].
