@@ -61,13 +61,13 @@ PharoCABenchmarkSupervisorTest >> testTimeoutWithoutWorkerResultIsSynthesized [
 ]
 
 { #category : 'tests' }
-PharoCABenchmarkSupervisorTest >> testHiddenEvaluationRootIsNotWrittenToRunManifest [
+PharoCABenchmarkSupervisorTest >> testHiddenEvaluationRepositoryIsNotWrittenToRunManifest [
 	| fs supervisor hiddenRoot run manifest |
 	fs := FileSystem memory.
 	supervisor := self configuredSupervisorOn: fs.
-	hiddenRoot := fs / 'private-evaluators'.
-	hiddenRoot ensureCreateDirectory.
-	supervisor evaluationPlansRoot: hiddenRoot.
+	hiddenRoot := fs / 'PharoCodingAssistant-BenchmarkEvaluations'.
+	(hiddenRoot / 'src' / 'PharoCodingAssistant-BenchmarkEvaluations') ensureCreateDirectory.
+	supervisor evaluationRepositoryRoot: hiddenRoot.
 	run := supervisor prepareRunFor: self sampleTask skillMode: #normal.
 	manifest := run manifestFile contents.
 	self deny: (manifest includesSubstring: hiddenRoot fullName)
@@ -78,29 +78,13 @@ PharoCABenchmarkSupervisorTest >> testWorkerFailureSkipsHiddenEvaluation [
 	| fs supervisor hiddenRoot run journal evaluation |
 	fs := FileSystem memory.
 	supervisor := self configuredSupervisorOn: fs.
-	hiddenRoot := fs / 'private-evaluators'.
-	hiddenRoot ensureCreateDirectory.
-	supervisor evaluationPlansRoot: hiddenRoot.
+	hiddenRoot := fs / 'PharoCodingAssistant-BenchmarkEvaluations'.
+	(hiddenRoot / 'src' / 'PharoCodingAssistant-BenchmarkEvaluations') ensureCreateDirectory.
+	supervisor evaluationRepositoryRoot: hiddenRoot.
 	run := supervisor prepareRunFor: self sampleTask skillMode: #normal.
 	journal := PharoCABenchmarkJournal on: run journalFile runId: run runId.
 	supervisor evaluateRun: run workerExitCode: 124 journal: journal.
 	evaluation := STONJSON fromString: run evaluationFile contents.
 	self assert: (evaluation at: 'outcome') equals: 'notEvaluated'.
 	self assert: run journalFile exists
-]
-
-{ #category : 'tests' }
-PharoCABenchmarkSupervisorTest >> testMissingHiddenPlanCreatesNotEvaluatedResult [
-	| fs supervisor hiddenRoot run journal evaluation |
-	fs := FileSystem memory.
-	supervisor := self configuredSupervisorOn: fs.
-	hiddenRoot := fs / 'private-evaluators'.
-	hiddenRoot ensureCreateDirectory.
-	supervisor evaluationPlansRoot: hiddenRoot.
-	run := supervisor prepareRunFor: self sampleTask skillMode: #normal.
-	journal := PharoCABenchmarkJournal on: run journalFile runId: run runId.
-	supervisor evaluateRun: run workerExitCode: 0 journal: journal.
-	evaluation := STONJSON fromString: run evaluationFile contents.
-	self assert: (evaluation at: 'outcome') equals: 'notEvaluated'.
-	self assert: ((evaluation at: 'error') includesSubstring: 'No hidden evaluation plan')
 ]

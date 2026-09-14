@@ -26,6 +26,7 @@ probe = '1'
 				'skillMode' -> skillMode asString.
 				'workspace' -> workspacePath.
 				'imagePath' -> Smalltalk imagePath.
+				'evaluationRepositoryVisible' -> (environment includesKey: 'PCA_BENCH_EVALUATION_REPOSITORY').
 				'evaluatorRootVisible' -> (environment includesKey: 'PCA_BENCH_EVALUATORS').
 				'evaluatorPlanVisible' -> (environment includesKey: 'PCA_BENCH_EVALUATION_PLAN')
 			} asDictionary); lf ].

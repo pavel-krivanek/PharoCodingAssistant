@@ -4,7 +4,7 @@ param(
     [string]$Task = 'basic-001-expression',
     [ValidateSet('normal','preloaded')][string]$SkillMode = 'normal',
     [string]$RunsRoot = '',
-    [string]$EvaluatorPlanRoot = '',
+    [string]$EvaluationRepository = '',
     [string]$ProfileRoot = '',
     [ValidateRange(0,3)][int]$Verbosity = 1
 )
@@ -19,7 +19,7 @@ $env:PCA_BENCH_TASK = $Task
 $env:PCA_BENCH_SKILL_MODE = $SkillMode
 $env:PCA_BENCH_VERBOSITY = [string]$Verbosity
 if (-not [string]::IsNullOrWhiteSpace($ProfileRoot)) { $env:PCA_BENCH_PROFILE_ROOT = $ProfileRoot } else { Remove-Item Env:PCA_BENCH_PROFILE_ROOT -ErrorAction SilentlyContinue }
-if (-not [string]::IsNullOrWhiteSpace($EvaluatorPlanRoot)) { $env:PCA_BENCH_EVALUATORS = $EvaluatorPlanRoot } else { Remove-Item Env:PCA_BENCH_EVALUATORS -ErrorAction SilentlyContinue }
+if (-not [string]::IsNullOrWhiteSpace($EvaluationRepository)) { $env:PCA_BENCH_EVALUATION_REPOSITORY = $EvaluationRepository } else { Remove-Item Env:PCA_BENCH_EVALUATION_REPOSITORY -ErrorAction SilentlyContinue }
 $script = Join-Path $repository 'scripts\run-benchmark-supervisor.st'
 $vmDirectory = Split-Path -Parent $Vm
 Push-Location $vmDirectory

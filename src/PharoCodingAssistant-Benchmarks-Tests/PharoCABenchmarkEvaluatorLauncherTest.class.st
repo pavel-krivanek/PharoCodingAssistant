@@ -22,38 +22,41 @@ PharoCABenchmarkEvaluatorLauncherTest >> sampleRunOn: fs [
 ]
 
 { #category : 'tests' }
-PharoCABenchmarkEvaluatorLauncherTest >> testLinuxCommandUsesEvaluatorImageAndHiddenPlanOnlyOnEvaluatorPath [
-	| fs launcher run plan command |
+PharoCABenchmarkEvaluatorLauncherTest >> testLinuxCommandUsesSeparateEvaluationRepository [
+	| fs launcher run evaluationRepo command |
 	fs := FileSystem memory.
 	run := self sampleRunOn: fs.
-	plan := fs / 'private' / 'basic-001-expression.json'.
+	evaluationRepo := fs / 'private' / 'PharoCodingAssistant-BenchmarkEvaluations'.
 	launcher := PharoCABenchmarkEvaluatorLauncher new
 		platform: #linux;
 		repositoryRoot: fs / 'repo';
+		evaluationRepositoryRoot: evaluationRepo;
 		vmExecutable: fs / 'vm' / 'pharo';
 		yourself.
-	command := launcher commandFor: run planFile: plan timeoutSeconds: 17.
+	command := launcher commandFor: run timeoutSeconds: 17.
 	self assert: (command includesSubstring: 'run-benchmark-evaluator.sh').
 	self assert: (command includesSubstring: run evaluatorImage fullName).
-	self assert: (command includesSubstring: plan fullName).
+	self assert: (command includesSubstring: evaluationRepo fullName).
 	self assert: (command includesSubstring: run evaluationFile fullName).
 	self assert: (command includesSubstring: '17')
 ]
 
 { #category : 'tests' }
 PharoCABenchmarkEvaluatorLauncherTest >> testWindowsCommandUsesPowerShellEvaluatorWrapper [
-	| fs launcher run plan command |
+	| fs launcher run evaluationRepo command |
 	fs := FileSystem memory.
 	run := self sampleRunOn: fs.
-	plan := fs / 'private' / 'basic-001-expression.json'.
+	evaluationRepo := fs / 'private' / 'PharoCodingAssistant-BenchmarkEvaluations'.
 	launcher := PharoCABenchmarkEvaluatorLauncher new
 		platform: #windows;
 		repositoryRoot: fs / 'repo';
+		evaluationRepositoryRoot: evaluationRepo;
 		vmExecutable: fs / 'vm' / 'PharoConsole.exe';
 		yourself.
-	command := launcher commandFor: run planFile: plan timeoutSeconds: 17.
+	command := launcher commandFor: run timeoutSeconds: 17.
 	self assert: (command includesSubstring: 'run-benchmark-evaluator.ps1').
-	self assert: (command includesSubstring: '-Plan').
+	self assert: (command includesSubstring: '-EvaluationRepository').
+	self deny: (command includesSubstring: '-Plan').
 	self assert: (command includesSubstring: '-Evaluation').
 	self assert: (command includesSubstring: '-TimeoutSeconds 17')
 ]

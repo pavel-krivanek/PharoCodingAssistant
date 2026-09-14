@@ -28,11 +28,11 @@
 
 ## 003 — hidden evaluation
 
-- [x] Put expected results and hidden SUnit evaluators in supervisor/evaluator-only state via an external evaluator-plan directory.
+- [x] Put expected results and hidden SUnit evaluators in supervisor/evaluator-only state via a separate PharoCodingAssistant-BenchmarkEvaluations repository.
 - [x] Evaluate after the agent worker exits, in a separate evaluator process/image copied from the completed worker image.
 - [x] Never expose hidden test names, source, pass counts or aggregate score to the worker.
 - [x] Keep the generic evaluator in PCA while injecting task-specific expected values/hidden Tonel packages only into the post-worker evaluator process.
-- [x] Remove evaluator-plan environment variables from Linux and Windows worker processes and verify the worker probe cannot see them.
+- [x] Remove evaluation-repository/legacy evaluator environment variables from Linux and Windows worker processes and verify the worker probe cannot see them.
 - [x] Add weighted partial-credit result schema while retaining `passed` / `partial` / `failed` as primary correctness outcomes.
 - [x] Distinguish worker timeout, evaluator timeout and evaluator failure from ordinary task failure.
 - [ ] Add an optional OS-level sandbox/account/ACL layer for adversarial secrecy against arbitrary unrestricted Smalltalk filesystem enumeration.
@@ -61,13 +61,13 @@
 - [x] Cover streams, FileReference, STON/JSON, Date/Duration, regex and elementary SUnit authoring.
 - [x] Add the first live-image navigation/debugging fixtures where the target class is not named in the prompt.
 - [x] Validate every private task-001 evaluator against a known-correct implementation on the supplied Pharo 14 image.
-- [x] Extend to task set 002 (30 tasks) and independently validate all 9 new private evaluator plans on Pharo 14.
+- [x] Extend to task set 002 (30 tasks) and independently validate all 9 new private Evaluation classes on Pharo 14.
 - [x] Add exception handling, processes/semaphores, announcements and reflection tasks.
 - [x] Add first unknown-API discovery tasks whose APIs cannot be memorized from public training data.
-- [x] Extend to task set 003 (41 tasks); validate all 11 new hidden plans against independent golden implementations and match the 41-ID private manifest to the public catalog.
+- [x] Extend to task set 003 (41 tasks); validate all 11 new hidden Evaluation classes against independent golden implementations and match the 41-ID private manifest to the public catalog.
 - [x] Add task set 003 structural refactoring tasks with behavior and method-ownership regression checks.
 - [x] Add first headless Spec2 tasks specifically designed for paired skill-effect measurement.
-- [x] Extend to task set 004 (51 tasks) with stronger live-image API discovery, deeper multi-class navigation, stateful cache debugging and recursive unknown-API traversal; validate all 10 new hidden plans against independent golden implementations.
+- [x] Extend to task set 004 (51 tasks) with stronger live-image API discovery, deeper multi-class navigation, stateful cache debugging and recursive unknown-API traversal; validate all 10 new hidden Evaluation classes against independent golden implementations.
 - [ ] Broaden plain-image API-discovery and Spec2 coverage after measuring the first skill deltas. External-package tasks are intentionally deferred.
 - [ ] Derive historical PCA repair/feature tasks from older repository states while keeping later solutions hidden.
 - [x] Add automated private development controls: one known-good implementation for every current task plus mutation/negative controls for representative failure modes.

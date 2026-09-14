@@ -149,3 +149,13 @@ PharoCABenchmarkTaskTest >> testAdditionalUnknownApisExposeOnlyNavigablePublicPr
 	self assert: root children first identicalTo: child.
 	self assert: child weight equals: 3
 ]
+
+{ #category : 'tests' }
+PharoCABenchmarkTaskTest >> testEveryTaskHasItsOwnConcreteClass [
+	| tasks classes |
+	tasks := PharoCABenchmarkCatalog allTasks.
+	classes := tasks collect: #class.
+	self assert: classes asSet size equals: tasks size.
+	self assert: (classes allSatisfy: [ :each | each superclass = PharoCABenchmarkTask ]).
+	self deny: (classes includes: PharoCABenchmarkTask)
+]

@@ -46,7 +46,7 @@ if (-not [string]::IsNullOrWhiteSpace($ProfileRoot)) {
     $psi.EnvironmentVariables.Remove('PCA_BENCH_PROFILE_ROOT')
 }
 # Do not leak supervisor-only evaluator locations into the agent process.
-@('PCA_BENCH_EVALUATORS','PCA_BENCH_EVALUATOR_TIMEOUT','PCA_BENCH_EVALUATION_PLAN','PCA_BENCH_EVALUATION_OUTPUT','PCA_BENCH_WORKER_RESULT') | ForEach-Object {
+@('PCA_BENCH_EVALUATION_REPOSITORY','PCA_BENCH_EVALUATORS','PCA_BENCH_EVALUATOR_TIMEOUT','PCA_BENCH_EVALUATION_PLAN','PCA_BENCH_EVALUATION_OUTPUT','PCA_BENCH_WORKER_RESULT') | ForEach-Object {
     $psi.EnvironmentVariables.Remove($_)
 }
 

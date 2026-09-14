@@ -28,14 +28,14 @@ headless supervisor image
     |       PCA harness + normal tools/skills
     |
     +-- post-worker evaluator process
-            generic evaluator + supervisor-private plan/tests
+            PharoCodingAssistant-BenchmarkEvaluations repository
 ```
 
 The supervisor owns the run identity and files. Every task starts from a copied base image. The worker's PCA filesystem workspace is a dedicated empty directory inside the run directory, not the PCA repository. After the task finishes, the worker snapshots its image so a later evaluator process can inspect classes/methods created by the model.
 
 `journal.jsonl` is append-only and survives worker failure. If a worker exits without writing `result.json`, the supervisor creates a terminal result. Timeout is represented consistently as exit code 124 on Linux and Windows.
 
-This separation is the basis for hidden evaluation and crash recovery. Task-specific expected values and hidden evaluator code are **not implemented in the worker package** and are injected only after the worker exits.
+This separation is the basis for hidden evaluation and crash recovery. Each public task is its own concrete `PharoCABenchmarkTask` subclass. Hidden evaluator/solution classes are **not present in this repository or worker image**; they live in the separate `PharoCodingAssistant-BenchmarkEvaluations` repository and are loaded only after the worker exits.
 
 > Workspace separation is currently an architectural isolation boundary, not an OS security sandbox. A sufficiently unrestricted Smalltalk evaluation could still access paths outside `PharoCAWorkspace`. Hidden evaluators therefore must ultimately live only in the supervisor/evaluator process (or another genuinely isolated resource), rather than simply in a hidden directory beside the worker.
 
@@ -75,7 +75,7 @@ Benchmark console output is controlled by verbosity level `0..3` and is written 
 - `2` — level 1 plus worker/evaluator lifecycle, model-request iterations, active skills and tool start/completion events;
 - `3` — level 2 plus live streamed assistant text, reasoning deltas and tool-call deltas.
 
-On Windows pass `-Verbosity 0`, `1`, `2`, or `3` to `run-benchmark-suite.ps1` / `run-benchmark-supervisor.ps1`. The top-level `run-pca-benchmark.ps1` propagates the same level through the entire process tree. At verbosity 2 or 3 worker stdout is inherited so `Stdio stdout` reaches the launching console while the task is running rather than being shown only after process exit.
+On Windows pass `-Verbosity 0`, `1`, `2`, or `3` to `run-benchmark-suite.ps1` / `run-benchmark-supervisor.ps1`. The top-level `run-pca-benchmark.ps1` propagates the same level through the entire process tree. On Windows, Pharo stdout/stderr is always redirected by the launcher and actively tee'd to the parent console while it is also written to the per-run log files. This avoids unreliable native handle inheritance through the nested PowerShell/Pharo process chain. At verbosity 2 or 3, `Stdio stdout` output therefore remains live while preserving deterministic logs.
 
 All benchmark VM invocations on both Windows and Linux explicitly pass `--headless`; there is no UI-capable Windows fallback. If the supplied VM cannot execute the benchmark with `--headless`, preparation fails instead of silently starting a GUI image.
 
@@ -88,7 +88,7 @@ The catalog intentionally begins below the difficulty of typical coding-agent be
 - 7 live-image navigation/debugging tasks, with multi-class call chains, configuration precedence and a stateful stale-cache defect;
 - difficulty level 5 for tasks requiring sustained navigation across stateful or recursive APIs.
 
-See `benchmark/TASKS.md` for the complete catalog and difficulty definitions. Task-specific expected values remain outside the PCA checkout in the private evaluator pack.
+See `benchmark/TASKS.md` for the complete catalog and difficulty definitions. Task-specific expected values remain outside the PCA checkout in the separate `PharoCodingAssistant-BenchmarkEvaluations` repository.
 
 The benchmark currently targets the **plain supplied Pharo image only**. Tasks must not require downloading or loading external packages. Spec2 is used because it is already present in the image and is evaluated headlessly without opening windows.
 
@@ -112,38 +112,27 @@ Task correctness is evaluated only after the agent worker has terminated. The ev
 ```text
 supervisor
     |
-    +-- worker.image  -> agent task -> result.json -> snapshot/exit
+    +-- worker.image -> public task + PCA agent -> result.json -> snapshot/exit
     |
     +-- copy worker.image -> evaluator.image
-    |                       + hidden plan injected now
-    |                       + optional hidden SUnit Tonel package
-    |                       + evaluation.json
-    |
-    +-- journal.jsonl
+                            + load separate PharoCodingAssistant-BenchmarkEvaluations repo
+                            + select the one Evaluation class for task id
+                            + evaluation.json
 ```
 
-The repository contains only the **generic evaluator engine**. Expected values, hidden expressions and hidden SUnit packages are stored in a separately configured evaluator-plan directory. Pass that directory as the optional sixth Linux argument or `-EvaluatorPlanRoot` on Windows. It should normally be outside the PCA checkout.
+The public PCA checkout contains **no task-specific evaluator or solution classes**. Each task is represented by one concrete public task class such as `PharoCABenchmarkBasic002MethodTask`. The private companion repository contains the corresponding `PharoCABenchmarkBasic002MethodEvaluation` and `PharoCABenchmarkBasic002MethodSolution`. The stable join key is the task id (`basic-002-method`).
 
-The hidden plan path is deliberately absent from `PharoCABenchmarkTask`, `manifest.json`, the worker command line and worker lifecycle events. The Linux and Windows worker wrappers also remove all `PCA_BENCH_EVALUAT*` variables before starting the agent VM, so a model inspecting `OSEnvironment` does not learn the hidden-plan location.
+Pass the private repository as `-EvaluationRepository` on Windows or the evaluation-repository argument on Linux. The supervisor receives that path, but worker wrappers remove `PCA_BENCH_EVALUATION_REPOSITORY` (and legacy evaluator variables) before starting the tested worker VM. The path is absent from the task object, run manifest, worker command line and worker lifecycle events.
 
-The worker never receives hidden-test feedback. `evaluation.json` is created only after the worker is gone. Per-check output contains only an ordinal, status and awarded/possible weight; expected values, expressions, test selectors and hidden source are not copied into the evaluation result.
+Hidden checks are owned by the concrete private Evaluation class. Hidden Smalltalk expressions are stored there as Strings and compiled only when a check executes. This is intentional: permanently compiling hidden selector literals into evaluator methods would alter sender/implementor results in the image being measured.
 
-Supported evaluator checks currently are:
+`evaluation.json` contains only scoring output (ordinal checks/weights, outcome, score and evaluator errors), never the hidden expected expressions or known-good source. Known-good Solution classes and mutation controls are development-only and are not loaded by ordinary benchmark evaluation.
 
-- `answerEquals` — exact trimmed comparison with the final worker answer;
-- `expressionIsTrue` — evaluate a hidden Smalltalk expression and require `true`;
-- `expressionPrintEquals` — compare an evaluated object's `printString` with a hidden value;
-- `sunitTonel` — load a hidden Tonel package from the private evaluator-plan directory and score the selected SUnit class by the fraction of passing tests.
-
-Checks are weighted. `score` is in `[0,1]`, while the primary outcome remains `passed`, `partial`, or `failed`. Infrastructure conditions such as a worker timeout or evaluator timeout remain distinguishable as `notEvaluated` / `evaluatorFailed` rather than being disguised as ordinary test failures.
-
-A private plan directory has one `<task-id>.json` plan per task. See `EVALUATOR-PLAN-FORMAT.md` for the schema. Private plans should not be committed to PCA.
-
-This is strong separation at the PCA protocol/process level, but it is still **not an OS security sandbox**. Arbitrary unrestricted Smalltalk can in principle enumerate host files. For adversarial benchmark secrecy, run the worker under a separate OS account/container/ACL boundary that cannot read the private evaluator directory. The benchmark architecture is intentionally compatible with adding that layer later without changing task/evaluator semantics.
+This is strong process/protocol separation but still not an OS security sandbox. For adversarial benchmark secrecy, make the private repository unreadable to the worker process with a separate OS account/container/ACL boundary.
 
 ## Validation
 
-See `SELF-VALIDATION.md` for the blind 51-task solvability run and mutation-testing results. `CONTROL-VALIDATION.md` documents the reusable private positive/negative control mechanism. The current private matrix contains 51 known-good controls and 25 mutation controls, each executed in its own disposable image. Private evaluator plans and control source are intentionally kept outside this repository tree.
+See `SELF-VALIDATION.md` for the blind 51-task solvability run and mutation-testing results. `CONTROL-VALIDATION.md` documents the reusable private positive/negative control mechanism. The current private matrix contains 51 known-good controls and 25 mutation controls, each executed in its own disposable image. Private Evaluation, Solution and mutant/control classes are intentionally kept in the separate `PharoCodingAssistant-BenchmarkEvaluations` repository.
 
 ## Reproducible provider/model profiles
 
@@ -165,7 +154,7 @@ A single supervised Windows task can then use that profile explicitly:
     -Vm C:\Pharo14\PharoConsole.exe `
     -BaseImage C:\Pharo14\Pharo14.image `
     -ProfileRoot C:\PCA-Benchmark-Profiles\qwen38-q4 `
-    -EvaluatorPlanRoot D:\Private\PCAEvaluators `
+    -EvaluationRepository C:\repos\PharoCodingAssistant-BenchmarkEvaluations `
     -Task discovery-003-senders `
     -SkillMode normal
 ```
@@ -181,7 +170,7 @@ The worker records the **effective** provider id/class, endpoint, model id, load
     -Vm C:\Pharo14\PharoConsole.exe `
     -BaseImage C:\Pharo14\Pharo14.image `
     -ProfileRoot C:\PCA-Benchmark-Profiles\qwen38-q4 `
-    -EvaluatorPlanRoot D:\Private\PCAEvaluators `
+    -EvaluationRepository C:\repos\PharoCodingAssistant-BenchmarkEvaluations `
     -SkillModes both `
     -Verbosity 2
 ```

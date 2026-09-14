@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Vm,
     [Parameter(Mandatory=$true)][string]$BaseImage,
     [Parameter(Mandatory=$true)][string]$ProfileRoot,
-    [string]$EvaluatorPlanRoot = '',
+    [string]$EvaluationRepository = '',
     [ValidateSet('normal','preloaded','both')][string]$SkillModes = 'normal',
     [string]$Tasks = '',
     [string]$RunsRoot = '',
@@ -26,7 +26,7 @@ $env:PCA_BENCH_TASKS = $Tasks
 $env:PCA_BENCH_TIMEOUT = [string]$TimeoutSeconds
 $env:PCA_BENCH_EVALUATOR_TIMEOUT = [string]$EvaluatorTimeoutSeconds
 $env:PCA_BENCH_VERBOSITY = [string]$Verbosity
-if (-not [string]::IsNullOrWhiteSpace($EvaluatorPlanRoot)) { $env:PCA_BENCH_EVALUATORS = (Resolve-Path $EvaluatorPlanRoot).Path } else { Remove-Item Env:PCA_BENCH_EVALUATORS -ErrorAction SilentlyContinue }
+if (-not [string]::IsNullOrWhiteSpace($EvaluationRepository)) { $env:PCA_BENCH_EVALUATION_REPOSITORY = (Resolve-Path $EvaluationRepository).Path } else { Remove-Item Env:PCA_BENCH_EVALUATION_REPOSITORY -ErrorAction SilentlyContinue }
 if (-not [string]::IsNullOrWhiteSpace($Output)) { $env:PCA_BENCH_SUITE_OUTPUT = $Output } else { Remove-Item Env:PCA_BENCH_SUITE_OUTPUT -ErrorAction SilentlyContinue }
 $script = Join-Path $repository 'scripts\run-benchmark-suite.st'
 $vmDirectory = Split-Path -Parent $Vm

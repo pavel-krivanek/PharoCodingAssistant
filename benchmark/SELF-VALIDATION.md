@@ -6,9 +6,9 @@ Task set: 004, 51 public tasks
 
 ## Blind solvability pass
 
-The public prompts were solved before any task-specific private evaluator plan was inspected. Each task was executed in isolation from the same clean public benchmark image and then scored by the private evaluator.
+The public prompts were solved before any task-specific private Evaluation class was inspected. Each task was executed in isolation from the same clean public benchmark image and then scored by the private evaluator.
 
-The first fixed candidate solution set contained one genuine semantic mistake in `exceptions-002-ensure-cleanup`: it used `workBlock value ensure:` rather than protecting evaluation with `[ workBlock value ] ensure:`. The evaluator correctly rejected it. The mistake was diagnosed from the public task specification, corrected without inspecting the private plan, and then passed.
+The first fixed candidate solution set contained one genuine semantic mistake in `exceptions-002-ensure-cleanup`: it used `workBlock value ensure:` rather than protecting evaluation with `[ workBlock value ] ensure:`. The evaluator correctly rejected it. The mistake was diagnosed from the public task specification, corrected without inspecting the private Evaluation class, and then passed.
 
 Result after that correction: **51 / 51 tasks passed all hidden checks**.
 
@@ -16,7 +16,7 @@ This validates prompt solvability and evaluator consistency; it is not a measure
 
 ## Automated development controls
 
-The blind solutions and mutation probes have now been turned into reusable private development controls. The public repository contains only the generic runner; candidate implementations stay beside the private evaluator plans.
+The blind solutions and mutation probes have now been turned into reusable private development controls. The public repository contains only the generic runner; candidate implementations stay beside the private Evaluation classs.
 
 Current matrix:
 

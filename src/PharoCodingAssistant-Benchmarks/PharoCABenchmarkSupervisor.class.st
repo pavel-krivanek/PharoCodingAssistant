@@ -1,8 +1,8 @@
-"Headless supervisor. It owns durable run state and disposable worker/evaluator images. Hidden task-specific evaluator plans are configured separately and are opened only after the worker process has terminated."
+"Headless supervisor. It owns durable run state and disposable worker/evaluator images. Hidden evaluation classes live in a separate repository that is configured only after the worker process has terminated."
 Class {
 	#name : 'PharoCABenchmarkSupervisor',
 	#superclass : 'Object',
-	#instVars : [ 'repositoryRoot', 'vmExecutable', 'baseImage', 'runsRoot', 'timeoutSeconds', 'launcher', 'evaluatorLauncher', 'evaluationPlansRoot', 'evaluatorTimeoutSeconds', 'profileRoot', 'verbosity' ],
+	#instVars : [ 'repositoryRoot', 'vmExecutable', 'baseImage', 'runsRoot', 'timeoutSeconds', 'launcher', 'evaluatorLauncher', 'evaluationRepositoryRoot', 'evaluatorTimeoutSeconds', 'profileRoot', 'verbosity' ],
 	#category : 'PharoCodingAssistant-Benchmarks-Supervision',
 	#package : 'PharoCodingAssistant-Benchmarks',
 	#tag : 'Supervision'
@@ -22,9 +22,17 @@ PharoCABenchmarkSupervisor >> initialize [
 { #category : 'accessing' }
 PharoCABenchmarkSupervisor >> baseImage: aFileReference [ baseImage := aFileReference asFileReference ]
 { #category : 'accessing' }
-PharoCABenchmarkSupervisor >> evaluationPlansRoot [ ^ evaluationPlansRoot ]
+PharoCABenchmarkSupervisor >> evaluationRepositoryRoot [ ^ evaluationRepositoryRoot ]
 { #category : 'accessing' }
-PharoCABenchmarkSupervisor >> evaluationPlansRoot: aFileReference [ evaluationPlansRoot := aFileReference asFileReference ]
+PharoCABenchmarkSupervisor >> evaluationRepositoryRoot: aFileReference [
+	evaluationRepositoryRoot := aFileReference asFileReference.
+	evaluatorLauncher evaluationRepositoryRoot: evaluationRepositoryRoot
+]
+
+{ #category : 'accessing - compatibility' }
+PharoCABenchmarkSupervisor >> evaluationPlansRoot [ ^ self evaluationRepositoryRoot ]
+{ #category : 'accessing - compatibility' }
+PharoCABenchmarkSupervisor >> evaluationPlansRoot: aFileReference [ self evaluationRepositoryRoot: aFileReference ]
 { #category : 'accessing' }
 PharoCABenchmarkSupervisor >> evaluatorLauncher [ ^ evaluatorLauncher ]
 { #category : 'accessing' }
@@ -127,32 +135,21 @@ PharoCABenchmarkSupervisor >> captureWorkerConfigurationFor: aRun journal: journ
 
 { #category : 'evaluation' }
 PharoCABenchmarkSupervisor >> evaluateRun: aRun workerExitCode: workerExitCode journal: journal [
-	| planFile exitCode |
-	evaluationPlansRoot ifNil: [ ^ self ].
+	| exitCode |
+	evaluationRepositoryRoot ifNil: [ ^ self ].
 	workerExitCode = 0 ifFalse: [
 		self synthesizeEvaluationFor: aRun outcome: #notEvaluated error: 'Worker did not complete successfully'.
 		journal appendEvent: #evaluationSkipped details: { 'reason' -> 'workerFailed' } asDictionary.
 		^ self ].
-	planFile := self evaluationPlanForTask: aRun task.
-	planFile exists ifFalse: [
-		self synthesizeEvaluationFor: aRun outcome: #notEvaluated error: 'No hidden evaluation plan is available for this task'.
-		journal appendEvent: #evaluationSkipped details: { 'reason' -> 'planMissing' } asDictionary.
-		^ self ].
 	aRun workerImage copyTo: aRun evaluatorImage.
 	self report: '[supervisor] run ', aRun runId, ' evaluator starting' minimumVerbosity: 2.
 	journal appendEvent: #evaluatorStarting details: Dictionary new.
-	exitCode := evaluatorLauncher launch: aRun planFile: planFile timeoutSeconds: evaluatorTimeoutSeconds.
+	exitCode := evaluatorLauncher launch: aRun timeoutSeconds: evaluatorTimeoutSeconds.
 	self report: '[supervisor] run ', aRun runId, ' evaluator exit=', exitCode asString minimumVerbosity: 2.
 	journal appendEvent: #evaluatorExited details: { 'exitCode' -> exitCode } asDictionary.
 	aRun hasEvaluation ifFalse: [
 		self synthesizeEvaluatorFailureFor: aRun exitCode: exitCode.
 		journal appendEvent: #evaluationSynthesized details: { 'exitCode' -> exitCode } asDictionary ]
-]
-
-{ #category : 'evaluation' }
-PharoCABenchmarkSupervisor >> evaluationPlanForTask: aTask [
-	"Do not expose this path in the worker manifest, task object, worker environment, or worker lifecycle journal."
-	^ evaluationPlansRoot / (aTask id, '.json')
 ]
 
 { #category : 'private' }
@@ -206,6 +203,8 @@ PharoCABenchmarkSupervisor >> validateConfiguration [
 	profileRoot ifNotNil: [
 		profileRoot exists ifFalse: [ Error signal: 'Benchmark profile root does not exist: ', profileRoot fullName ].
 		(profileRoot / 'runtime.json') exists ifFalse: [ Error signal: 'Benchmark profile root has no runtime.json: ', profileRoot fullName ] ].
-	evaluationPlansRoot ifNotNil: [
-		evaluationPlansRoot exists ifFalse: [ Error signal: 'Hidden evaluation plan root does not exist' ] ]
+	evaluationRepositoryRoot ifNotNil: [
+		evaluationRepositoryRoot exists ifFalse: [ Error signal: 'Hidden evaluation repository does not exist: ', evaluationRepositoryRoot fullName ].
+		(evaluationRepositoryRoot / 'src' / 'PharoCodingAssistant-BenchmarkEvaluations') exists ifFalse: [
+			Error signal: 'Hidden evaluation repository has no PharoCodingAssistant-BenchmarkEvaluations package' ] ]
 ]

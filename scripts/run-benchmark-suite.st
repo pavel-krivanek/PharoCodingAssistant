@@ -1,5 +1,5 @@
 "Headless full-suite entry point. Configuration is supplied through environment variables by the platform wrapper."
-| environment repoRoot src vmPath imagePath runsRoot evaluatorRoot evaluatorTimeout profileRoot timeout verbosity taskIds skillModeText skillModes tasks supervisor suiteRunner summary output supervisorClass suiteClass catalogClass writerClass |
+| environment repoRoot src vmPath imagePath runsRoot evaluationRepository evaluatorTimeout profileRoot timeout verbosity taskIds skillModeText skillModes tasks supervisor suiteRunner summary output supervisorClass suiteClass catalogClass writerClass |
 environment := OSEnvironment current.
 repoRoot := (environment at: 'PCA_BENCH_REPOSITORY' ifAbsent: [ FileLocator workingDirectory fullName ]) asFileReference.
 src := repoRoot / 'src'.
@@ -8,7 +8,7 @@ src := repoRoot / 'src'.
 vmPath := (environment at: 'PCA_BENCH_VM') asFileReference.
 imagePath := (environment at: 'PCA_BENCH_BASE_IMAGE') asFileReference.
 runsRoot := (environment at: 'PCA_BENCH_RUNS' ifAbsent: [ (repoRoot / 'benchmark' / 'runs') fullName ]) asFileReference.
-evaluatorRoot := environment at: 'PCA_BENCH_EVALUATORS' ifAbsent: [ nil ].
+evaluationRepository := environment at: 'PCA_BENCH_EVALUATION_REPOSITORY' ifAbsent: [ nil ].
 evaluatorTimeout := (environment at: 'PCA_BENCH_EVALUATOR_TIMEOUT' ifAbsent: [ '120' ]) asInteger.
 profileRoot := environment at: 'PCA_BENCH_PROFILE_ROOT' ifAbsent: [ nil ].
 timeout := (environment at: 'PCA_BENCH_TIMEOUT' ifAbsent: [ '900' ]) asInteger.
@@ -32,7 +32,7 @@ supervisor := supervisorClass new
 	evaluatorTimeoutSeconds: evaluatorTimeout;
 	verbosity: verbosity;
 	yourself.
-evaluatorRoot ifNotNil: [ supervisor evaluationPlansRoot: evaluatorRoot asFileReference ].
+evaluationRepository ifNotNil: [ supervisor evaluationRepositoryRoot: evaluationRepository asFileReference ].
 profileRoot ifNotNil: [ supervisor profileRoot: profileRoot asFileReference ].
 suiteRunner := suiteClass on: supervisor.
 suiteRunner verbosity: verbosity.

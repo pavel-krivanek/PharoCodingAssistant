@@ -1,8 +1,8 @@
-"Starts a post-worker evaluator process. Hidden plan paths are supplied only to this launcher, after the worker has exited, and are never added to the worker manifest or environment."
+"Starts a post-worker evaluator process. The private evaluation repository is supplied only after the worker has exited and is never added to the worker manifest or environment."
 Class {
 	#name : 'PharoCABenchmarkEvaluatorLauncher',
 	#superclass : 'Object',
-	#instVars : [ 'repositoryRoot', 'vmExecutable', 'platform' ],
+	#instVars : [ 'repositoryRoot', 'vmExecutable', 'platform', 'evaluationRepositoryRoot' ],
 	#category : 'PharoCodingAssistant-Benchmarks-Supervision',
 	#package : 'PharoCodingAssistant-Benchmarks',
 	#tag : 'Supervision'
@@ -24,6 +24,8 @@ PharoCABenchmarkEvaluatorLauncher >> platform: aSymbol [
 { #category : 'accessing' }
 PharoCABenchmarkEvaluatorLauncher >> repositoryRoot: aFileReference [ repositoryRoot := aFileReference asFileReference ]
 { #category : 'accessing' }
+PharoCABenchmarkEvaluatorLauncher >> evaluationRepositoryRoot: aFileReference [ evaluationRepositoryRoot := aFileReference asFileReference ]
+{ #category : 'accessing' }
 PharoCABenchmarkEvaluatorLauncher >> vmExecutable: aFileReference [ vmExecutable := aFileReference asFileReference ]
 
 { #category : 'private - quoting' }
@@ -38,28 +40,28 @@ PharoCABenchmarkEvaluatorLauncher >> windowsQuote: aString [
 ]
 
 { #category : 'commands' }
-PharoCABenchmarkEvaluatorLauncher >> commandFor: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds [
+PharoCABenchmarkEvaluatorLauncher >> commandFor: aRun timeoutSeconds: timeoutSeconds [
 	^ platform = #windows
-		ifTrue: [ self windowsCommandFor: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds ]
-		ifFalse: [ self linuxCommandFor: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds ]
+		ifTrue: [ self windowsCommandFor: aRun timeoutSeconds: timeoutSeconds ]
+		ifFalse: [ self linuxCommandFor: aRun timeoutSeconds: timeoutSeconds ]
 ]
 
 { #category : 'commands' }
-PharoCABenchmarkEvaluatorLauncher >> linuxCommandFor: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds [
+PharoCABenchmarkEvaluatorLauncher >> linuxCommandFor: aRun timeoutSeconds: timeoutSeconds [
 	| q script |
 	q := [ :value | self linuxQuote: value ].
 	script := repositoryRoot / 'scripts' / 'run-benchmark-evaluator.sh'.
 	^ String streamContents: [ :stream |
 		{ script fullName. vmExecutable fullName. aRun evaluatorImage fullName.
-		  repositoryRoot fullName. aRun task id. aRun resultFile fullName.
-		  aPlanFile fullName. aRun evaluationFile fullName. timeoutSeconds asString.
+		  repositoryRoot fullName. evaluationRepositoryRoot fullName. aRun task id.
+		  aRun resultFile fullName. aRun evaluationFile fullName. timeoutSeconds asString.
 		  aRun evaluatorStdoutFile fullName. aRun evaluatorStderrFile fullName }
 			do: [ :each | stream nextPutAll: (q value: each) ]
 			separatedBy: [ stream space ] ]
 ]
 
 { #category : 'commands' }
-PharoCABenchmarkEvaluatorLauncher >> windowsCommandFor: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds [
+PharoCABenchmarkEvaluatorLauncher >> windowsCommandFor: aRun timeoutSeconds: timeoutSeconds [
 	| q script |
 	q := [ :value | self windowsQuote: value ].
 	script := repositoryRoot / 'scripts' / 'run-benchmark-evaluator.ps1'.
@@ -68,9 +70,9 @@ PharoCABenchmarkEvaluatorLauncher >> windowsCommandFor: aRun planFile: aPlanFile
 		stream nextPutAll: ' -Vm '; nextPutAll: (q value: vmExecutable fullName).
 		stream nextPutAll: ' -Image '; nextPutAll: (q value: aRun evaluatorImage fullName).
 		stream nextPutAll: ' -Repository '; nextPutAll: (q value: repositoryRoot fullName).
+		stream nextPutAll: ' -EvaluationRepository '; nextPutAll: (q value: evaluationRepositoryRoot fullName).
 		stream nextPutAll: ' -Task '; nextPutAll: (q value: aRun task id).
 		stream nextPutAll: ' -WorkerResult '; nextPutAll: (q value: aRun resultFile fullName).
-		stream nextPutAll: ' -Plan '; nextPutAll: (q value: aPlanFile fullName).
 		stream nextPutAll: ' -Evaluation '; nextPutAll: (q value: aRun evaluationFile fullName).
 		stream nextPutAll: ' -TimeoutSeconds '; nextPutAll: timeoutSeconds asString.
 		stream nextPutAll: ' -Stdout '; nextPutAll: (q value: aRun evaluatorStdoutFile fullName).
@@ -78,8 +80,8 @@ PharoCABenchmarkEvaluatorLauncher >> windowsCommandFor: aRun planFile: aPlanFile
 ]
 
 { #category : 'running' }
-PharoCABenchmarkEvaluatorLauncher >> launch: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds [
-	^ self normalizeSystemStatus: (LibC uniqueInstance system: (self commandFor: aRun planFile: aPlanFile timeoutSeconds: timeoutSeconds))
+PharoCABenchmarkEvaluatorLauncher >> launch: aRun timeoutSeconds: timeoutSeconds [
+	^ self normalizeSystemStatus: (LibC uniqueInstance system: (self commandFor: aRun timeoutSeconds: timeoutSeconds))
 ]
 
 { #category : 'running' }

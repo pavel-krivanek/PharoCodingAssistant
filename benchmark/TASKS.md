@@ -110,4 +110,4 @@ These tasks are deliberately executable and evaluable headlessly. All three decl
 
 ## Evaluation
 
-Task definitions contain no expected values. The private evaluator pack has multiple independent checks for most coding tasks so partial correctness can be measured. It is supplied only to the post-worker evaluator process.
+Task definitions contain no expected values. The separate `PharoCodingAssistant-BenchmarkEvaluations` repository contains one private Evaluation class per task, with multiple independent checks for most coding tasks so partial correctness can be measured. It is loaded only into the post-worker evaluator process.

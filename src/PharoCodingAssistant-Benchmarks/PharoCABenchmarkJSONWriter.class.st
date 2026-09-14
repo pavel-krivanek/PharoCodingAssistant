@@ -9,6 +9,7 @@ Class {
 { #category : 'writing' }
 PharoCABenchmarkJSONWriter class >> writeDictionary: aDictionary to: aFileReference [
 	aFileReference parent ensureCreateDirectory.
+	aFileReference exists ifTrue: [ aFileReference delete ].
 	aFileReference writeStreamDo: [ :stream |
 		stream nextPutAll: (STONJSON toStringPretty: aDictionary); lf ]
 ]
