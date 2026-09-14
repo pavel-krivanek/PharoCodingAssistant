@@ -134,9 +134,39 @@ This is strong process/protocol separation but still not an OS security sandbox.
 
 See `SELF-VALIDATION.md` for the blind 51-task solvability run and mutation-testing results. `CONTROL-VALIDATION.md` documents the reusable private positive/negative control mechanism. The current private matrix contains 51 known-good controls and 25 mutation controls, each executed in its own disposable image. Private Evaluation, Solution and mutant/control classes are intentionally kept in the separate `PharoCodingAssistant-BenchmarkEvaluations` repository.
 
+## Reusable common-issues learning in benchmarks
+
+Benchmark workers use the same `remember_common_issue` tool as ordinary PCA. The top-level Windows driver defaults to **read/write** access to `%USERPROFILE%\.pharo-ca\common-issues.md`, even though runtime/model settings use an isolated benchmark profile. This is intentional: by default benchmark agents can benefit from reusable Pharo lessons learned by previous runs and can contribute newly proven lessons.
+
+For controlled comparisons, choose one of four modes:
+
+```powershell
+# default: read earlier lessons and append new ones
+.\run-pca-benchmark.ps1 -Mode Full -CommonIssuesMode readwrite
+
+# freeze the knowledge base during measurement
+.\run-pca-benchmark.ps1 -Mode Full -CommonIssuesMode readonly
+
+# collect struggles without giving the model previous lessons
+.\run-pca-benchmark.ps1 -Mode Full -CommonIssuesMode writeonly
+
+# clean-room benchmark
+.\run-pca-benchmark.ps1 -Mode Full -CommonIssuesMode off
+```
+
+Use `-CommonIssuesPath` to create an independent knowledge stream, for example one file per model:
+
+```powershell
+.\run-pca-benchmark.ps1 -Mode Full `
+    -ModelId ornith-1.5-35b-a3b `
+    -CommonIssuesPath C:\tmp\benchmark\model-memory\ornith.md
+```
+
+The selected mode/path and the file's initial SHA-256 are recorded in `work\state\benchmark-environment.json`. This matters for reproducibility because an evolving shared knowledge file intentionally makes later runs different from earlier ones.
+
 ## Reproducible provider/model profiles
 
-Benchmark workers can use an isolated PCA profile root instead of the normal `~/.pharo-ca`. This prevents personal instructions, skills and session state from silently changing benchmark behavior. The benchmark profile should contain only `runtime.json` and, optionally, `settings.json`; built-in skills still come from the PCA codebase.
+Benchmark workers can use an isolated PCA profile root instead of the normal `~/.pharo-ca`. This prevents personal instructions, skills and session state from silently changing benchmark behavior. The benchmark profile should contain only `runtime.json` and, optionally, `settings.json`; built-in skills still come from the PCA codebase. Common-issues learning is the deliberate exception and is independently controlled as described above.
 
 Configure and select the provider/model in ordinary PCA, call `saveRuntimeProfile`, then copy only the reproducible runtime/settings files:
 
@@ -178,3 +208,18 @@ The worker records the **effective** provider id/class, endpoint, model id, load
 `both` means all tasks run in `normal` mode and tasks that declare relevant skills are additionally run in `preloaded` mode. Preloaded duplicates are skipped for tasks with no declared skills. Use `-Tasks "basic-001-expression,collections-001-select-even"` for a subset, `-TimeoutSeconds` for slow local models, `-Verbosity 0..3` for console detail, and `-Output` to choose the aggregate JSON file.
 
 The suite report contains per-run paths/results, per-mode average scores and a paired `skillDelta` calculated only from skill-sensitive tasks that have both normal and preloaded scores.
+
+
+## Stopping a Windows benchmark
+
+The top-level Windows benchmark driver tracks the active suite process in `work\state\active-run.json` and owns the complete descendant process tree. Pressing **Ctrl+C** in the benchmark console now unwinds through a `finally` block that terminates the active suite with `taskkill /T /F`, so its supervisor, worker, evaluator and wrapper descendants are terminated as well. Completed logs/results and already-created workspaces remain on disk for diagnosis.
+
+A run can also be stopped from another PowerShell window:
+
+```powershell
+.\run-pca-benchmark.ps1 -Mode Stop
+```
+
+`Stop` first validates and terminates the PID recorded in `active-run.json`. As a recovery fallback it also looks for Pharo processes using the disposable benchmark VM below `work\vm` and detached benchmark wrapper scripts belonging to this PCA checkout. It does not target LM Studio or Pharo executables from other installations. The stop request is recorded in `work\state\stop-request.json`.
+
+The repository-level Windows launchers (`run-benchmark-suite.ps1`, `run-benchmark-supervisor.ps1`, `run-benchmark-worker.ps1`, `run-benchmark-evaluator.ps1` and `run-benchmark.ps1`) also terminate their current native Pharo child tree from `finally` when interrupted, so direct use of those scripts does not intentionally leave detached VMs either.

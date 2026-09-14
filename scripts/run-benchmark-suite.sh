@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
-if [ "$#" -lt 3 ] || [ "$#" -gt 9 ]; then
-    echo "usage: $0 VM BASE_IMAGE PROFILE_ROOT [EVALUATION_REPOSITORY] [SKILL_MODES] [TASKS] [RUNS_ROOT] [OUTPUT] [VERBOSITY]" >&2
+if [ "$#" -lt 3 ] || [ "$#" -gt 11 ]; then
+    echo "usage: $0 VM BASE_IMAGE PROFILE_ROOT [EVALUATION_REPOSITORY] [SKILL_MODES] [TASKS] [RUNS_ROOT] [OUTPUT] [VERBOSITY] [COMMON_ISSUES_MODE] [COMMON_ISSUES_PATH]" >&2
     exit 2
 fi
 VM=$1
@@ -14,8 +14,18 @@ REPOSITORY=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 RUNS_ROOT=${7:-"$REPOSITORY/benchmark/runs"}
 OUTPUT=${8:-}
 VERBOSITY=${9:-1}
+COMMON_ISSUES_MODE=${10:-readwrite}
+COMMON_ISSUES_PATH=${11:-"$HOME/.pharo-ca/common-issues.md"}
+case "$COMMON_ISSUES_MODE" in
+  readwrite) CI_READ=1; CI_WRITE=1 ;;
+  readonly) CI_READ=1; CI_WRITE=0 ;;
+  writeonly) CI_READ=0; CI_WRITE=1 ;;
+  off) CI_READ=0; CI_WRITE=0 ;;
+  *) echo "invalid common issues mode: $COMMON_ISSUES_MODE" >&2; exit 2 ;;
+esac
 [ "$SKILL_MODES" = both ] && SKILL_MODES=normal,preloaded
 export PCA_BENCH_REPOSITORY="$REPOSITORY" PCA_BENCH_VM="$VM" PCA_BENCH_BASE_IMAGE="$BASE_IMAGE" PCA_BENCH_PROFILE_ROOT="$PROFILE_ROOT" PCA_BENCH_RUNS="$RUNS_ROOT" PCA_BENCH_SKILL_MODES="$SKILL_MODES" PCA_BENCH_TASKS="$TASKS" PCA_BENCH_VERBOSITY="$VERBOSITY"
+export PCA_BENCH_COMMON_ISSUES_READ="$CI_READ" PCA_BENCH_COMMON_ISSUES_WRITE="$CI_WRITE" PCA_BENCH_COMMON_ISSUES_PATH="$COMMON_ISSUES_PATH"
 if [ -n "$EVALUATION_REPOSITORY" ]; then export PCA_BENCH_EVALUATION_REPOSITORY="$EVALUATION_REPOSITORY"; else unset PCA_BENCH_EVALUATION_REPOSITORY 2>/dev/null || true; fi
 if [ -n "$OUTPUT" ]; then export PCA_BENCH_SUITE_OUTPUT="$OUTPUT"; else unset PCA_BENCH_SUITE_OUTPUT 2>/dev/null || true; fi
 "$VM" --headless "$BASE_IMAGE" st "$REPOSITORY/scripts/run-benchmark-suite.st"

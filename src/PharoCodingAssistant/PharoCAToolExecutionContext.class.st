@@ -18,7 +18,8 @@ Class {
 		'objectHandleRegistry',
 		'testRunStore',
 		'transcriptBuffer',
-		'runtimeHandleRegistry'
+		'runtimeHandleRegistry',
+		'commonIssuesStore'
 	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
@@ -50,6 +51,14 @@ PharoCAToolExecutionContext >> cancellationToken [
 { #category : 'accessing' }
 PharoCAToolExecutionContext >> cancellationToken: aToken [
 	cancellationToken := aToken
+]
+
+{ #category : 'learning' }
+PharoCAToolExecutionContext >> commonIssuesStore [ ^ commonIssuesStore
+]
+
+{ #category : 'learning' }
+PharoCAToolExecutionContext >> commonIssuesStore: aStore [ commonIssuesStore := aStore
 ]
 
 { #category : 'testing' }

@@ -577,6 +577,7 @@ Recognized files/directories include:
   templates/
     *.md
   extensions.json
+  common-issues.md
   sessions/
 ```
 
@@ -650,6 +651,10 @@ Known settings are:
 - `tools.profile`
 - `tools.allow`
 - `tools.exclude`
+- `commonIssues.readEnabled` — load the common-issues file into the stable instruction prefix (default `true`)
+- `commonIssues.writeEnabled` — allow the `remember_common_issue` tool to append learned fixes (default `true`)
+- `commonIssues.path` — optional absolute path or path relative to the global resource root; default is `~/.pharo-ca/common-issues.md`
+- `commonIssues.maxReadCharacters` — maximum tail of the file injected into model context (default `12000`)
 
 Project settings take effect only for a trusted workspace. Programmatic harness setting overrides have the highest precedence.
 
@@ -662,12 +667,26 @@ harness settingOverrideAt: 'temperature' put: 0.1.
 harness reloadResources.
 ```
 
+## Common Pharo issues: cross-run learning
+
+PCA has a deliberately small persistent learning channel for reusable Pharo knowledge that does not change model weights. The eager `remember_common_issue` tool is intended only after the agent has **successfully resolved** a general Pharo language/library/tooling pitfall. It takes two concise strings, `problem` and `solution`, and appends one Markdown entry to `~/.pharo-ca/common-issues.md` by default. Project-specific facts, guesses, unresolved failures and ordinary task results must not be recorded.
+
+When reading is enabled, the common-issues file is injected near the beginning of the stable instruction prefix on every run. Only the newest `commonIssues.maxReadCharacters` characters are loaded, so the file may remain an append-only audit trail without consuming unbounded context. The instruction explicitly treats learned entries as hints and requires version-sensitive details to be checked against the live image.
+
+A typical entry is intentionally terse:
+
+```markdown
+- **Problem:** Adjacent keyword messages were parsed as one selector. **Solution:** Parenthesize the first keyword expression before sending the next keyword message.
+```
+
+The tool belongs to the `learning` capability, enabled by the normal `coding` and `full` profiles but not by `read-only`. Set `commonIssues.writeEnabled` to `false` to hide/disable persistent learning, set `commonIssues.readEnabled` to `false` for a clean-room run, or point `commonIssues.path` at a different file for experiments.
+
 ## Tool profiles
 
 The settings schema recognizes these tool profiles:
 
 - `read-only` — inspection and session-management tools only;
-- `coding` — the normal coding-agent profile: inspection, structured coding, testing, refactoring, and Pharo evaluation;
+- `coding` — the normal coding-agent profile: inspection, structured coding, testing, refactoring, Pharo evaluation, and persistent reusable learning;
 - `full` — `coding` plus debugging, destructive, and process-control capabilities.
 
 Since iteration 055, Pharo evaluation is deliberately part of the normal `coding` profile. A coding agent must be able to execute expressions/DoIts while investigating and validating live-image behavior. Use `read-only` when evaluation must be prohibited, and `tools.exclude` when only selected evaluation tools should be removed.
@@ -704,7 +723,7 @@ The tool registry can contain more tools than are advertised to the model on eve
 
 Pack activation is session-scoped and persisted with the session. It changes the schemas advertised on the **next model request**, including the next round of the same running agent. It does not bypass the selected tool profile or explicit `tools.allow`/`tools.exclude` policy.
 
-Iteration 055 also put an explicit context budget around this catalog architecture. In iteration 068 the supplied image still has **143 registered tools** whose parameter schemas total **26,333 serialized JSON characters** before lazy filtering, while the default advertised surface remains **26 definitions / 9,845 serialized characters**. `search_tools` leaves that default surface and live-image `search_classes` moves into `core`, so the count stays flat. Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 26 tools / 10,000 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
+The catalog architecture keeps an explicit context budget. With persistent common-issue learning enabled, the supplied image currently has **146 registered tools** whose parameter schemas total **27,281 serialized JSON characters** before lazy filtering, while the default advertised surface is **27 definitions / 10,341 serialized characters**. The additional eager definition is `remember_common_issue`, because a model must know that the learning channel exists before it can use it after resolving a reusable problem. Regression tests cap an individual parameter schema at 1,000 characters and the default advertised surface at 27 tools / 10,500 serialized characters; large result families must continue to use pagination, caller limits, handles, artifacts, or separate detail tools.
 
 The lazy `browse` pack contains the Pharo-native browsing and structural-search tools. Iteration 048 introduced the pack and iteration 049 expanded it substantially:
 

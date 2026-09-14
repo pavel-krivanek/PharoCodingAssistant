@@ -19,7 +19,7 @@ Class {
 PharoCAToolProfile class >> coding [
 	^ self new
 		name: 'coding';
-		capabilities: #(inspection session coding testing evaluation refactoring);
+		capabilities: #(inspection session coding testing evaluation refactoring learning);
 		yourself
 ]
 
@@ -27,7 +27,7 @@ PharoCAToolProfile class >> coding [
 PharoCAToolProfile class >> full [
 	^ self new
 		name: 'full';
-		capabilities: #(inspection session coding testing evaluation debugging refactoring destructive process);
+		capabilities: #(inspection session coding testing evaluation debugging refactoring destructive process learning);
 		yourself
 ]
 

@@ -1,6 +1,6 @@
 "Disposable headless benchmark worker. The supervisor owns this process and its files.
 Environment variables are supplied by the platform-specific worker launcher."
-| environment repoRoot src taskId outputPath skillMode workspacePath profileRoot verbosity workspace harness runner result probe probeSleep workspaceClass harnessClass runnerClass catalogClass writerClass resourceLoaderClass |
+| environment repoRoot src taskId outputPath skillMode workspacePath profileRoot verbosity commonIssuesRead commonIssuesWrite commonIssuesPath workspace harness runner result probe probeSleep workspaceClass harnessClass runnerClass catalogClass writerClass resourceLoaderClass |
 environment := OSEnvironment current.
 repoRoot := (environment at: 'PCA_BENCH_REPOSITORY') asFileReference.
 taskId := environment at: 'PCA_BENCH_TASK'.
@@ -11,6 +11,9 @@ profileRoot := environment at: 'PCA_BENCH_PROFILE_ROOT' ifAbsent: [ nil ].
 probe := environment at: 'PCA_BENCH_INFRASTRUCTURE_PROBE' ifAbsent: [ '0' ].
 probeSleep := (environment at: 'PCA_BENCH_INFRASTRUCTURE_PROBE_SLEEP_SECONDS' ifAbsent: [ '0' ]) asInteger.
 verbosity := (environment at: 'PCA_BENCH_VERBOSITY' ifAbsent: [ '0' ]) asInteger.
+commonIssuesRead := (environment at: 'PCA_BENCH_COMMON_ISSUES_READ' ifAbsent: [ '1' ]) ~= '0'.
+commonIssuesWrite := (environment at: 'PCA_BENCH_COMMON_ISSUES_WRITE' ifAbsent: [ '1' ]) ~= '0'.
+commonIssuesPath := environment at: 'PCA_BENCH_COMMON_ISSUES_PATH' ifAbsent: [ nil ].
 
 "A tiny process/isolation probe used by infrastructure tests. It deliberately does not load PCA or call an LLM.
 Keep normal worker initialization in the opposite branch: after a saved probe image is restarted,
@@ -49,6 +52,11 @@ probe = '1'
 		harness := harnessClass new workspace: workspace; yourself.
 		profileRoot ifNotNil: [
 			harness resourceLoader: (resourceLoaderClass new globalRoot: profileRoot asFileReference; yourself) ].
+		harness settingOverrideAt: 'commonIssues.readEnabled' put: commonIssuesRead.
+		harness settingOverrideAt: 'commonIssues.writeEnabled' put: commonIssuesWrite.
+		commonIssuesPath ifNotNil: [
+			commonIssuesPath trimBoth isEmpty ifFalse: [
+				harness settingOverrideAt: 'commonIssues.path' put: commonIssuesPath ] ].
 		harness reloadResources.
 		runner := runnerClass on: harness.
 		runner skillMode: skillMode; verbosity: verbosity.

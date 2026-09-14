@@ -33,6 +33,10 @@ PharoCASettingsSchema >> knownKeys [
 		'tools.profile'
 		'tools.allow'
 		'tools.exclude'
+		'commonIssues.readEnabled'
+		'commonIssues.writeEnabled'
+		'commonIssues.path'
+		'commonIssues.maxReadCharacters'
 	)
 ]
 
@@ -58,6 +62,10 @@ PharoCASettingsSchema >> validationErrorForKey: aKey value: value [
 	key = 'tools.profile' ifTrue: [ ^ ((value isString or: [ value isSymbol ]) and: [ #('read-only' 'coding' 'full') includes: value asString asLowercase ]) ifFalse: [ 'Must be read-only, coding, or full' ] ].
 	key = 'tools.allow' ifTrue: [ ^ self validationErrorForToolNameCollection: value ].
 	key = 'tools.exclude' ifTrue: [ ^ self validationErrorForToolNameCollection: value ].
+	key = 'commonIssues.readEnabled' ifTrue: [ ^ (value == true or: [ value == false ]) ifFalse: [ 'Must be a boolean' ] ].
+	key = 'commonIssues.writeEnabled' ifTrue: [ ^ (value == true or: [ value == false ]) ifFalse: [ 'Must be a boolean' ] ].
+	key = 'commonIssues.path' ifTrue: [ ^ (value isNil or: [ value isString ]) ifFalse: [ 'Must be nil or a path string' ] ].
+	key = 'commonIssues.maxReadCharacters' ifTrue: [ ^ (value isInteger and: [ value > 0 ]) ifFalse: [ 'Must be a positive integer' ] ].
 	^ nil
 ]
 

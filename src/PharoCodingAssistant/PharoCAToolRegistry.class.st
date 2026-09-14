@@ -20,7 +20,8 @@ Class {
 		'testRunStoresBySessionId',
 		'transcriptBuffer',
 		'runtimeHandleRegistriesBySessionId',
-		'defaultCatalogRevision'
+		'defaultCatalogRevision',
+		'commonIssuesStore'
 	],
 	#category : 'PharoCodingAssistant-Tools',
 	#package : 'PharoCodingAssistant',
@@ -292,6 +293,14 @@ PharoCAToolRegistry >> environment [
 	^ environment
 ]
 
+{ #category : 'learning' }
+PharoCAToolRegistry >> commonIssuesStore [ ^ commonIssuesStore
+]
+
+{ #category : 'learning' }
+PharoCAToolRegistry >> commonIssuesStore: aStore [ commonIssuesStore := aStore
+]
+
 { #category : 'accessing' }
 PharoCAToolRegistry >> environment: anEnvironment [
 	environment := anEnvironment.
@@ -326,6 +335,7 @@ PharoCAToolRegistry >> executeInvocation: invocation cancellationToken: cancella
 			eventBlock value: #progress value: invocation value: progress ].
 	context
 		environment: (run ifNil: [ environment ] ifNotNil: [ run environment ]);
+		commonIssuesStore: commonIssuesStore;
 		workspace: workspace;
 		workspaceCommandRunner: workspaceCommandRunner;
 		workspaceOutputStore: workspaceOutputStore;
@@ -458,6 +468,7 @@ PharoCAToolRegistry >> executeNamed: aName arguments: arguments context: context
 	validation := self validateArguments: arguments forTool: tool.
 	validation ifNotNil: [ ^ validation ].
 	context environment ifNil: [ context environment: environment ].
+	context commonIssuesStore ifNil: [ context commonIssuesStore: commonIssuesStore ].
 	context workspace ifNil: [ context workspace: workspace ].
 	context workspaceCommandRunner ifNil: [ context workspaceCommandRunner: workspaceCommandRunner ].
 	context workspaceOutputStore ifNil: [ context workspaceOutputStore: workspaceOutputStore ].

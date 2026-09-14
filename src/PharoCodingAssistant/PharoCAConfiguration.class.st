@@ -53,6 +53,7 @@ Smalltalk: unary > binary > keyword; (...) groups, [...] blocks; Points use x @ 
 Link names: [Class](pharo://class/Class), [Class>>selector](pharo://method/Class/instance/selector), [Class class>>selector](pharo://method/Class/class/selector). URL-encode path parts.
 Use live APIs; respect side/package/protocol. Prefer minimal changes/reuse.
 After edits verify tests/inspection; browse only on uncertainty/failure. Prefer structured tools to reflection DoIts; once verified, finish unless a concrete defect remains.
+When remember_common_issue is available, use it only after successfully resolving a reusable general Pharo/library/tooling pitfall; never record project-specific facts, guesses, or unresolved issues.
 Results are bounded/paginated. Do not claim success without evidence'.
 	toolTimeoutMilliseconds := 60000
 ]

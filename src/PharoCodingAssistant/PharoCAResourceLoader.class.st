@@ -50,6 +50,20 @@ PharoCAResourceLoader >> discoverAgentsFileFor: workspace into: resources [
 ]
 
 { #category : 'private-loading' }
+PharoCAResourceLoader >> discoverCommonIssuesUsing: settings into: resources [
+	| store content source |
+	store := PharoCACommonIssuesStore fromSettings: settings globalRoot: globalRoot.
+	store readEnabled ifFalse: [ ^ self ].
+	content := store instructionText.
+	content ifNil: [ ^ self ].
+	source := (PharoCAInstructionSource globalNamed: 'common-issues' content: content)
+		priority: 75;
+		sourcePath: store file fullName;
+		yourself.
+	resources addInstruction: source
+]
+
+{ #category : 'private-loading' }
 PharoCAResourceLoader >> discoverExtensionsAt: file scope: scope trusted: trusted into: resources [
 	| object names |
 	file exists ifFalse: [ ^ self ].
@@ -161,6 +175,10 @@ PharoCAResourceLoader >> initialize [
 		'context.overflowRecoveryAttempts' -> 1.
 		'context.overflowSafetyMarginIncrementTokens' -> 1024.
 		'skill.discoveryCharacterBudget' -> 4000.
+		'commonIssues.readEnabled' -> true.
+		'commonIssues.writeEnabled' -> true.
+		'commonIssues.path' -> nil.
+		'commonIssues.maxReadCharacters' -> 12000.
 		'systemPrompt' -> PharoCAConfiguration new systemPrompt.
 		'context.reservedOutputTokens' -> nil
 	} asDictionary
@@ -209,6 +227,7 @@ PharoCAResourceLoader >> loadForWorkspace: aWorkspace overrides: overrideDiction
 	projectRoot := aWorkspace projectResourceRoot.
 	projectSettings := self loadSettingsAt: projectRoot / 'settings.json' scope: #project into: resources.
 	settings project: projectSettings.
+	self discoverCommonIssuesUsing: settings into: resources.
 	(aWorkspace trusted not and: [ projectSettings notEmpty ]) ifTrue: [
 		resources addDiagnostic: (PharoCAResourceDiagnostic
 			severity: #warning

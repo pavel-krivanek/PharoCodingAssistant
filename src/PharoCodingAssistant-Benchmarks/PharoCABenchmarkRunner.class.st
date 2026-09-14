@@ -63,7 +63,10 @@ PharoCABenchmarkRunner >> effectiveModelConfiguration [
 		'defaultReasoningEffort' -> model defaultReasoningEffort.
 		'metadataSource' -> model metadataSource.
 		'capabilities' -> capabilities.
-		'profileRoot' -> (root ifNil: [ nil ] ifNotNil: [ root fullName ])
+		'profileRoot' -> (root ifNil: [ nil ] ifNotNil: [ root fullName ]).
+		'commonIssues' -> (agent toolRegistry commonIssuesStore
+			ifNil: [ nil ]
+			ifNotNil: [ :store | store asDictionary ])
 	} asDictionary
 ]
 

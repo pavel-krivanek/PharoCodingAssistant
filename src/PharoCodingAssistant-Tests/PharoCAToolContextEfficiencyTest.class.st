@@ -20,6 +20,6 @@ PharoCAToolContextEfficiencyTest >> testDefaultAdvertisedLLMSurfaceStaysWithinBu
 	| registry serialized |
 	registry := PharoCAToolRegistry default.
 	serialized := STONJSON toString: (registry llmDefinitions collect: [ :definition | definition asDictionary ]).
-	self assert: registry llmDefinitions size <= 26 description: 'Keep the default callable surface small; additional tools belong in lazy packs.'.
-	self assert: serialized size <= 10000 description: 'Default tool definitions exceeded the 10K-character context budget.'
+	self assert: registry llmDefinitions size <= 27 description: 'Keep the default callable surface small; additional tools belong in lazy packs.'.
+	self assert: serialized size <= 10500 description: 'Default tool definitions exceeded the 10.5K-character context budget.'
 ]

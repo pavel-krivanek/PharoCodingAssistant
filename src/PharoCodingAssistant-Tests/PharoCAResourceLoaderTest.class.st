@@ -149,3 +149,40 @@ PharoCAResourceLoaderTest >> testResourceSnapshotIsJSONSafeAndDoesNotContainSkil
 	self deny: (json includesSubstring: 'SECRETISH_BODY_NOT_CATALOG').
 	self assert: (STONJSON fromString: json) isDictionary
 ]
+
+{ #category : 'tests' }
+PharoCAResourceLoaderTest >> testCommonIssuesAreLoadedAsGlobalInstructions [
+	| fixture global root workspace loader resources source |
+	fixture := self fixture.
+	global := fixture second.
+	root := fixture third.
+	self write: '# Common Pharo issues', String lf, '- **Problem:** P **Solution:** S' to: global / 'common-issues.md'.
+	workspace := PharoCAWorkspace rootedAt: root.
+	loader := PharoCAResourceLoader new globalRoot: global; yourself.
+	resources := loader loadForWorkspace: workspace.
+	source := resources instructions detect: [ :each | each name = 'common-issues' ].
+	self assert: source kind equals: #global.
+	self assert: source priority equals: 75.
+	self assert: (source content includesSubstring: '**Problem:** P').
+	self assert: source sourcePath equals: (global / 'common-issues.md') fullName
+]
+
+{ #category : 'tests' }
+PharoCAResourceLoaderTest >> testCommonIssuesReadingCanBeDisabledOrRedirected [
+	| fixture global root workspace loader resources |
+	fixture := self fixture.
+	global := fixture second.
+	root := fixture third.
+	self write: '- **Problem:** default **Solution:** default' to: global / 'common-issues.md'.
+	self write: '- **Problem:** alternate **Solution:** alternate' to: global / 'alternate.md'.
+	workspace := PharoCAWorkspace rootedAt: root.
+	loader := PharoCAResourceLoader new globalRoot: global; yourself.
+	resources := loader loadForWorkspace: workspace overrides: ({
+		'commonIssues.readEnabled' -> false
+	} asDictionary).
+	self deny: (resources instructions anySatisfy: [ :each | each name = 'common-issues' ]).
+	resources := loader loadForWorkspace: workspace overrides: ({
+		'commonIssues.path' -> 'alternate.md'
+	} asDictionary).
+	self assert: ((resources instructions detect: [ :each | each name = 'common-issues' ]) content includesSubstring: 'alternate')
+]

@@ -63,8 +63,11 @@ PharoCACodingHarness >> applyEffectiveSettings [ self applyEffectiveSettingsTo: 
 
 { #category : 'private-settings' }
 PharoCACodingHarness >> applyEffectiveSettingsTo: anAgent [
-	| settings |
+	| settings commonIssuesStore |
 	settings := resources settings.
+	commonIssuesStore := PharoCACommonIssuesStore fromSettings: settings globalRoot: resourceLoader globalRoot.
+	anAgent toolRegistry commonIssuesStore: commonIssuesStore.
+	commonIssuesStore writeEnabled ifFalse: [ anAgent toolRegistry excludeToolNamed: #remember_common_issue ].
 	self applySetting: 'maxIterations' from: settings do: [ :value | anAgent configuration maxIterations: value ].
 	self applySetting: 'timeout' from: settings do: [ :value | anAgent configuration timeout: value ].
 	self applySetting: 'temperature' from: settings do: [ :value | anAgent configuration temperature: value ].
