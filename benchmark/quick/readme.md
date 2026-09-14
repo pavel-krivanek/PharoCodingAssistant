@@ -1,8 +1,12 @@
-I prepared the single Windows driver script:
+```
+powershell.exe -ExecutionPolicy Bypass `
+  -File .\run-pca-benchmark.ps1 `
+  -Mode Smoke `
+  -ModelId ornith-1.5-35b-a3b `
+  -SkillModes preloaded `
+  -Verbosity 3
+```
 
-[Download `run-pca-benchmark.ps1`](sandbox:/mnt/data/run-pca-benchmark.ps1)
-
-SHA-256: `81f921144c8ec48cea2ca725e0ba097b9efff35e5cb0f3639d1e1053790243b3`
 
 It assumes exactly this layout:
 
