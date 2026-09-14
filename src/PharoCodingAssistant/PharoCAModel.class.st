@@ -7,6 +7,8 @@ Class {
 	#instVars : [
 		'name',
 		'contextSize',
+		'maximumContextSize',
+		'contextSizeSource',
 		'maximumOutputTokens',
 		'supportsTools',
 		'supportsParallelToolCalls',
@@ -15,6 +17,9 @@ Class {
 		'supportsUsageStreaming',
 		'supportsImages',
 		'supportsSystemMessages',
+		'reasoningEfforts',
+		'defaultReasoningEffort',
+		'metadataSource',
 		'tokenEstimator'
 	],
 	#category : 'PharoCodingAssistant-LLM',
@@ -34,7 +39,12 @@ PharoCAModel >> asDictionary [
 	^ {
 		'name' -> name.
 		'contextSize' -> contextSize.
+		'maximumContextSize' -> maximumContextSize.
+		'contextSizeSource' -> contextSizeSource.
 		'maximumOutputTokens' -> maximumOutputTokens.
+		'reasoningEfforts' -> reasoningEfforts copy.
+		'defaultReasoningEffort' -> defaultReasoningEffort.
+		'metadataSource' -> metadataSource.
 		'capabilities' -> self capabilities
 	} asDictionary
 ]
@@ -62,10 +72,32 @@ PharoCAModel >> contextSize: anIntegerOrNil [
 	contextSize := anIntegerOrNil
 ]
 
+{ #category : 'accessing' }
+PharoCAModel >> contextSizeSource [
+	^ contextSizeSource
+]
+
+{ #category : 'accessing' }
+PharoCAModel >> contextSizeSource: aStringOrNil [
+	contextSizeSource := aStringOrNil ifNotNil: [ aStringOrNil asString ]
+]
+
+{ #category : 'reasoning' }
+PharoCAModel >> defaultReasoningEffort [
+	^ defaultReasoningEffort
+]
+
+{ #category : 'reasoning' }
+PharoCAModel >> defaultReasoningEffort: aStringOrSymbolOrNil [
+	defaultReasoningEffort := aStringOrSymbolOrNil ifNotNil: [ aStringOrSymbolOrNil asString ]
+]
+
 { #category : 'initialization' }
 PharoCAModel >> initialize [
 	super initialize.
 	contextSize := nil.
+	maximumContextSize := nil.
+	contextSizeSource := nil.
 	maximumOutputTokens := nil.
 	supportsTools := true.
 	supportsParallelToolCalls := true.
@@ -74,7 +106,20 @@ PharoCAModel >> initialize [
 	supportsUsageStreaming := true.
 	supportsImages := false.
 	supportsSystemMessages := true.
+	reasoningEfforts := #().
+	defaultReasoningEffort := nil.
+	metadataSource := nil.
 	tokenEstimator := nil
+]
+
+{ #category : 'accessing' }
+PharoCAModel >> maximumContextSize [
+	^ maximumContextSize
+]
+
+{ #category : 'accessing' }
+PharoCAModel >> maximumContextSize: anIntegerOrNil [
+	maximumContextSize := anIntegerOrNil
 ]
 
 { #category : 'accessing' }
@@ -88,6 +133,16 @@ PharoCAModel >> maximumOutputTokens: anIntegerOrNil [
 ]
 
 { #category : 'accessing' }
+PharoCAModel >> metadataSource [
+	^ metadataSource
+]
+
+{ #category : 'accessing' }
+PharoCAModel >> metadataSource: aStringOrNil [
+	metadataSource := aStringOrNil ifNotNil: [ aStringOrNil asString ]
+]
+
+{ #category : 'accessing' }
 PharoCAModel >> name [
 	^ name
 ]
@@ -95,6 +150,48 @@ PharoCAModel >> name [
 { #category : 'accessing' }
 PharoCAModel >> name: aString [
 	name := aString
+]
+
+{ #category : 'reasoning' }
+PharoCAModel >> normalizedReasoningEffort: anObject [
+	| value |
+	anObject ifNil: [ ^ nil ].
+	value := anObject asString trimBoth asLowercase.
+	(value = 'provider-default' or: [ value isEmpty ]) ifTrue: [ ^ nil ].
+	(value = 'none' and: [ reasoningEfforts includes: 'off' ]) ifTrue: [ value := 'off' ].
+	reasoningEfforts isEmpty ifTrue: [ ^ value asSymbol ].
+	(reasoningEfforts includes: value) ifFalse: [
+		Error signal: 'Reasoning effort ', value, ' is not supported by model ', name,
+			'. Allowed values: ', (', ' join: reasoningEfforts) ].
+	^ value asSymbol
+]
+
+{ #category : 'reasoning' }
+PharoCAModel >> reasoningEfforts [
+	^ reasoningEfforts
+]
+
+{ #category : 'reasoning' }
+PharoCAModel >> reasoningEfforts: aCollectionOrNil [
+	| normalized |
+	aCollectionOrNil ifNil: [ reasoningEfforts := #(). ^ self ].
+	normalized := OrderedCollection new.
+	aCollectionOrNil do: [ :each |
+		| value |
+		value := each asString trimBoth asLowercase.
+		(value isNotEmpty and: [ (normalized includes: value) not ]) ifTrue: [ normalized add: value ] ].
+	reasoningEfforts := normalized asArray
+]
+
+{ #category : 'reasoning' }
+PharoCAModel >> supportsReasoningEffort: anObject [
+	| normalized |
+	anObject ifNil: [ ^ true ].
+	supportsReasoning ifFalse: [ ^ false ].
+	reasoningEfforts isEmpty ifTrue: [ ^ true ].
+	normalized := anObject asString trimBoth asLowercase.
+	(normalized = 'none' and: [ reasoningEfforts includes: 'off' ]) ifTrue: [ normalized := 'off' ].
+	^ reasoningEfforts includes: normalized
 ]
 
 { #category : 'capabilities' }

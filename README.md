@@ -130,13 +130,13 @@ localModels collect: [ :each | each name ].
 harness setModelNamed: 'the-model-id-returned-by-the-provider' forAgentId: 'default'.
 ```
 
-`discoverModelsFromProviderNamed:` is safe to call again. It adds newly visible models and can fill numeric metadata that was previously unknown. It does **not** replace explicit context/output settings already present on a registered model. If a discovered ID is already registered against another provider, the result reports it under `conflicts` rather than silently changing ownership.
+`discoverModelsFromProviderNamed:` is safe to call again. It adds newly visible models and refreshes provider-authoritative metadata. An explicit configured context remains untouched when discovery only knows a model maximum, but an **actually loaded** LM Studio instance is authoritative: if LM Studio reports that the selected instance is loaded with a different `context_length`, PCA updates the effective context to that value. If a discovered ID is already registered against another provider, the result reports it under `conflicts` rather than silently changing ownership.
 
 The returned summary contains `added`, `updated`, `unchanged`, `conflicts`, and `discoveredCount`.
 
 ### Override metadata after discovery
 
-The standard OpenAI Models API guarantees model IDs but does not guarantee context-window or capability metadata. OpenAI-compatible local servers may expose more. llama.cpp, for example, includes model metadata in `/v1/models`; when numeric context metadata is present PharoCodingAssistant imports it. If the provider does not report a value, or you want to use a different effective runtime limit, set it explicitly:
+The standard OpenAI Models API guarantees model IDs but does not guarantee context-window or capability metadata. OpenAI-compatible local servers may expose more. For **LM Studio**, PCA now augments `/v1/models` with LM Studio's native `/api/v1/models` metadata automatically. This provides the loaded instance's effective context, the model maximum, vision/tool capability hints, and the model-specific public reasoning options/default. PCA also refreshes this native metadata before requests while the model has not yet been observed as a loaded instance, so an auto-loaded model can converge from its architectural maximum to the actual runtime context after loading. For other providers PCA continues to consume whatever metadata their model-list endpoint exposes. If no usable value is reported, or you intentionally want a different effective runtime limit, set it explicitly:
 
 ```smalltalk
 | model |
@@ -150,7 +150,7 @@ model
 harness saveRuntimeProfile.
 ```
 
-Explicit values survive later discovery runs.
+Explicit values survive later discovery runs unless the provider can report a more authoritative **loaded-instance** runtime value.
 
 Discovery is intentionally conservative about behavioral capabilities. A generic OpenAI-compatible model-list response is enough to register the model ID, but it is **not** treated as proof that reasoning, reasoning streaming, usage streaming, image input, or parallel tool calls are supported. Those flags remain conservative unless the adapter can derive them from explicit provider metadata or you override the discovered `PharoCAModel` yourself. This prevents auto-discovery from enabling request shapes that an otherwise OpenAI-compatible server does not implement.
 
@@ -481,31 +481,30 @@ If the setup code can be executed repeatedly in the same image, guard agent crea
 
 ## Reasoning effort
 
-Each agent has its own reasoning-effort value:
+Each agent has its own reasoning-effort value, but PCA no longer assumes a universal list such as `low/medium/high/max`. Reasoning modes belong to the **selected model/provider**. When LM Studio exposes native model metadata, PCA imports that model's `reasoning.allowed_options` and `reasoning.default`; the web UI and `/reasoning` completion are built from those values dynamically.
+
+For example, one model may advertise only `off/on`, while another may advertise `off/low/medium/high`. The model descriptor exposes this as:
 
 ```smalltalk
-(harness agentNamed: 'default') reasoningEffort: #medium.
-(harness agentNamed: 'reviewer') reasoningEffort: #high.
+model reasoningEfforts.
+model defaultReasoningEffort.
 ```
 
-Supported UI values are:
-
-- provider default (`nil` internally);
-- `#none`;
-- `#low`;
-- `#medium`;
-- `#high`;
-- `#max`.
-
-The request field is only emitted when the selected model advertises `supportsReasoning` and the agent's effort is not `nil`.
-
-Use `nil` to omit the generic reasoning-effort field and let the provider choose its default:
+Provider/model default is the safe default (`nil` internally):
 
 ```smalltalk
 harness agent reasoningEffort: nil.
 ```
 
-The browser exposes the same control, and `/reasoning` provides command-line-style access.
+To select a specific advertised mode:
+
+```smalltalk
+harness agent reasoningEffort: #medium.
+```
+
+The external protocol validates requested values against the selected model and rejects unsupported choices. When the selected model changes, an incompatible previously selected effort is reconciled to the newly advertised default (or provider default if no model default is available). Legacy `none` is normalized to `off` when the model advertises `off`.
+
+The request field is emitted only when the selected model advertises reasoning support and a non-default effort is selected. The browser exposes the same model-specific control, and `/reasoning` completion shows only `provider-default` plus the selected model's advertised options.
 
 ## Persistent runtime configuration
 
@@ -1078,7 +1077,7 @@ The current built-in command set includes:
 /models
 /model [modelId]
 /skills
-/reasoning [provider-default|none|low|medium|high|max]
+/reasoning [provider-default|MODEL-OPTION]
 /max-iterations [off|N]
 /checkpoint [label]
 /checkpoints
@@ -1088,7 +1087,7 @@ The root `/` completion is queried from the server rather than being hard-coded 
 
 ## Context and token telemetry
 
-For useful context-fill information, configure `PharoCAModel>>contextSize:` accurately.
+For useful context-fill information PCA uses `PharoCAModel>>contextSize`. With current LM Studio, model discovery fills this automatically from the **loaded instance** context and separately records `maximumContextSize`; manual configuration is needed only when the provider does not expose usable metadata or when you intentionally override it.
 
 The UI distinguishes:
 

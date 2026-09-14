@@ -127,14 +127,18 @@ PharoCAExternalProtocol >> agentsSetModel: params [
 
 { #category : 'agents' }
 PharoCAExternalProtocol >> agentsSetReasoningEffort: params [
-	| identifier effort agent |
+	| identifier effort agent normalized |
 	identifier := self agentIdentifierFromParams: params required: true.
 	effort := params at: 'reasoningEffort' ifAbsent: [
 		PharoCAProtocolError code: 'invalid_params' message: 'Missing parameter: reasoningEffort' ].
 	(effort isNil or: [ effort isString and: [ effort trimBoth isNotEmpty ] ]) ifFalse: [
 		PharoCAProtocolError code: 'invalid_params' message: 'reasoningEffort must be a non-empty string or null' ].
 	agent := harness agentManager agentNamed: identifier.
-	agent reasoningEffort: (effort ifNil: [ nil ] ifNotNil: [ effort trimBoth asSymbol ]).
+	[
+		normalized := agent model normalizedReasoningEffort: effort.
+		agent reasoningEffort: normalized
+	] on: Error do: [ :error |
+		PharoCAProtocolError code: 'invalid_params' message: error messageText ].
 	^ self agentDescriptorNamed: identifier
 ]
 
@@ -324,15 +328,20 @@ PharoCAExternalProtocol >> commandCompletionSuggestionsForLine: line params: par
 	commandName := (body copyFrom: 1 to: separator - 1) asLowercase.
 	argumentPrefix := (body copyFrom: separator + 1 to: body size) trimBoth asLowercase.
 	commandName = 'reasoning' ifTrue: [
+		| selectedModel reasoningOptions |
 		agentId := self agentIdentifierFromParams: params required: false.
-		candidates := #('provider-default' 'none' 'low' 'medium' 'high' 'max') select: [ :value |
+		selectedModel := (harness agentManager agentNamed: agentId) model.
+		reasoningOptions := selectedModel reasoningEfforts.
+		candidates := ({ 'provider-default' }, reasoningOptions) select: [ :value |
 			value beginsWith: argumentPrefix ].
 		^ (candidates collect: [ :value |
 			{
 				'kind' -> 'reasoning'.
 				'completion' -> ('/reasoning ', value).
 				'label' -> value.
-				'description' -> ((value = 'provider-default') ifTrue: [ 'omit reasoning_effort from requests' ] ifFalse: [ 'reasoning effort for current agent' ])
+				'description' -> ((value = 'provider-default')
+					ifTrue: [ 'let the provider/model choose its default reasoning mode' ]
+					ifFalse: [ 'reasoning mode advertised by the selected model' ])
 			} asDictionary ]) asArray ].
 	commandName = 'max-iterations' ifTrue: [
 		candidates := #('off' 'unlimited') select: [ :value | value beginsWith: argumentPrefix ].
@@ -903,7 +912,7 @@ PharoCAExternalProtocol >> registerDefaultCommands [
 						self agentsSetModel: p ] ] ]).
 	commandRegistry register: (PharoCACommand named: 'skills' description: 'List skills available to the current agent' usage: '/skills' handler: [ :params |
 		self skillsList: params ]).
-	commandRegistry register: (PharoCACommand named: 'reasoning' description: 'Show or select reasoning effort for the current agent' usage: '/reasoning [provider-default|none|low|medium|high|max]' handler: [ :params |
+	commandRegistry register: (PharoCACommand named: 'reasoning' description: 'Show or select reasoning effort for the current agent' usage: '/reasoning [provider-default|MODEL-OPTION]' handler: [ :params |
 		| argument agentId p |
 		argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
 		agentId := self agentIdentifierFromParams: params required: false.

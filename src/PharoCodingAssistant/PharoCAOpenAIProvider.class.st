@@ -53,7 +53,154 @@ PharoCAOpenAIProvider >> credentialResolver: aResolver [ credentialResolver := a
 
 { #category : 'model-discovery' }
 PharoCAOpenAIProvider >> discoverModels [
-	^ self modelsFromWireList: self fetchModelListDictionary
+	| models native |
+	models := self modelsFromWireList: self fetchModelListDictionary.
+	native := self fetchNativeModelMetadataDictionaryIfAvailable.
+	native ifNotNil: [ self enrichModels: models fromNativeModelList: native ].
+	^ models
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> applyNativeCapabilities: capabilities toModel: model [
+	| reasoning options default |
+	capabilities isDictionary ifFalse: [ ^ self ].
+	(capabilities at: 'vision' ifAbsent: [ nil ]) ifNotNil: [ :value |
+		(value = true or: [ value = false ]) ifTrue: [ model supportsImages: value ] ].
+	(capabilities at: 'trained_for_tool_use' ifAbsent: [ nil ]) ifNotNil: [ :value |
+		(value = true or: [ value = false ]) ifTrue: [ model supportsTools: value ] ].
+	reasoning := capabilities at: 'reasoning' ifAbsent: [ nil ].
+	reasoning isDictionary
+		ifFalse: [
+			model
+			reasoningEfforts: #();
+			defaultReasoningEffort: nil;
+			supportsReasoning: false;
+			supportsReasoningStreaming: false ]
+		ifTrue: [
+			options := reasoning at: 'allowed_options' ifAbsent: [ #() ].
+			(options isArray or: [ options isKindOf: SequenceableCollection ]) ifFalse: [ options := #() ].
+			default := reasoning at: 'default' ifAbsent: [ nil ].
+			model
+				reasoningEfforts: options;
+				defaultReasoningEffort: default;
+				supportsReasoning: options notEmpty;
+				supportsReasoningStreaming: options notEmpty ]
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> applyNativeModelDescriptor: descriptor matchingInstance: instance toModel: model [
+	| maximum context config capabilities |
+	maximum := self positiveIntegerFromModelDescriptor: descriptor keys: #('max_context_length').
+	model maximumContextSize: maximum.
+	instance ifNotNil: [
+		config := instance at: 'config' ifAbsent: [ nil ].
+		config isDictionary ifTrue: [ context := self positiveIntegerFromModelDescriptor: config keys: #('context_length') ] ].
+	context
+		ifNil: [
+			maximum ifNotNil: [
+				model
+					contextSize: maximum;
+					contextSizeSource: 'model-maximum' ] ]
+		ifNotNil: [
+			model
+				contextSize: context;
+				contextSizeSource: 'loaded-instance' ].
+	capabilities := descriptor at: 'capabilities' ifAbsent: [ nil ].
+	self applyNativeCapabilities: capabilities toModel: model.
+	model metadataSource: 'lmstudio-native-v1'
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> enrichModels: models fromNativeModelList: aDictionary [
+	| nativeModels |
+	aDictionary isDictionary ifFalse: [ ^ self ].
+	nativeModels := aDictionary at: 'models' ifAbsent: [ ^ self ].
+	(nativeModels isArray or: [ nativeModels isKindOf: SequenceableCollection ]) ifFalse: [ ^ self ].
+	models do: [ :model |
+		| match descriptor instance |
+		match := self nativeModelAndInstanceMatching: model name in: nativeModels.
+		match ifNotNil: [
+			descriptor := match first.
+			instance := match second.
+			self applyNativeModelDescriptor: descriptor matchingInstance: instance toModel: model ] ]
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> fetchNativeModelMetadataDictionaryIfAvailable [
+	| client code apiKey body object |
+	client := ZnClient new.
+	[
+		[
+			client timeout: (timeout min: 10); url: self nativeModelListUrl.
+			apiKey := credentialResolver resolve: credentialName.
+			apiKey ifNotNil: [ client headerAt: 'Authorization' put: 'Bearer ', apiKey ].
+			client get.
+			code := client response code.
+			(code between: 200 and: 299) ifFalse: [ ^ nil ].
+			body := [ client response entity contents ] on: Error do: [ :error | ^ nil ].
+			object := [ STONJSON fromString: body ] on: Error do: [ :error | ^ nil ].
+			(object isDictionary and: [ object includesKey: 'models' ]) ifFalse: [ ^ nil ].
+			^ object
+		] on: Error do: [ :error | ^ nil ]
+	] ensure: [ [ client close ] on: Error do: [ :error | ] ]
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> refreshRuntimeMetadataForModel: model [
+	| native nativeModels match previousContext previousSource |
+	native := self fetchNativeModelMetadataDictionaryIfAvailable.
+	native ifNil: [ ^ false ].
+	nativeModels := native at: 'models' ifAbsent: [ ^ false ].
+	(nativeModels isArray or: [ nativeModels isKindOf: SequenceableCollection ]) ifFalse: [ ^ false ].
+	match := self nativeModelAndInstanceMatching: model name in: nativeModels.
+	match ifNil: [ ^ false ].
+	previousContext := model contextSize.
+	previousSource := model contextSizeSource.
+	self applyNativeModelDescriptor: match first matchingInstance: match second toModel: model.
+	"A model maximum is useful as a fallback for an unconfigured model, but it must not silently replace an explicit effective context. A loaded instance is authoritative."
+	(match second isNil and: [ previousContext notNil ]) ifTrue: [
+		model
+			contextSize: previousContext;
+			contextSizeSource: previousSource ].
+	^ true
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> nativeModelAndInstanceMatching: modelIdentifier in: nativeModels [
+	| wanted |
+	wanted := modelIdentifier asString.
+	nativeModels do: [ :descriptor |
+		| instances exactInstance key variants selected descriptorMatches instance |
+		descriptor isDictionary ifTrue: [
+			instances := descriptor at: 'loaded_instances' ifAbsent: [ #() ].
+			(instances isArray or: [ instances isKindOf: SequenceableCollection ]) ifFalse: [ instances := #() ].
+			exactInstance := instances detect: [ :each |
+				each isDictionary and: [ (each at: 'id' ifAbsent: [ '' ]) asString = wanted ] ] ifNone: [ nil ].
+			exactInstance ifNotNil: [ ^ { descriptor. exactInstance } ].
+			key := (descriptor at: 'key' ifAbsent: [ '' ]) asString.
+			selected := (descriptor at: 'selected_variant' ifAbsent: [ '' ]) asString.
+			variants := descriptor at: 'variants' ifAbsent: [ #() ].
+			(variants isArray or: [ variants isKindOf: SequenceableCollection ]) ifFalse: [ variants := #() ].
+			descriptorMatches := key = wanted
+				or: [ selected = wanted
+				or: [ variants anySatisfy: [ :each | each asString = wanted ] ] ].
+			descriptorMatches ifTrue: [
+				instance := instances size = 1 ifTrue: [ instances first ] ifFalse: [ nil ].
+				^ { descriptor. instance } ] ] ].
+	^ nil
+]
+
+{ #category : 'model-discovery-native' }
+PharoCAOpenAIProvider >> nativeModelListUrl [
+	| marker index root |
+	marker := '/v1/'.
+	index := baseUrl findString: marker startingAt: 1.
+	index > 0 ifTrue: [
+		root := baseUrl copyFrom: 1 to: index - 1.
+		^ root, '/api/v1/models' ].
+	(baseUrl endsWith: '/v1') ifTrue: [ ^ (baseUrl allButLast: 3), '/api/v1/models' ].
+	(baseUrl endsWith: '/') ifTrue: [ ^ baseUrl, 'api/v1/models' ].
+	^ baseUrl, '/api/v1/models'
 ]
 
 { #category : 'model-discovery-private' }
@@ -198,7 +345,7 @@ PharoCAOpenAIProvider >> responseFromWireCompletion: aDictionary [
 	message := PharoCALLMMessage
 		assistant: (wireMessage at: 'content' ifAbsent: [ '' ])
 		toolCalls: calls
-		reasoning: (wireMessage at: 'reasoning_content' ifAbsent: [ '' ]).
+		reasoning: (wireMessage at: 'reasoning_content' ifAbsent: [ wireMessage at: 'reasoning' ifAbsent: [ '' ] ]).
 	finish := self normalizedFinishReason: (choice at: 'finish_reason' ifAbsent: [ nil ]).
 	usageObject := (aDictionary at: 'usage' ifAbsent: [ nil ]) ifNotNil: [ :wireUsage | self usageFromWire: wireUsage ].
 	^ PharoCALLMResponse message: message finishReason: finish usage: usageObject

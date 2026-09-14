@@ -165,3 +165,137 @@ PharoCARuntimeTest >> testDiscoveryReportsModelIdentifierOwnedByAnotherProviderA
 	self assert: (summary at: 'conflicts') equals: #('shared-model').
 	self assert: (harness modelRegistry providerIdentifierForModelNamed: 'shared-model') equals: 'first'
 ]
+
+{ #category : 'tests-057' }
+PharoCARuntimeTest >> testOpenAICompatibleDiscoveryEnrichesFromLMStudioNativeMetadata [
+	| provider models model native |
+	provider := PharoCAOpenAIProvider new.
+	models := provider modelsFromWireList: ({
+		'data' -> { { 'id' -> 'qwen3.8-27b'. 'object' -> 'model' } asDictionary }
+	} asDictionary).
+	native := {
+		'models' -> { {
+			'type' -> 'llm'.
+			'key' -> 'publisher/qwen3.8-27b-gguf'.
+			'max_context_length' -> 262144.
+			'loaded_instances' -> { {
+				'id' -> 'qwen3.8-27b'.
+				'config' -> ({ 'context_length' -> 196608 } asDictionary)
+			} asDictionary }.
+			'capabilities' -> ({
+				'vision' -> false.
+				'trained_for_tool_use' -> true.
+				'reasoning' -> ({
+					'allowed_options' -> #('off' 'low' 'medium' 'high').
+					'default' -> 'medium'
+				} asDictionary)
+			} asDictionary)
+		} asDictionary }
+	} asDictionary.
+	provider enrichModels: models fromNativeModelList: native.
+	model := models first.
+	self assert: model contextSize equals: 196608.
+	self assert: model maximumContextSize equals: 262144.
+	self assert: model contextSizeSource equals: 'loaded-instance'.
+	self assert: model metadataSource equals: 'lmstudio-native-v1'.
+	self assert: model supportsTools.
+	self deny: model supportsImages.
+	self assert: model supportsReasoning.
+	self assert: model supportsReasoningStreaming.
+	self assert: model reasoningEfforts equals: #('off' 'low' 'medium' 'high').
+	self assert: model defaultReasoningEffort equals: 'medium'
+]
+
+{ #category : 'tests-057' }
+PharoCARuntimeTest >> testLMStudioNativeMetadataUsesMaximumContextWhenModelIsNotLoaded [
+	| provider models model native |
+	provider := PharoCAOpenAIProvider new.
+	models := provider modelsFromWireList: ({
+		'data' -> { { 'id' -> 'model-key'. 'object' -> 'model' } asDictionary }
+	} asDictionary).
+	native := {
+		'models' -> { {
+			'type' -> 'llm'.
+			'key' -> 'model-key'.
+			'max_context_length' -> 131072.
+			'loaded_instances' -> #().
+			'capabilities' -> ({ 'vision' -> false. 'trained_for_tool_use' -> true } asDictionary)
+		} asDictionary }
+	} asDictionary.
+	provider enrichModels: models fromNativeModelList: native.
+	model := models first.
+	self assert: model contextSize equals: 131072.
+	self assert: model maximumContextSize equals: 131072.
+	self assert: model contextSizeSource equals: 'model-maximum'.
+	self deny: model supportsReasoning.
+	self assert: model reasoningEfforts isEmpty
+]
+
+{ #category : 'tests-057' }
+PharoCARuntimeTest >> testDiscoveryRefreshesAuthoritativeLoadedContextAndReasoningMetadata [
+	| registry existing discovered summary |
+	registry := PharoCAModelRegistry new.
+	existing := PharoCAModel named: 'live-model'.
+	existing contextSize: 65536; supportsReasoning: false.
+	registry register: existing provider: 'lmstudio'.
+	discovered := PharoCAModel named: 'live-model'.
+	discovered
+		contextSize: 196608;
+		maximumContextSize: 262144;
+		contextSizeSource: 'loaded-instance';
+		metadataSource: 'lmstudio-native-v1';
+		supportsReasoning: true;
+		supportsReasoningStreaming: true;
+		reasoningEfforts: #('off' 'on');
+		defaultReasoningEffort: 'on'.
+	summary := registry registerDiscoveredModels: { discovered } provider: 'lmstudio'.
+	self assert: (summary at: 'updated') equals: #('live-model').
+	self assert: existing contextSize equals: 196608.
+	self assert: existing maximumContextSize equals: 262144.
+	self assert: existing reasoningEfforts equals: #('off' 'on').
+	self assert: existing defaultReasoningEffort equals: 'on'.
+	self assert: existing supportsReasoning
+]
+
+{ #category : 'tests-057' }
+PharoCARuntimeTest >> testLMStudioNativeMetadataUrlIsDerivedFromOpenAIEndpoint [
+	| provider |
+	provider := PharoCAOpenAIProvider new
+		baseUrl: 'http://127.0.0.1:1234/v1/chat/completions';
+		yourself.
+	self assert: provider nativeModelListUrl equals: 'http://127.0.0.1:1234/api/v1/models'
+]
+
+{ #category : 'tests-057' }
+PharoCARuntimeTest >> testSelectingModelReconcilesUnsupportedReasoningEffortToAdvertisedDefault [
+	| harness model |
+	harness := PharoCACodingHarness new.
+	model := PharoCAModel named: 'reasoning-switch'.
+	model
+		reasoningEfforts: #('off' 'on');
+		defaultReasoningEffort: 'on';
+		supportsReasoning: true.
+	harness modelRegistry register: model provider: 'openai-compatible'.
+	harness agent reasoningEffort: #high.
+	harness setModelNamed: 'reasoning-switch' forAgentId: 'default'.
+	self assert: harness agent reasoningEffort equals: #on
+]
+
+{ #category : 'tests-057' }
+PharoCARuntimeTest >> testDiscoveryPreservesExplicitContextWhenOnlyModelMaximumIsKnown [
+	| registry existing discovered |
+	registry := PharoCAModelRegistry new.
+	existing := PharoCAModel named: 'configured-model'.
+	existing contextSize: 65536; contextSizeSource: 'manual'.
+	registry register: existing provider: 'lmstudio'.
+	discovered := PharoCAModel named: 'configured-model'.
+	discovered
+		contextSize: 262144;
+		maximumContextSize: 262144;
+		contextSizeSource: 'model-maximum';
+		metadataSource: 'lmstudio-native-v1'.
+	registry registerDiscoveredModels: { discovered } provider: 'lmstudio'.
+	self assert: existing contextSize equals: 65536.
+	self assert: existing contextSizeSource equals: 'manual'.
+	self assert: existing maximumContextSize equals: 262144
+]

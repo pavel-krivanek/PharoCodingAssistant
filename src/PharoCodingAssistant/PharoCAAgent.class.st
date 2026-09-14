@@ -278,7 +278,7 @@ PharoCAAgent >> extensionRegistry: aRegistry [
 { #category : 'initialization' }
 PharoCAAgent >> initialize [
 	super initialize.
-	reasoningEffort := #high.
+	reasoningEffort := nil.
 	configuration := PharoCAConfiguration new.
 	model := PharoCAModel named: configuration modelName.
 	provider := PharoCAOpenAIProvider new
@@ -479,6 +479,13 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 		[
 			[
 				recoverOverflow := false.
+				((activeProvider respondsTo: #refreshRuntimeMetadataForModel:)
+					and: [ activeModel metadataSource ~= 'lmstudio-native-v1'
+						or: [ activeModel contextSizeSource ~= 'loaded-instance' ] ]) ifTrue: [
+					[ activeProvider refreshRuntimeMetadataForModel: activeModel ]
+						on: Error
+						do: [ :error | ].
+					activeModel == model ifTrue: [ self reconcileReasoningEffortWithModel ] ].
 				context := contextBuilder
 					buildForMessages: contextMessages
 					tools: tools
@@ -732,7 +739,7 @@ PharoCAAgent >> requestForContext: aContext tools: tools model: aModel [
 		temperature: configuration temperature;
 		yourself.
 	(aModel supportsTools and: [ tools notEmpty ]) ifTrue: [ request toolDefinitions: tools; toolChoice: #auto ].
-	(aModel supportsReasoning and: [ self reasoningEffort notNil ]) ifTrue: [ request reasoningEffort: self reasoningEffort ].
+	(aModel supportsReasoning and: [ self reasoningEffort notNil ]) ifTrue: [ request reasoningEffort: (aModel normalizedReasoningEffort: self reasoningEffort) ].
 	aContext reservedOutputTokens > 0 ifTrue: [ request maxOutputTokens: aContext reservedOutputTokens ].
 	^ request
 ]
@@ -948,12 +955,25 @@ PharoCAAgent >> unregisterActiveRun: aRun [
 	^ aRun
 ]
 
+{ #category : 'configuration-private' }
+PharoCAAgent >> reconcileReasoningEffortWithModel [
+	reasoningEffort ifNil: [ ^ self ].
+	model supportsReasoning ifFalse: [ reasoningEffort := nil. ^ self ].
+	(model supportsReasoningEffort: reasoningEffort) ifTrue: [
+		reasoningEffort := model normalizedReasoningEffort: reasoningEffort.
+		^ self ].
+	model defaultReasoningEffort
+		ifNil: [ reasoningEffort := nil ]
+		ifNotNil: [ :value | reasoningEffort := value asSymbol ]
+]
+
 { #category : 'configuration' }
 PharoCAAgent >> useModelNamed: modelIdentifier providerRegistry: providerRegistry modelRegistry: modelRegistry [
 	| providerIdentifier |
 	providerIdentifier := modelRegistry providerIdentifierForModelNamed: modelIdentifier.
 	self model: (modelRegistry modelNamed: modelIdentifier).
 	self provider: (providerRegistry providerNamed: providerIdentifier).
+	self reconcileReasoningEffortWithModel.
 	^ self
 ]
 

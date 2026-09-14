@@ -82,7 +82,8 @@ PharoCACodingHarness >> applyEffectiveSettingsTo: anAgent [
 	self applySetting: 'tools.allow' from: settings do: [ :value | anAgent toolRegistry allowToolsNamed: value ].
 	self applySetting: 'tools.exclude' from: settings do: [ :value | anAgent toolRegistry excludeToolsNamed: value ].
 	self applySetting: 'model' from: settings do: [ :value |
-		anAgent useModelNamed: value providerRegistry: providerRegistry modelRegistry: modelRegistry ]
+		anAgent useModelNamed: value providerRegistry: providerRegistry modelRegistry: modelRegistry ].
+	anAgent reconcileReasoningEffortWithModel
 ]
 
 { #category : 'private-loading' }
@@ -126,7 +127,7 @@ PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
 				timeout: timeout
 				serverTelemetryMode: telemetryMode ] ].
 	modelDescriptors do: [ :descriptor |
-		| id providerId model contextSize maximumOutput capabilities |
+		| id providerId model contextSize maximumContext contextSource maximumOutput reasoningEfforts defaultReasoning metadataSource capabilities |
 		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile model entry must be an object' ].
 		id := descriptor at: 'modelId' ifAbsent: [ Error signal: 'Runtime profile model has no modelId' ].
 		providerId := descriptor at: 'providerId' ifAbsent: [ Error signal: 'Runtime profile model has no providerId' ].
@@ -134,10 +135,23 @@ PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
 		(modelRegistry includesModelNamed: id) ifFalse: [
 			model := PharoCAModel named: id.
 			contextSize := descriptor at: 'contextSize' ifAbsent: [ nil ].
+			maximumContext := descriptor at: 'maximumContextSize' ifAbsent: [ nil ].
+			contextSource := descriptor at: 'contextSizeSource' ifAbsent: [ nil ].
 			maximumOutput := descriptor at: 'maximumOutputTokens' ifAbsent: [ nil ].
+			reasoningEfforts := descriptor at: 'reasoningEfforts' ifAbsent: [ #() ].
+			defaultReasoning := descriptor at: 'defaultReasoningEffort' ifAbsent: [ nil ].
+			metadataSource := descriptor at: 'metadataSource' ifAbsent: [ nil ].
 			(contextSize isNil or: [ contextSize isInteger and: [ contextSize > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile contextSize must be a positive integer or null' ].
+			(maximumContext isNil or: [ maximumContext isInteger and: [ maximumContext > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile maximumContextSize must be a positive integer or null' ].
 			(maximumOutput isNil or: [ maximumOutput isInteger and: [ maximumOutput > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile maximumOutputTokens must be a positive integer or null' ].
-			model contextSize: contextSize; maximumOutputTokens: maximumOutput.
+			model
+				contextSize: contextSize;
+				maximumContextSize: maximumContext;
+				contextSizeSource: contextSource;
+				maximumOutputTokens: maximumOutput;
+				reasoningEfforts: reasoningEfforts;
+				defaultReasoningEffort: defaultReasoning;
+				metadataSource: metadataSource.
 			capabilities := descriptor at: 'capabilities' ifAbsent: [ Dictionary new ].
 			self runtimeProfileApplyCapabilities: capabilities to: model.
 			modelRegistry register: model provider: providerId ] ].
@@ -147,7 +161,7 @@ PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
 		id := descriptor at: 'agentId' ifAbsent: [ Error signal: 'Runtime profile agent has no agentId' ].
 		name := descriptor at: 'name' ifAbsent: [ nil ].
 		modelId := descriptor at: 'modelId' ifAbsent: [ nil ].
-		reasoningEffort := descriptor at: 'reasoningEffort' ifAbsent: [ 'high' ].
+		reasoningEffort := descriptor at: 'reasoningEffort' ifAbsent: [ nil ].
 		reasoningEffort ifNotNil: [ reasoningEffort := reasoningEffort asSymbol ].
 		(id = 'default')
 			ifTrue: [
@@ -166,7 +180,9 @@ PharoCACodingHarness >> applyRuntimeProfileDictionary: profile [
 						modelId ifNil: [ Error signal: 'Runtime profile non-default agent requires modelId' ].
 						(modelRegistry includesModelNamed: modelId) ifFalse: [ Error signal: 'Runtime profile agent references unknown model: ', modelId asString ].
 						self newAgentIdentifiedBy: id named: name modelNamed: modelId ] ].
-		(self agentManager agentNamed: id) reasoningEffort: reasoningEffort ].
+		(self agentManager agentNamed: id)
+			reasoningEffort: reasoningEffort;
+			reconcileReasoningEffortWithModel ].
 	mappings := profile at: 'credentialEnvironmentMappings' ifAbsent: [ Dictionary new ].
 	mappings isDictionary ifFalse: [ Error signal: 'Runtime profile credentialEnvironmentMappings must be an object' ].
 	mappings keysAndValuesDo: [ :credentialName :environmentName |
@@ -474,7 +490,12 @@ PharoCACodingHarness >> runtimeProfileDictionary [
 				'modelId' -> model name.
 				'providerId' -> providerId.
 				'contextSize' -> model contextSize.
+				'maximumContextSize' -> model maximumContextSize.
+				'contextSizeSource' -> model contextSizeSource.
 				'maximumOutputTokens' -> model maximumOutputTokens.
+				'reasoningEfforts' -> model reasoningEfforts copy.
+				'defaultReasoningEffort' -> model defaultReasoningEffort.
+				'metadataSource' -> model metadataSource.
 				'capabilities' -> (self runtimeProfileCapabilitiesFor: model)
 			} asDictionary.
 			models add: descriptor.
@@ -691,7 +712,7 @@ PharoCACodingHarness >> validateRuntimeProfileDictionary: profile [
 		providerIds add: id ].
 	modelIds := Set new.
 	modelDescriptors do: [ :descriptor |
-		| id providerId contextSize maximumOutput capabilities |
+		| id providerId contextSize maximumContext maximumOutput reasoningEfforts defaultReasoning capabilities |
 		descriptor isDictionary ifFalse: [ Error signal: 'Runtime profile model entry must be an object' ].
 		id := descriptor at: 'modelId' ifAbsent: [ Error signal: 'Runtime profile model has no modelId' ].
 		(id isString and: [ id trimBoth isNotEmpty ]) ifFalse: [ Error signal: 'Runtime profile modelId must be a non-empty string' ].
@@ -699,9 +720,16 @@ PharoCACodingHarness >> validateRuntimeProfileDictionary: profile [
 		providerId := descriptor at: 'providerId' ifAbsent: [ Error signal: 'Runtime profile model has no providerId' ].
 		(providerId isString and: [ providerIds includes: providerId ]) ifFalse: [ Error signal: 'Runtime profile model references unknown provider: ', providerId asString ].
 		contextSize := descriptor at: 'contextSize' ifAbsent: [ nil ].
+		maximumContext := descriptor at: 'maximumContextSize' ifAbsent: [ nil ].
 		maximumOutput := descriptor at: 'maximumOutputTokens' ifAbsent: [ nil ].
+		reasoningEfforts := descriptor at: 'reasoningEfforts' ifAbsent: [ #() ].
+		defaultReasoning := descriptor at: 'defaultReasoningEffort' ifAbsent: [ nil ].
 		(contextSize isNil or: [ contextSize isInteger and: [ contextSize > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile contextSize must be a positive integer or null' ].
+		(maximumContext isNil or: [ maximumContext isInteger and: [ maximumContext > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile maximumContextSize must be a positive integer or null' ].
 		(maximumOutput isNil or: [ maximumOutput isInteger and: [ maximumOutput > 0 ] ]) ifFalse: [ Error signal: 'Runtime profile maximumOutputTokens must be a positive integer or null' ].
+		(reasoningEfforts isArray and: [ reasoningEfforts allSatisfy: [ :each | each isString and: [ each trimBoth isNotEmpty ] ] ]) ifFalse: [ Error signal: 'Runtime profile reasoningEfforts must be an array of non-empty strings' ].
+		(defaultReasoning isNil or: [ defaultReasoning isString and: [ defaultReasoning trimBoth isNotEmpty ] ]) ifFalse: [ Error signal: 'Runtime profile defaultReasoningEffort must be a non-empty string or null' ].
+		(defaultReasoning notNil and: [ reasoningEfforts notEmpty and: [ (reasoningEfforts includes: defaultReasoning) not ] ]) ifTrue: [ Error signal: 'Runtime profile defaultReasoningEffort must be included in reasoningEfforts' ].
 		capabilities := descriptor at: 'capabilities' ifAbsent: [ Dictionary new ].
 		self runtimeProfileValidateCapabilities: capabilities.
 		modelIds add: id ].
@@ -715,7 +743,7 @@ PharoCACodingHarness >> validateRuntimeProfileDictionary: profile [
 		name := descriptor at: 'name' ifAbsent: [ nil ].
 		(name isNil or: [ name isString ]) ifFalse: [ Error signal: 'Runtime profile agent name must be a string or null' ].
 		modelId := descriptor at: 'modelId' ifAbsent: [ nil ].
-		reasoningEffort := descriptor at: 'reasoningEffort' ifAbsent: [ 'high' ].
+		reasoningEffort := descriptor at: 'reasoningEffort' ifAbsent: [ nil ].
 		(reasoningEffort isNil or: [ reasoningEffort isString and: [ reasoningEffort trimBoth isNotEmpty ] ]) ifFalse: [ Error signal: 'Runtime profile agent reasoningEffort must be a non-empty string or null' ].
 		(id = 'default' and: [ modelId isNil ]) ifFalse: [
 			(modelId isString and: [ modelIds includes: modelId ]) ifFalse: [ Error signal: 'Runtime profile agent references unknown model: ', modelId asString ] ].

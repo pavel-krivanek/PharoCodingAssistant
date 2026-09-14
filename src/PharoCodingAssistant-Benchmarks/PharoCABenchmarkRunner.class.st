@@ -55,8 +55,13 @@ PharoCABenchmarkRunner >> effectiveModelConfiguration [
 		'endpoint' -> ((provider respondsTo: #baseUrl) ifTrue: [ provider baseUrl ] ifFalse: [ nil ]).
 		'modelId' -> model name.
 		'contextSize' -> model contextSize.
+		'maximumContextSize' -> model maximumContextSize.
+		'contextSizeSource' -> model contextSizeSource.
 		'maximumOutputTokens' -> model maximumOutputTokens.
 		'reasoningEffort' -> (agent reasoningEffort ifNil: [ nil ] ifNotNil: [ agent reasoningEffort asString ]).
+		'reasoningEfforts' -> model reasoningEfforts copy.
+		'defaultReasoningEffort' -> model defaultReasoningEffort.
+		'metadataSource' -> model metadataSource.
 		'capabilities' -> capabilities.
 		'profileRoot' -> (root ifNil: [ nil ] ifNotNil: [ root fullName ])
 	} asDictionary

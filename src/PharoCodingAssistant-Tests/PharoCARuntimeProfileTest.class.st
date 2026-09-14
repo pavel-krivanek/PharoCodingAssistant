@@ -216,7 +216,7 @@ PharoCARuntimeProfileTest >> testMalformedDependencyGraphIsRejectedBeforeAnyProv
 ]
 
 { #category : 'tests-038' }
-PharoCARuntimeProfileTest >> testLegacyRuntimeProfileWithoutReasoningEffortDefaultsToHigh [
+PharoCARuntimeProfileTest >> testLegacyRuntimeProfileWithoutReasoningEffortUsesProviderDefault [
 	| harness profile |
 	harness := self newHarness.
 	harness reloadResources.
@@ -226,7 +226,7 @@ PharoCARuntimeProfileTest >> testLegacyRuntimeProfileWithoutReasoningEffortDefau
 	harness agent reasoningEffort: #low.
 	harness validateRuntimeProfileDictionary: profile.
 	harness applyRuntimeProfileDictionary: profile.
-	self assert: harness agent reasoningEffort equals: #high
+	self assert: harness agent reasoningEffort isNil
 ]
 
 { #category : 'tests-044' }
@@ -269,4 +269,37 @@ PharoCARuntimeProfileTest >> testLlamaCppTelemetryModeSurvivesRuntimeProfileRest
 	providerDescriptor := second providerRegistry descriptorForProviderNamed: 'llama-local'.
 	self assert: (providerDescriptor at: 'serverTelemetryMode') equals: 'llamacpp'.
 	self assert: (second providerRegistry providerNamed: 'llama-local') serverTelemetryMode equals: #llamacpp
+]
+
+{ #category : 'tests-057' }
+PharoCARuntimeProfileTest >> testDiscoveredModelMetadataRoundTripsThroughRuntimeProfile [
+	| first second model descriptor |
+	first := self newHarness.
+	first reloadResources.
+	first providerRegistry
+		registerOpenAICompatible: 'lmstudio-metadata'
+		baseUrl: 'http://localhost:1234/v1/chat/completions'
+		credentialName: 'none'
+		timeout: 30.
+	model := PharoCAModel named: 'metadata-model'.
+	model
+		contextSize: 196608;
+		maximumContextSize: 262144;
+		contextSizeSource: 'loaded-instance';
+		metadataSource: 'lmstudio-native-v1';
+		reasoningEfforts: #('off' 'low' 'medium' 'high');
+		defaultReasoningEffort: 'medium';
+		supportsReasoning: true;
+		supportsReasoningStreaming: true.
+	first modelRegistry register: model provider: 'lmstudio-metadata'.
+	first saveRuntimeProfile.
+	second := self newHarness.
+	second reloadResources.
+	descriptor := second modelRegistry descriptorForModelNamed: 'metadata-model'.
+	self assert: (descriptor at: 'contextSize') equals: 196608.
+	self assert: (descriptor at: 'maximumContextSize') equals: 262144.
+	self assert: (descriptor at: 'contextSizeSource') equals: 'loaded-instance'.
+	self assert: (descriptor at: 'metadataSource') equals: 'lmstudio-native-v1'.
+	self assert: (descriptor at: 'reasoningEfforts') equals: #('off' 'low' 'medium' 'high').
+	self assert: (descriptor at: 'defaultReasoningEffort') equals: 'medium'
 ]

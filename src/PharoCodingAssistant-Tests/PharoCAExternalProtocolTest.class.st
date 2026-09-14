@@ -1212,6 +1212,10 @@ PharoCAExternalProtocolTest >> testSessionTreeBranchDepthStaysFlatForLinearChain
 { #category : 'tests-038' }
 PharoCAExternalProtocolTest >> testReasoningEffortControlIsExposedAndCommandCompletes [
 	| response completion reset |
+	harness agent model
+		reasoningEfforts: #('off' 'low' 'medium' 'high');
+		defaultReasoningEffort: 'medium';
+		supportsReasoning: true.
 	response := protocol handleRequest: (self request: 'agents.setReasoningEffort' params: ({
 		'agentId' -> 'default'.
 		'reasoningEffort' -> 'medium'
@@ -1298,7 +1302,7 @@ PharoCAExternalProtocolTest >> testFreshSessionKeepsCompleteSlashCommandCatalogI
 	} asDictionary)).
 	self assert: (completion at: 'ok').
 	labels := (((completion at: 'result') at: 'items') collect: [ :each | each at: 'label' ]) asSet.
-	#('/help' '/status' '/sessions' '/new [name]' '/continue' '/templates' '/models' '/model [modelId]' '/skills' '/reasoning [provider-default|none|low|medium|high|max]' '/max-iterations [off|N]' '/checkpoint [label]' '/checkpoints')
+	#('/help' '/status' '/sessions' '/new [name]' '/continue' '/templates' '/models' '/model [modelId]' '/skills' '/reasoning [provider-default|MODEL-OPTION]' '/max-iterations [off|N]' '/checkpoint [label]' '/checkpoints')
 		do: [ :usage | self assert: (labels includes: usage) ].
 	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
 		'line' -> '/skills'.
@@ -1481,4 +1485,40 @@ PharoCAExternalProtocolTest >> testSkillsListReportsActiveSkillsForCurrentSessio
 	self assert: (core at: 'active').
 	self assert: (spec at: 'active').
 	self assert: (protocol methodNames includes: 'skills.list')
+]
+
+{ #category : 'tests-057' }
+PharoCAExternalProtocolTest >> testReasoningControlRejectsOptionNotAdvertisedByModel [
+	| response |
+	harness agent model
+		reasoningEfforts: #('off' 'on');
+		defaultReasoningEffort: 'on';
+		supportsReasoning: true.
+	response := protocol handleRequest: (self request: 'agents.setReasoningEffort' params: ({
+		'agentId' -> 'default'.
+		'reasoningEffort' -> 'high'
+	} asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'invalid_params'.
+	self assert: harness agent reasoningEffort isNil
+]
+
+{ #category : 'tests-057' }
+PharoCAExternalProtocolTest >> testReasoningCommandCompletionUsesAdvertisedModelOptions [
+	| completion values |
+	harness agent model
+		reasoningEfforts: #('off' 'on');
+		defaultReasoningEffort: 'on';
+		supportsReasoning: true.
+	completion := protocol handleRequest: (self request: 'commands.complete' params: ({
+		'line' -> '/reasoning '.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (completion at: 'ok').
+	values := (((completion at: 'result') at: 'items') collect: [ :each | each at: 'completion' ]) asSet.
+	self assert: (values includes: '/reasoning provider-default').
+	self assert: (values includes: '/reasoning off').
+	self assert: (values includes: '/reasoning on').
+	self deny: (values includes: '/reasoning high').
+	self deny: (values includes: '/reasoning max')
 ]

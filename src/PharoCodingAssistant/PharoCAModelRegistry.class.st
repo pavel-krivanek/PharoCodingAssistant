@@ -68,6 +68,33 @@ PharoCAModelRegistry >> register: aModel provider: providerIdentifier [
 	^ aModel
 ]
 
+{ #category : 'model-discovery-private' }
+PharoCAModelRegistry >> mergeDiscoveredModel: discovered into: existing [
+	| changed authoritativeContext |
+	changed := false.
+	authoritativeContext := discovered contextSizeSource = 'loaded-instance'.
+	((existing contextSize isNil or: [ authoritativeContext ])
+		and: [ discovered contextSize notNil and: [ existing contextSize ~= discovered contextSize ] ]) ifTrue: [
+		existing contextSize: discovered contextSize.
+		existing contextSizeSource: discovered contextSizeSource.
+		changed := true ].
+	(existing maximumContextSize ~= discovered maximumContextSize and: [ discovered maximumContextSize notNil ]) ifTrue: [
+		existing maximumContextSize: discovered maximumContextSize.
+		changed := true ].
+	(existing maximumOutputTokens isNil and: [ discovered maximumOutputTokens notNil ]) ifTrue: [
+		existing maximumOutputTokens: discovered maximumOutputTokens.
+		changed := true ].
+	discovered metadataSource ifNotNil: [ :source |
+		existing metadataSource ~= source ifTrue: [ existing metadataSource: source. changed := true ].
+		existing supportsTools ~= discovered supportsTools ifTrue: [ existing supportsTools: discovered supportsTools. changed := true ].
+		existing supportsImages ~= discovered supportsImages ifTrue: [ existing supportsImages: discovered supportsImages. changed := true ].
+		existing supportsReasoning ~= discovered supportsReasoning ifTrue: [ existing supportsReasoning: discovered supportsReasoning. changed := true ].
+		existing supportsReasoningStreaming ~= discovered supportsReasoningStreaming ifTrue: [ existing supportsReasoningStreaming: discovered supportsReasoningStreaming. changed := true ].
+		existing reasoningEfforts ~= discovered reasoningEfforts ifTrue: [ existing reasoningEfforts: discovered reasoningEfforts. changed := true ].
+		existing defaultReasoningEffort ~= discovered defaultReasoningEffort ifTrue: [ existing defaultReasoningEffort: discovered defaultReasoningEffort. changed := true ] ].
+	^ changed
+]
+
 { #category : 'model-discovery' }
 PharoCAModelRegistry >> registerDiscoveredModels: discoveredModels provider: providerIdentifier [
 	| providerId added updated unchanged conflicts |
@@ -89,9 +116,7 @@ PharoCAModelRegistry >> registerDiscoveredModels: discoveredModels provider: pro
 					ifFalse: [ conflicts add: id ]
 					ifTrue: [
 						existing := self modelNamed: id.
-						changed := false.
-						(existing contextSize isNil and: [ discovered contextSize notNil ]) ifTrue: [ existing contextSize: discovered contextSize. changed := true ].
-						(existing maximumOutputTokens isNil and: [ discovered maximumOutputTokens notNil ]) ifTrue: [ existing maximumOutputTokens: discovered maximumOutputTokens. changed := true ].
+						changed := self mergeDiscoveredModel: discovered into: existing.
 						changed ifTrue: [ updated add: id ] ifFalse: [ unchanged add: id ] ] ] ].
 	^ {
 		'providerId' -> providerId.

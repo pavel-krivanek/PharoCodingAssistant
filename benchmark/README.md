@@ -170,7 +170,7 @@ A single supervised Windows task can then use that profile explicitly:
     -SkillMode normal
 ```
 
-The worker records the **effective** provider id/class, endpoint, model id, context size, maximum output tokens, reasoning effort and model capability flags in `result.json`. After the worker exits the supervisor copies this non-secret metadata into `manifest.json` as `workerConfiguration`, so old run directories remain attributable even if the profile later changes.
+The worker records the **effective** provider id/class, endpoint, model id, loaded context size, model maximum context, context-source metadata, maximum output tokens, selected reasoning effort, advertised reasoning options/default, metadata source, and model capability flags in `result.json`. After the worker exits the supervisor copies this non-secret metadata into `manifest.json` as `workerConfiguration`, so old run directories remain attributable even if the profile later changes.
 
 ## Running a suite
 

@@ -24,19 +24,22 @@ if ($stderrParent) { New-Item -ItemType Directory -Force -Path $stderrParent | O
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $Vm
-# All worker VMs are explicitly headless. Never fall back to a UI-capable invocation.
 $psi.Arguments = "--headless `"$Image`" st --quit `"$workerScript`""
 $psi.WorkingDirectory = Split-Path -Parent $Vm
 $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
-$psi.RedirectStandardOutput = -not $liveStdout
+# Always capture the VM streams. At verbosity >= 2 we tee captured output to
+# this PowerShell process's stdout/stderr, which are inherited by the suite.
+$psi.RedirectStandardOutput = $true
 $psi.RedirectStandardError = $true
 $psi.EnvironmentVariables['PCA_BENCH_REPOSITORY'] = $Repository
 $psi.EnvironmentVariables['PCA_BENCH_TASK'] = $Task
 $psi.EnvironmentVariables['PCA_BENCH_OUTPUT'] = $Output
 $psi.EnvironmentVariables['PCA_BENCH_SKILL_MODE'] = $SkillMode
 $psi.EnvironmentVariables['PCA_BENCH_WORKSPACE'] = $Workspace
-if ($liveStdout) { $psi.EnvironmentVariables['PCA_BENCH_STDOUT_LOG'] = $Stdout } else { $psi.EnvironmentVariables.Remove('PCA_BENCH_STDOUT_LOG') }
+# The wrapper owns worker.stdout.log. The Pharo reporter writes only to Stdio
+# stdout, avoiding two writers opening the same log file concurrently.
+$psi.EnvironmentVariables.Remove('PCA_BENCH_STDOUT_LOG')
 if (-not [string]::IsNullOrWhiteSpace($ProfileRoot)) {
     $psi.EnvironmentVariables['PCA_BENCH_PROFILE_ROOT'] = $ProfileRoot
 } else {
@@ -50,22 +53,67 @@ if (-not [string]::IsNullOrWhiteSpace($ProfileRoot)) {
 $process = New-Object System.Diagnostics.Process
 $process.StartInfo = $psi
 if (-not $process.Start()) { exit 125 }
-$stdoutTask = if ($psi.RedirectStandardOutput) { $process.StandardOutput.ReadToEndAsync() } else { $null }
-$stderrTask = $process.StandardError.ReadToEndAsync()
 
-$timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
-if ($timedOut) {
-    try { $process.Kill() } catch { }
+$stdoutWriter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $Stdout, $false
+$stderrWriter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $Stderr, $false
+$stdoutWriter.AutoFlush = $true
+$stderrWriter.AutoFlush = $true
+
+$stdoutBuffer = New-Object 'char[]' 4096
+$stderrBuffer = New-Object 'char[]' 4096
+$stdoutTask = $process.StandardOutput.ReadAsync($stdoutBuffer, 0, $stdoutBuffer.Length)
+$stderrTask = $process.StandardError.ReadAsync($stderrBuffer, 0, $stderrBuffer.Length)
+$stdoutDone = $false
+$stderrDone = $false
+$timedOut = $false
+$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+
+try {
+    while (-not ($process.HasExited -and $stdoutDone -and $stderrDone)) {
+        $didWork = $false
+
+        if (-not $stdoutDone -and $stdoutTask.IsCompleted) {
+            $count = $stdoutTask.Result
+            if ($count -le 0) {
+                $stdoutDone = $true
+            } else {
+                $text = -join $stdoutBuffer[0..($count - 1)]
+                $stdoutWriter.Write($text)
+                $stdoutWriter.Flush()
+                if ($liveStdout) { [Console]::Out.Write($text) }
+                $stdoutBuffer = New-Object 'char[]' 4096
+                $stdoutTask = $process.StandardOutput.ReadAsync($stdoutBuffer, 0, $stdoutBuffer.Length)
+            }
+            $didWork = $true
+        }
+
+        if (-not $stderrDone -and $stderrTask.IsCompleted) {
+            $count = $stderrTask.Result
+            if ($count -le 0) {
+                $stderrDone = $true
+            } else {
+                $text = -join $stderrBuffer[0..($count - 1)]
+                $stderrWriter.Write($text)
+                $stderrWriter.Flush()
+                if ($liveStdout) { [Console]::Error.Write($text) }
+                $stderrBuffer = New-Object 'char[]' 4096
+                $stderrTask = $process.StandardError.ReadAsync($stderrBuffer, 0, $stderrBuffer.Length)
+            }
+            $didWork = $true
+        }
+
+        if (-not $process.HasExited -and -not $timedOut -and [DateTime]::UtcNow -ge $deadline) {
+            $timedOut = $true
+            try { $process.Kill() } catch { }
+        }
+
+        if (-not $didWork) { Start-Sleep -Milliseconds 10 }
+    }
     $process.WaitForExit()
-} else {
-    $process.WaitForExit()
+} finally {
+    $stdoutWriter.Dispose()
+    $stderrWriter.Dispose()
 }
 
-if ($psi.RedirectStandardOutput) {
-    [System.IO.File]::WriteAllText($Stdout, $stdoutTask.Result)
-} elseif (-not (Test-Path -LiteralPath $Stdout)) {
-    [System.IO.File]::WriteAllText($Stdout, '')
-}
-[System.IO.File]::WriteAllText($Stderr, $stderrTask.Result)
 if ($timedOut) { exit 124 }
 exit $process.ExitCode
