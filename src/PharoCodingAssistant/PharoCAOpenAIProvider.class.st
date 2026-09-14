@@ -541,13 +541,29 @@ PharoCAOpenAIProvider >> wirePayloadForRequest: aRequest [
 	aRequest toolDefinitions notEmpty ifTrue: [
 		payload at: 'tools' put: (aRequest toolDefinitions collect: [ :definition | self wireToolDefinitionFor: definition ]) asArray.
 		aRequest toolChoice ifNotNil: [ payload at: 'tool_choice' put: aRequest toolChoice asString ] ].
-	aRequest reasoningEffort ifNotNil: [ payload at: 'reasoning_effort' put: aRequest reasoningEffort ].
+	(self wireReasoningEffortForRequest: aRequest) ifNotNil: [ :effort |
+		payload at: 'reasoning_effort' put: effort ].
 	aRequest maxOutputTokens ifNotNil: [ payload at: 'max_tokens' put: aRequest maxOutputTokens ].
 	protected := #('model' 'messages' 'temperature' 'tools' 'tool_choice' 'reasoning_effort' 'max_tokens' 'stream').
 	aRequest providerOptions keysAndValuesDo: [ :key :value |
 		(protected includes: key asString) ifTrue: [ Error signal: 'Provider option conflicts with OpenAI wire field: ', key asString ].
 		payload at: key asString put: value ].
 	^ payload
+]
+
+
+{ #category : 'mapping' }
+PharoCAOpenAIProvider >> wireReasoningEffortForRequest: aRequest [
+	| effort model |
+	effort := aRequest reasoningEffort.
+	effort ifNil: [ ^ nil ].
+	effort := effort asString trimBoth asLowercase.
+	model := aRequest model.
+	(model respondsTo: #metadataSource) ifTrue: [
+		model metadataSource = 'lmstudio-native-v1' ifTrue: [
+			effort = 'off' ifTrue: [ ^ #none ].
+			effort = 'on' ifTrue: [ ^ #medium ] ] ].
+	^ effort asSymbol
 ]
 
 { #category : 'mapping' }

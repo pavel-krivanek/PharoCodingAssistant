@@ -219,3 +219,65 @@ PharoCALLMProtocolTest >> testAutoTelemetryLearnsFromLlamaCppTimingsForFollowing
 	self assert: (wire at: 'return_progress').
 	self assert: (wire at: 'timings_per_token')
 ]
+
+{ #category : 'tests-058' }
+PharoCALLMProtocolTest >> testLMStudioToggleReasoningMapsToOpenAIWireVocabulary [
+	| model request wire |
+	model := PharoCAModel named: 'lmstudio-toggle'.
+	model
+		metadataSource: 'lmstudio-native-v1';
+		reasoningEfforts: #('off' 'on');
+		defaultReasoningEffort: 'on'.
+	request := PharoCALLMRequest new
+		model: model;
+		messages: { PharoCALLMMessage user: 'hello' };
+		reasoningEffort: #off;
+		yourself.
+	wire := PharoCAOpenAIProvider new wirePayloadForRequest: request.
+	self assert: (wire at: 'reasoning_effort') equals: #none.
+	request reasoningEffort: #on.
+	wire := PharoCAOpenAIProvider new wirePayloadForRequest: request.
+	self assert: (wire at: 'reasoning_effort') equals: #medium
+]
+
+{ #category : 'tests-058' }
+PharoCALLMProtocolTest >> testLMStudioGraduatedReasoningPassesThrough [
+	| model request wire |
+	model := PharoCAModel named: 'lmstudio-graduated'.
+	model
+		metadataSource: 'lmstudio-native-v1';
+		reasoningEfforts: #('off' 'low' 'medium' 'high');
+		defaultReasoningEffort: 'medium'.
+	request := PharoCALLMRequest new
+		model: model;
+		messages: { PharoCALLMMessage user: 'hello' };
+		reasoningEffort: #high;
+		yourself.
+	wire := PharoCAOpenAIProvider new wirePayloadForRequest: request.
+	self assert: (wire at: 'reasoning_effort') equals: #high
+]
+
+{ #category : 'tests-058' }
+PharoCALLMProtocolTest >> testHTTPErrorNormalizesByteArrayAndExposesServerMessage [
+	| body caught |
+	body := '{"error":{"message":"Invalid reasoning effort: off","type":"invalid_request_error"}}' utf8Encoded.
+	[ PharoCALLMHTTPError statusCode: 400 responseBody: body ]
+		on: PharoCALLMHTTPError
+		do: [ :error | caught := error ].
+	self assert: caught notNil.
+	self assert: caught responseBody isString.
+	self assert: (caught description includesSubstring: 'Invalid reasoning effort: off').
+	self deny: caught looksLikeContextOverflow
+]
+
+{ #category : 'tests-058' }
+PharoCALLMProtocolTest >> testHTTPErrorContextDetectionHandlesByteArray [
+	| caught |
+	[ PharoCALLMHTTPError
+		statusCode: 400
+		responseBody: '{"error":{"message":"maximum context length exceeded"}}' utf8Encoded ]
+		on: PharoCALLMHTTPError
+		do: [ :error | caught := error ].
+	self assert: caught looksLikeContextOverflow
+]
+

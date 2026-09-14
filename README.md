@@ -506,6 +506,8 @@ The external protocol validates requested values against the selected model and 
 
 The request field is emitted only when the selected model advertises reasoning support and a non-default effort is selected. The browser exposes the same model-specific control, and `/reasoning` completion shows only `provider-default` plus the selected model's advertised options.
 
+LM Studio exposes **public model reasoning modes** through `/api/v1/models`, but its OpenAI-compatible `/v1/chat/completions` endpoint uses the OpenAI `reasoning_effort` vocabulary. PCA keeps the public choices in the UI and performs the transport mapping inside `PharoCAOpenAIProvider`. For LM Studio toggle-style models this means `off -> none` and `on -> medium`; `provider-default` still omits the field entirely. Graduated modes such as `low`, `medium` and `high` pass through unchanged. This separation is important: values advertised for LM Studio's native API must not be copied blindly into the OpenAI-compatible wire request.
+
 ## Persistent runtime configuration
 
 `PharoCACodingHarness` persists reconstructible runtime configuration in:
