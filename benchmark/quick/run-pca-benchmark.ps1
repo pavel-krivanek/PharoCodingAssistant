@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     One-command Windows launcher for the PharoCodingAssistant benchmark.
 
@@ -16,8 +16,9 @@
     LM Studio must already be running and the intended model must be available through its
     OpenAI-compatible API. Context size and model-specific reasoning modes are auto-detected
     from LM Studio native /api/v1/models metadata when available. The script creates an isolated
-    PCA runtime.json itself; it does not
-    read ~/.pharo-ca and therefore does not inherit personal PCA instructions/sessions/settings.
+    PCA runtime.json itself; it does not read ~/.pharo-ca runtime/settings/instructions/sessions.
+    The one intentional shared global resource is the Common Pharo Issues file, which defaults
+    to %USERPROFILE%\.pharo-ca\common-issues.md and can be disabled or redirected per benchmark.
 
 .EXAMPLE
     .\run-pca-benchmark.ps1 -Mode Prepare
@@ -44,17 +45,26 @@
     .\run-pca-benchmark.ps1 -Mode Full -Repeat 3 -PruneRunImages:$true
 
 .EXAMPLE
+    .\run-pca-benchmark.ps1 -Mode Full -CommonIssuesMode readonly
+
+.EXAMPLE
+    .\run-pca-benchmark.ps1 -Mode Full -CommonIssuesPath C:\tmp\benchmark\model-memory\ornith.md
+
+.EXAMPLE
     .\run-pca-benchmark.ps1 -Mode Models
 
 .EXAMPLE
     .\run-pca-benchmark.ps1 -Mode Status
 
 .EXAMPLE
+    .\run-pca-benchmark.ps1 -Mode Stop
+
+.EXAMPLE
     .\run-pca-benchmark.ps1 -Mode Clean
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Prepare','Smoke','Quick','Full','Task','Status','Models','Clean')]
+    [ValidateSet('Prepare','Smoke','Quick','Full','Task','Status','Models','Stop','Clean')]
     [string]$Mode = 'Smoke',
 
     # Leave empty to auto-detect the directory containing this script.
@@ -81,6 +91,12 @@ param(
 
     [ValidateSet('normal','preloaded','both')]
     [string]$SkillModes = 'both',
+
+    # Cross-run reusable Pharo learning. readwrite is intentionally the benchmark default.
+    # The default file is outside disposable work\ so learning survives Clean.
+    [ValidateSet('readwrite','readonly','writeonly','off')]
+    [string]$CommonIssuesMode = 'readwrite',
+    [string]$CommonIssuesPath = '',
 
     # 0=silent agent progress, 1=task lifecycle, 2=model/tool activity, 3=live generated model output/reasoning.
     [ValidateRange(0,3)]
@@ -143,6 +159,17 @@ $BaseDirectory = Get-NormalizedAbsolutePath -Path $BaseDirectory -ParameterName 
 $Repository = Get-NormalizedAbsolutePath -Path $Repository -ParameterName 'Repository'
 if (-not $NoEvaluation) { $EvaluationRepository = Get-NormalizedAbsolutePath -Path $EvaluationRepository -ParameterName 'EvaluationRepository' }
 
+if ([string]::IsNullOrWhiteSpace($CommonIssuesPath)) {
+    $userHome = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+    if ([string]::IsNullOrWhiteSpace($userHome)) { $userHome = $env:USERPROFILE }
+    $CommonIssuesPath = Join-Path $userHome '.pharo-ca\common-issues.md'
+}
+$CommonIssuesPath = Get-NormalizedAbsolutePath -Path $CommonIssuesPath -ParameterName 'CommonIssuesPath'
+$CommonIssuesAuditPath = [System.IO.Path]::ChangeExtension($CommonIssuesPath, '.jsonl')
+
+$commonIssuesRead = $CommonIssuesMode -in @('readwrite','readonly')
+$commonIssuesWrite = $CommonIssuesMode -in @('readwrite','writeonly')
+
 $ResourcesDirectory = Join-Path $BaseDirectory 'resources'
 $WorkDirectory = Join-Path $BaseDirectory 'work'
 $VmDirectory = Join-Path $WorkDirectory 'vm'
@@ -163,6 +190,8 @@ $EnvironmentRecordFile = Join-Path $StateDirectory 'benchmark-environment.json'
 $ModelListRecordFile = Join-Path $StateDirectory 'lmstudio-models.json'
 $NativeModelListRecordFile = Join-Path $StateDirectory 'lmstudio-native-models.json'
 $PharoInvocationRecordFile = Join-Path $StateDirectory 'pharo-invocation.txt'
+$ActiveRunFile = Join-Path $StateDirectory 'active-run.json'
+$StopRequestFile = Join-Path $StateDirectory 'stop-request.json'
 
 $SmokeTasks = @(
     'basic-001-expression',
@@ -281,6 +310,163 @@ function Find-PharoImage {
     return $images[0].FullName
 }
 
+function Stop-ProcessTree {
+    param(
+        [Parameter(Mandatory=$true)][int]$ProcessId,
+        [switch]$Quiet
+    )
+
+    if ($ProcessId -le 0) { return $false }
+    try {
+        $existing = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $existing) { return $false }
+        $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
+        if (-not (Test-Path -LiteralPath $taskkill -PathType Leaf)) { $taskkill = 'taskkill.exe' }
+        $killInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $killInfo.FileName = $taskkill
+        $killInfo.Arguments = "/PID $ProcessId /T /F"
+        $killInfo.UseShellExecute = $false
+        $killInfo.CreateNoWindow = $true
+        $killInfo.RedirectStandardOutput = $true
+        $killInfo.RedirectStandardError = $true
+        $killer = New-Object System.Diagnostics.Process
+        $killer.StartInfo = $killInfo
+        if ($killer.Start()) {
+            $null = $killer.WaitForExit(10000)
+            if (-not $killer.HasExited) { try { $killer.Kill() } catch { } }
+        }
+        return $true
+    } catch {
+        if (-not $Quiet) { Write-Warn "Could not stop process tree rooted at PID ${ProcessId}: $($_.Exception.Message)" }
+        return $false
+    }
+}
+
+function Write-ActiveRunState {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory=$true)][string]$Vm,
+        [Parameter(Mandatory=$true)][string]$Image,
+        [Parameter(Mandatory=$true)][string]$Script,
+        [hashtable]$Metadata = @{}
+    )
+
+    $parent = Split-Path -Parent $Path
+    if ($parent) { Ensure-Directory $parent }
+    $state = [ordered]@{
+        format = 'PharoCABenchmarkActiveRun'
+        version = 1
+        startedAt = (Get-Date).ToString('o')
+        parentPowerShellPid = $PID
+        processId = $Process.Id
+        executable = $Vm
+        image = $Image
+        script = $Script
+        metadata = $Metadata
+    }
+    $tmp = "$Path.tmp"
+    [System.IO.File]::WriteAllText($tmp, ($state | ConvertTo-Json -Depth 12), [System.Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $tmp -Destination $Path -Force
+}
+
+function Clear-ActiveRunState {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [int]$ExpectedProcessId = 0
+    )
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return }
+    if ($ExpectedProcessId -gt 0) {
+        try {
+            $state = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+            if ([int]$state.processId -ne $ExpectedProcessId) { return }
+        } catch { }
+    }
+    Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+}
+
+function Stop-BenchmarkRun {
+    Ensure-Directory $StateDirectory
+    $stopped = 0
+    $roots = @{}
+
+    if (Test-Path -LiteralPath $ActiveRunFile -PathType Leaf) {
+        try {
+            $active = Get-Content -LiteralPath $ActiveRunFile -Raw | ConvertFrom-Json
+            $activePid = [int]$active.processId
+            $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $activePid" -ErrorAction SilentlyContinue
+            if ($null -ne $proc) {
+                $expectedExe = [string]$active.executable
+                $exeMatches = -not [string]::IsNullOrWhiteSpace($proc.ExecutablePath) -and
+                    ([System.StringComparer]::OrdinalIgnoreCase.Equals($proc.ExecutablePath, $expectedExe))
+                $scriptName = Split-Path -Leaf ([string]$active.script)
+                $commandMatches = [string]::IsNullOrWhiteSpace($scriptName) -or
+                    (-not [string]::IsNullOrWhiteSpace($proc.CommandLine) -and $proc.CommandLine.IndexOf($scriptName, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+                if ($exeMatches -and $commandMatches) { $roots[$activePid] = $true }
+            }
+        } catch {
+            Write-Warn "Could not read active benchmark state: $($_.Exception.Message)"
+        }
+    }
+
+    # Fallback cleanup for a launcher that was interrupted before active-run.json
+    # could be removed. Restrict this to the disposable benchmark VM directory.
+    $vmPaths = @()
+    if (Test-Path -LiteralPath $VmDirectory -PathType Container) {
+        $vmPaths = @(Get-ChildItem -LiteralPath $VmDirectory -Recurse -File -Filter 'Pharo*.exe' -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.FullName })
+    }
+    if ($vmPaths.Count -gt 0) {
+        Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
+            $exe = [string]$_.ExecutablePath
+            if (-not [string]::IsNullOrWhiteSpace($exe)) {
+                foreach ($vmPath in $vmPaths) {
+                    if ([System.StringComparer]::OrdinalIgnoreCase.Equals($exe, $vmPath)) {
+                        $roots[[int]$_.ProcessId] = $true
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    foreach ($rootPid in @($roots.Keys)) {
+        if (Stop-ProcessTree -ProcessId $rootPid -Quiet) {
+            Write-Host "Stopped benchmark process tree rooted at PID $rootPid"
+            $stopped++
+        }
+    }
+
+    # Detached PowerShell wrappers are unlikely after killing the Pharo tree,
+    # but clean them up too. Never match this top-level run-pca-benchmark.ps1.
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        ($_.Name -ieq 'powershell.exe' -or $_.Name -ieq 'pwsh.exe') -and
+        -not [string]::IsNullOrWhiteSpace($_.CommandLine) -and
+        $_.CommandLine -match 'run-benchmark-(worker|evaluator|supervisor|suite)\.ps1' -and
+        $_.CommandLine.IndexOf($Repository, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    } | ForEach-Object {
+        $wrapperPid = [int]$_.ProcessId
+        if ($wrapperPid -ne $PID -and (Stop-ProcessTree -ProcessId $wrapperPid -Quiet)) {
+            Write-Host "Stopped detached benchmark wrapper PID $wrapperPid"
+            $stopped++
+        }
+    }
+
+    Clear-ActiveRunState -Path $ActiveRunFile
+    $record = [ordered]@{
+        requestedAt = (Get-Date).ToString('o')
+        requestedByPid = $PID
+        stoppedTreeCount = $stopped
+    }
+    [System.IO.File]::WriteAllText($StopRequestFile, ($record | ConvertTo-Json -Depth 5), [System.Text.UTF8Encoding]::new($false))
+
+    if ($stopped -eq 0) {
+        Write-Host 'No running benchmark processes were found.'
+    } else {
+        Write-Host "Benchmark stop complete. Stopped $stopped process tree(s)." -ForegroundColor Green
+    }
+}
+
 function Invoke-PharoProcess {
     param(
         [Parameter(Mandatory=$true)][string]$Vm,
@@ -290,7 +476,9 @@ function Invoke-PharoProcess {
         [Parameter(Mandatory=$true)][string]$Stdout,
         [Parameter(Mandatory=$true)][string]$Stderr,
         [int]$TimeoutSeconds = 120,
-        [switch]$LiveStdout
+        [switch]$LiveStdout,
+        [string]$ActiveRunPath = '',
+        [hashtable]$ActiveMetadata = @{}
     )
 
     $stdoutParent = Split-Path -Parent $Stdout
@@ -324,6 +512,9 @@ function Invoke-PharoProcess {
     $process.StartInfo = $psi
     if (-not $process.Start()) {
         return [pscustomobject]@{ ExitCode = 125; TimedOut = $false; Arguments = $psi.Arguments }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ActiveRunPath)) {
+        Write-ActiveRunState -Path $ActiveRunPath -Process $process -Vm $Vm -Image $Image -Script $Script -Metadata $ActiveMetadata
     }
 
     $stdoutWriter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $Stdout, $false
@@ -376,13 +567,21 @@ function Invoke-PharoProcess {
 
             if (-not $process.HasExited -and -not $timedOut -and [DateTime]::UtcNow -ge $deadline) {
                 $timedOut = $true
-                try { $process.Kill() } catch { }
+                $null = Stop-ProcessTree -ProcessId $process.Id -Quiet
             }
 
             if (-not $didWork) { Start-Sleep -Milliseconds 10 }
         }
         $process.WaitForExit()
     } finally {
+        # Ctrl+C / pipeline cancellation can unwind this function while the native
+        # process is still alive. Always terminate the entire descendant tree.
+        try {
+            if (-not $process.HasExited) { $null = Stop-ProcessTree -ProcessId $process.Id -Quiet }
+        } catch { }
+        if (-not [string]::IsNullOrWhiteSpace($ActiveRunPath)) {
+            Clear-ActiveRunState -Path $ActiveRunPath -ExpectedProcessId $process.Id
+        }
         $stdoutWriter.Dispose()
         $stderrWriter.Dispose()
     }
@@ -456,6 +655,29 @@ function Get-ApiUrls {
     }
 }
 
+
+function Get-OptionalPropertyValue {
+    param(
+        [AllowNull()]
+        [object]$Object,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+
 function Get-LmStudioModels {
     $urls = Get-ApiUrls
     Write-Step "Querying LM Studio: $($urls.Models)"
@@ -465,14 +687,15 @@ function Get-LmStudioModels {
         throw "LM Studio is not reachable at $($urls.Models). Start the LM Studio API server and load the model. $($_.Exception.Message)"
     }
 
-    if ($null -eq $response.data) {
+    $data = Get-OptionalPropertyValue -Object $response -Name 'data'
+    if ($null -eq $data) {
         throw "LM Studio /v1/models response has no 'data' array."
     }
 
     Ensure-Directory $StateDirectory
     $json = $response | ConvertTo-Json -Depth 20
     [System.IO.File]::WriteAllText($ModelListRecordFile, $json, [System.Text.UTF8Encoding]::new($false))
-    return @($response.data)
+    return @($data)
 }
 
 
@@ -485,7 +708,8 @@ function Get-LmStudioNativeModels {
         return @()
     }
 
-    if ($null -eq $response.models) {
+    $models = Get-OptionalPropertyValue -Object $response -Name 'models'
+    if ($null -eq $models) {
         Write-Warn "LM Studio $($urls.NativeModels) response has no 'models' array."
         return @()
     }
@@ -493,45 +717,65 @@ function Get-LmStudioNativeModels {
     Ensure-Directory $StateDirectory
     $json = $response | ConvertTo-Json -Depth 30
     [System.IO.File]::WriteAllText($NativeModelListRecordFile, $json, [System.Text.UTF8Encoding]::new($false))
-    return @($response.models)
+    return @($models)
 }
 
+
 function Find-LmStudioNativeModelMatch([object[]]$NativeModels, [string]$SelectedModelId) {
-    # A custom LM Studio identifier can be the loaded-instance id while the underlying
-    # native model key/variant has a completely different name. Match that first.
+    # LM Studio's native /api/v1/models objects are intentionally heterogeneous:
+    # downloaded-but-not-loaded models, loaded instances, embedding models, etc. do not
+    # necessarily expose the same optional properties. Never access optional native
+    # metadata directly while Set-StrictMode is enabled.
     foreach ($model in $NativeModels) {
-        foreach ($instance in @($model.loaded_instances)) {
-            if ($null -ne $instance -and [string]$instance.id -eq $SelectedModelId) {
+        $loadedInstances = @(Get-OptionalPropertyValue -Object $model -Name 'loaded_instances')
+        foreach ($instance in $loadedInstances) {
+            if ($null -eq $instance) {
+                continue
+            }
+
+            $instanceId = Get-OptionalPropertyValue -Object $instance -Name 'id'
+            if ($null -ne $instanceId -and [string]$instanceId -eq $SelectedModelId) {
                 return [pscustomobject]@{ Model = $model; Instance = $instance; Match = 'loaded-instance-id' }
             }
         }
     }
 
     foreach ($model in $NativeModels) {
-        if ([string]$model.key -eq $SelectedModelId) {
-            $instance = @($model.loaded_instances) | Select-Object -First 1
-            return [pscustomobject]@{ Model = $model; Instance = $instance; Match = 'model-key' }
+        $loadedInstances = @(Get-OptionalPropertyValue -Object $model -Name 'loaded_instances')
+        $firstInstance = $loadedInstances | Select-Object -First 1
+
+        $key = Get-OptionalPropertyValue -Object $model -Name 'key'
+        if ($null -ne $key -and [string]$key -eq $SelectedModelId) {
+            return [pscustomobject]@{ Model = $model; Instance = $firstInstance; Match = 'model-key' }
         }
-        if (($model.PSObject.Properties.Name -contains 'selected_variant') -and [string]$model.selected_variant -eq $SelectedModelId) {
-            $instance = @($model.loaded_instances) | Select-Object -First 1
-            return [pscustomobject]@{ Model = $model; Instance = $instance; Match = 'selected-variant' }
+
+        $selectedVariant = Get-OptionalPropertyValue -Object $model -Name 'selected_variant'
+        if ($null -ne $selectedVariant -and [string]$selectedVariant -eq $SelectedModelId) {
+            return [pscustomobject]@{ Model = $model; Instance = $firstInstance; Match = 'selected-variant' }
         }
-        foreach ($variant in @($model.variants)) {
-            if ([string]$variant -eq $SelectedModelId) {
-                $instance = @($model.loaded_instances) | Select-Object -First 1
-                return [pscustomobject]@{ Model = $model; Instance = $instance; Match = 'variant' }
+
+        $variants = @(Get-OptionalPropertyValue -Object $model -Name 'variants')
+        foreach ($variant in $variants) {
+            if ($null -ne $variant -and [string]$variant -eq $SelectedModelId) {
+                return [pscustomobject]@{ Model = $model; Instance = $firstInstance; Match = 'variant' }
             }
         }
     }
+
     return $null
 }
+
 
 function Resolve-LmStudioModelMetadata(
     [object[]]$OpenAiModels,
     [object[]]$NativeModels,
     [string]$SelectedModelId
 ) {
-    $openAi = $OpenAiModels | Where-Object { [string]$_.id -eq $SelectedModelId } | Select-Object -First 1
+    $openAi = $OpenAiModels | Where-Object {
+        $candidateId = Get-OptionalPropertyValue -Object $_ -Name 'id'
+        $null -ne $candidateId -and [string]$candidateId -eq $SelectedModelId
+    } | Select-Object -First 1
+
     $match = Find-LmStudioNativeModelMatch -NativeModels $NativeModels -SelectedModelId $SelectedModelId
 
     $nativeModel = $null
@@ -551,27 +795,43 @@ function Resolve-LmStudioModelMetadata(
         $instance = $match.Instance
         $metadataSource = 'lmstudio-native-v1'
 
-        if (($nativeModel.PSObject.Properties.Name -contains 'max_context_length') -and $null -ne $nativeModel.max_context_length) {
-            $maximumContext = [int64]$nativeModel.max_context_length
-        }
-        if ($null -ne $instance -and $null -ne $instance.config -and
-            ($instance.config.PSObject.Properties.Name -contains 'context_length') -and
-            $null -ne $instance.config.context_length) {
-            $loadedContext = [int64]$instance.config.context_length
+        $nativeMaximumContext = Get-OptionalPropertyValue -Object $nativeModel -Name 'max_context_length'
+        if ($null -ne $nativeMaximumContext) {
+            $maximumContext = [int64]$nativeMaximumContext
         }
 
-        if ($null -ne $nativeModel.capabilities) {
-            if ($nativeModel.capabilities.PSObject.Properties.Name -contains 'trained_for_tool_use') {
-                $supportsTools = [bool]$nativeModel.capabilities.trained_for_tool_use
+        $instanceConfig = Get-OptionalPropertyValue -Object $instance -Name 'config'
+        $instanceContext = Get-OptionalPropertyValue -Object $instanceConfig -Name 'context_length'
+        if ($null -ne $instanceContext) {
+            $loadedContext = [int64]$instanceContext
+        }
+
+        $capabilities = Get-OptionalPropertyValue -Object $nativeModel -Name 'capabilities'
+        if ($null -ne $capabilities) {
+            $trainedForToolUse = Get-OptionalPropertyValue -Object $capabilities -Name 'trained_for_tool_use'
+            if ($null -ne $trainedForToolUse) {
+                $supportsTools = [bool]$trainedForToolUse
             }
-            if ($nativeModel.capabilities.PSObject.Properties.Name -contains 'vision') {
-                $supportsImages = [bool]$nativeModel.capabilities.vision
+
+            $vision = Get-OptionalPropertyValue -Object $capabilities -Name 'vision'
+            if ($null -ne $vision) {
+                $supportsImages = [bool]$vision
             }
-            if (($nativeModel.capabilities.PSObject.Properties.Name -contains 'reasoning') -and $null -ne $nativeModel.capabilities.reasoning) {
-                $reasoningOptions = @($nativeModel.capabilities.reasoning.allowed_options | ForEach-Object { [string]$_ })
-                if ($nativeModel.capabilities.reasoning.PSObject.Properties.Name -contains 'default') {
-                    $defaultReasoning = [string]$nativeModel.capabilities.reasoning.default
+
+            # Do not name this $reasoning: PowerShell variable names are case-insensitive,
+            # and that would shadow the script-level $Reasoning option in this function.
+            $reasoningCapability = Get-OptionalPropertyValue -Object $capabilities -Name 'reasoning'
+            if ($null -ne $reasoningCapability) {
+                $allowedOptions = Get-OptionalPropertyValue -Object $reasoningCapability -Name 'allowed_options'
+                if ($null -ne $allowedOptions) {
+                    $reasoningOptions = @($allowedOptions | ForEach-Object { [string]$_ })
                 }
+
+                $nativeDefaultReasoning = Get-OptionalPropertyValue -Object $reasoningCapability -Name 'default'
+                if ($null -ne $nativeDefaultReasoning) {
+                    $defaultReasoning = [string]$nativeDefaultReasoning
+                }
+
                 $supportsReasoning = $reasoningOptions.Count -gt 0
             }
         }
@@ -590,15 +850,20 @@ function Resolve-LmStudioModelMetadata(
     } else {
         $legacyContext = $null
         if ($null -ne $openAi) {
-            if (($openAi.PSObject.Properties.Name -contains 'context_length') -and $null -ne $openAi.context_length) {
-                $legacyContext = [int64]$openAi.context_length
-            } elseif (($openAi.PSObject.Properties.Name -contains 'max_context_length') -and $null -ne $openAi.max_context_length) {
-                $legacyContext = [int64]$openAi.max_context_length
+            $openAiContext = Get-OptionalPropertyValue -Object $openAi -Name 'context_length'
+            $openAiMaximumContext = Get-OptionalPropertyValue -Object $openAi -Name 'max_context_length'
+
+            if ($null -ne $openAiContext) {
+                $legacyContext = [int64]$openAiContext
+            } elseif ($null -ne $openAiMaximumContext) {
+                $legacyContext = [int64]$openAiMaximumContext
             }
         }
+
         if ($null -eq $legacyContext -or $legacyContext -le 0) {
             throw "Could not determine the context window for '$SelectedModelId'. Load the model in a current LM Studio version or pass -ContextSize explicitly."
         }
+
         $effectiveContext = $legacyContext
         $contextSource = 'openai-model-list'
         $metadataSource = 'openai-model-list'
@@ -608,6 +873,7 @@ function Resolve-LmStudioModelMetadata(
     if ([string]::IsNullOrWhiteSpace($requestedReasoning) -or $requestedReasoning -eq 'auto') {
         $requestedReasoning = 'provider-default'
     }
+
     if ($requestedReasoning -eq 'none' -and $reasoningOptions -contains 'off') {
         $requestedReasoning = 'off'
     }
@@ -617,9 +883,11 @@ function Resolve-LmStudioModelMetadata(
         if (-not $supportsReasoning) {
             throw "Model '$SelectedModelId' does not advertise configurable reasoning. Use -Reasoning provider-default."
         }
+
         if (-not ($reasoningOptions -contains $requestedReasoning)) {
             throw "Reasoning '$Reasoning' is not supported by '$SelectedModelId'. Allowed values: provider-default,$($reasoningOptions -join ',')"
         }
+
         $effectiveReasoning = $requestedReasoning
     }
 
@@ -642,38 +910,67 @@ function Resolve-LmStudioModelMetadata(
     }
 }
 
+
 function Show-LmStudioModels {
     $models = @(Get-LmStudioModels)
     $nativeModels = @(Get-LmStudioNativeModels)
+
     if ($models.Count -eq 0) {
         Write-Host 'LM Studio returned no models.'
         return
     }
+
     Write-Host ''
     foreach ($model in $models) {
-        $id = [string]$model.id
+        $modelId = Get-OptionalPropertyValue -Object $model -Name 'id'
+        if ($null -eq $modelId) {
+            continue
+        }
+
+        $id = [string]$modelId
         $match = Find-LmStudioNativeModelMatch -NativeModels $nativeModels -SelectedModelId $id
         $parts = @()
+
         if ($null -ne $match) {
             $native = $match.Model
             $instance = $match.Instance
-            if ($null -ne $instance -and $null -ne $instance.config -and $null -ne $instance.config.context_length) {
-                $parts += "context=$($instance.config.context_length) loaded"
-            } elseif ($null -ne $native.max_context_length) {
-                $parts += "context<=$($native.max_context_length)"
+
+            $instanceConfig = Get-OptionalPropertyValue -Object $instance -Name 'config'
+            $instanceContext = Get-OptionalPropertyValue -Object $instanceConfig -Name 'context_length'
+            $maximumContext = Get-OptionalPropertyValue -Object $native -Name 'max_context_length'
+
+            if ($null -ne $instanceContext) {
+                $parts += "context=$instanceContext loaded"
+            } elseif ($null -ne $maximumContext) {
+                $parts += "context<=$maximumContext"
             }
-            if ($null -ne $native.capabilities -and $null -ne $native.capabilities.reasoning) {
-                $options = @($native.capabilities.reasoning.allowed_options | ForEach-Object { [string]$_ })
-                $default = [string]$native.capabilities.reasoning.default
-                if ($options.Count -gt 0) { $parts += "reasoning=$($options -join '/') default=$default" }
+
+            $capabilities = Get-OptionalPropertyValue -Object $native -Name 'capabilities'
+            $reasoningCapability = Get-OptionalPropertyValue -Object $capabilities -Name 'reasoning'
+            if ($null -ne $reasoningCapability) {
+                $allowedOptions = Get-OptionalPropertyValue -Object $reasoningCapability -Name 'allowed_options'
+                $defaultValue = Get-OptionalPropertyValue -Object $reasoningCapability -Name 'default'
+                $options = @()
+                if ($null -ne $allowedOptions) {
+                    $options = @($allowedOptions | ForEach-Object { [string]$_ })
+                }
+
+                if ($options.Count -gt 0) {
+                    $default = if ($null -eq $defaultValue) { '' } else { [string]$defaultValue }
+                    $parts += "reasoning=$($options -join '/') default=$default"
+                } else {
+                    $parts += 'reasoning=not-advertised'
+                }
             } else {
                 $parts += 'reasoning=not-advertised'
             }
         }
+
         $suffix = if ($parts.Count -gt 0) { '  [' + ($parts -join '; ') + ']' } else { '' }
         Write-Host "  $id$suffix"
     }
 }
+
 
 function Select-LmStudioModel([object[]]$Models) {
     $ids = @($Models | ForEach-Object { [string]$_.id })
@@ -807,6 +1104,15 @@ function Write-EnvironmentRecord([string]$Vm, [string]$Image, [string]$SelectedM
             workerTimeoutSeconds = $TimeoutSeconds
             evaluatorTimeoutSeconds = $EvaluatorTimeoutSeconds
             verbosity = $Verbosity
+            commonIssues = [ordered]@{
+                mode = $CommonIssuesMode
+                path = $CommonIssuesPath
+                readEnabled = $commonIssuesRead
+                writeEnabled = $commonIssuesWrite
+                initialSha256 = $(if (Test-Path -LiteralPath $CommonIssuesPath -PathType Leaf) { (Get-FileHash -LiteralPath $CommonIssuesPath -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null })
+                auditPath = $CommonIssuesAuditPath
+                initialAuditSha256 = $(if (Test-Path -LiteralPath $CommonIssuesAuditPath -PathType Leaf) { (Get-FileHash -LiteralPath $CommonIssuesAuditPath -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null })
+            }
         }
     }
     $json = $record | ConvertTo-Json -Depth 20
@@ -877,6 +1183,8 @@ function Prepare-Benchmark {
     Write-Info "Reasoning: $reasoningText"
     Write-Info "Selected reasoning: $($metadata.RequestedReasoning)"
     Write-Info "Profile: $ProfileDirectory"
+    Write-Info "Common issues: $CommonIssuesMode -> $CommonIssuesPath"
+    Write-Info "Learning audit: $CommonIssuesAuditPath"
     if (-not $NoEvaluation) { Write-Info "Evaluations: $EvaluationRepository" }
 
     return [pscustomobject]@{
@@ -910,28 +1218,60 @@ function Show-SuiteSummary([string]$Path) {
     }
     $summary = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 
+    $taskSetVersion = Get-OptionalPropertyValue -Object $summary -Name 'taskSetVersion'
+    $requestedTaskCount = Get-OptionalPropertyValue -Object $summary -Name 'requestedTaskCount'
+    $runCount = Get-OptionalPropertyValue -Object $summary -Name 'runCount'
+    $durationMilliseconds = Get-OptionalPropertyValue -Object $summary -Name 'durationMilliseconds'
+    $modeSummaries = @(Get-OptionalPropertyValue -Object $summary -Name 'modeSummaries')
+
     Write-Host ''
     Write-Host "Suite: $Path" -ForegroundColor Green
-    Write-Host "Task set: $($summary.taskSetVersion)   requested tasks: $($summary.requestedTaskCount)   runs: $($summary.runCount)"
-    Write-Host "Duration: $([Math]::Round(([double]$summary.durationMilliseconds / 60000.0), 1)) min"
-    foreach ($mode in @($summary.modeSummaries)) {
-        $avg = if ($null -eq $mode.averageScore) { 'n/a' } else { '{0:P1}' -f [double]$mode.averageScore }
-        Write-Host ("  {0,-10} avg {1,7}   pass {2,3}  partial {3,3}  fail {4,3}  scored {5,3}/{6,3}" -f `
-            $mode.mode, $avg, $mode.passed, $mode.partial, $mode.failed, $mode.scoredCount, $mode.runCount)
+    Write-Host "Task set: $taskSetVersion   requested tasks: $requestedTaskCount   runs: $runCount"
+    if ($null -ne $durationMilliseconds) {
+        Write-Host "Duration: $([Math]::Round(([double]$durationMilliseconds / 60000.0), 1)) min"
     }
-    if ($null -ne $summary.skillDelta -and $summary.skillDelta.pairedTaskCount -gt 0) {
-        $delta = '{0:+0.000;-0.000;0.000}' -f [double]$summary.skillDelta.averageDelta
-        Write-Host "  skill delta: $delta across $($summary.skillDelta.pairedTaskCount) paired task(s)"
+    foreach ($mode in $modeSummaries) {
+        $modeName = Get-OptionalPropertyValue -Object $mode -Name 'mode'
+        $averageScore = Get-OptionalPropertyValue -Object $mode -Name 'averageScore'
+        $passed = Get-OptionalPropertyValue -Object $mode -Name 'passed'
+        $partial = Get-OptionalPropertyValue -Object $mode -Name 'partial'
+        $failed = Get-OptionalPropertyValue -Object $mode -Name 'failed'
+        $scoredCount = Get-OptionalPropertyValue -Object $mode -Name 'scoredCount'
+        $modeRunCount = Get-OptionalPropertyValue -Object $mode -Name 'runCount'
+        $commonIssuesAdded = Get-OptionalPropertyValue -Object $mode -Name 'commonIssuesAdded'
+
+        $avg = if ($null -eq $averageScore) { 'n/a' } else { '{0:P1}' -f [double]$averageScore }
+        $learned = if ($null -eq $commonIssuesAdded) { 0 } else { [int]$commonIssuesAdded }
+        Write-Host ("  {0,-10} avg {1,7}   pass {2,3}  partial {3,3}  fail {4,3}  scored {5,3}/{6,3}  learned {7,3}" -f `
+            $modeName, $avg, $passed, $partial, $failed, $scoredCount, $modeRunCount, $learned)
     }
 
-    $problemRuns = @($summary.runs | Where-Object {
-        $_.status -ne 'completed' -or ($null -ne $_.outcome -and $_.outcome -ne 'passed')
+    $skillDelta = Get-OptionalPropertyValue -Object $summary -Name 'skillDelta'
+    $pairedTaskCount = Get-OptionalPropertyValue -Object $skillDelta -Name 'pairedTaskCount'
+    if ($null -ne $pairedTaskCount -and [int]$pairedTaskCount -gt 0) {
+        $averageDelta = Get-OptionalPropertyValue -Object $skillDelta -Name 'averageDelta'
+        if ($null -ne $averageDelta) {
+            $delta = '{0:+0.000;-0.000;0.000}' -f [double]$averageDelta
+            Write-Host "  skill delta: $delta across $pairedTaskCount paired task(s)"
+        }
+    }
+
+    $runs = @(Get-OptionalPropertyValue -Object $summary -Name 'runs')
+    $problemRuns = @($runs | Where-Object {
+        $status = Get-OptionalPropertyValue -Object $_ -Name 'status'
+        $outcome = Get-OptionalPropertyValue -Object $_ -Name 'outcome'
+        ($null -ne $status -and $status -ne 'completed') -or ($null -ne $outcome -and $outcome -ne 'passed')
     })
     if ($problemRuns.Count -gt 0) {
         Write-Host ''
         Write-Host 'Non-passing / infrastructure runs:' -ForegroundColor Yellow
         foreach ($run in $problemRuns) {
-            Write-Host "  $($run.taskId) [$($run.skillMode)] status=$($run.status) outcome=$($run.outcome) score=$($run.score)"
+            $taskId = Get-OptionalPropertyValue -Object $run -Name 'taskId'
+            $skillMode = Get-OptionalPropertyValue -Object $run -Name 'skillMode'
+            $status = Get-OptionalPropertyValue -Object $run -Name 'status'
+            $outcome = Get-OptionalPropertyValue -Object $run -Name 'outcome'
+            $score = Get-OptionalPropertyValue -Object $run -Name 'score'
+            Write-Host "  $taskId [$skillMode] status=$status outcome=$outcome score=$score"
         }
     }
 }
@@ -975,6 +1315,9 @@ function Invoke-BenchmarkSuite([string]$TaskList, [string]$Label) {
             'PCA_BENCH_EVALUATOR_TIMEOUT' = [string]$EvaluatorTimeoutSeconds
             'PCA_BENCH_SUITE_OUTPUT' = $output
             'PCA_BENCH_VERBOSITY' = [string]$Verbosity
+            'PCA_BENCH_COMMON_ISSUES_READ' = $(if ($commonIssuesRead) { '1' } else { '0' })
+            'PCA_BENCH_COMMON_ISSUES_WRITE' = $(if ($commonIssuesWrite) { '1' } else { '0' })
+            'PCA_BENCH_COMMON_ISSUES_PATH' = $CommonIssuesPath
         }
         if ($NoEvaluation) {
             $suiteEnvironment['PCA_BENCH_EVALUATION_REPOSITORY'] = $null
@@ -988,9 +1331,20 @@ function Invoke-BenchmarkSuite([string]$TaskList, [string]$Label) {
         # In 'both' mode only skill-sensitive tasks are duplicated, but 2x is a safe upper bound.
         $maximumRuns = if ($SkillModes -eq 'both') { $requestedTaskCount * 2 } else { $requestedTaskCount }
         $suiteTimeout = [Math]::Max(300, ($maximumRuns * ($TimeoutSeconds + $EvaluatorTimeoutSeconds + 60)))
+        Remove-Item -LiteralPath $StopRequestFile -Force -ErrorAction SilentlyContinue
+        $activeMetadata = @{
+            kind = 'suite'
+            label = $Label
+            repetition = $i
+            output = $output
+            modelId = $prepared.ModelId
+            taskList = $TaskList
+            skillModes = $SkillModes
+        }
         $processResult = Invoke-PharoProcess -Vm $prepared.Vm -Image $prepared.Image -Script $SuiteStScript `
             -Environment $suiteEnvironment -Stdout $suiteStdout -Stderr $suiteStderr `
-            -TimeoutSeconds $suiteTimeout -LiveStdout:($Verbosity -gt 0)
+            -TimeoutSeconds $suiteTimeout -LiveStdout:($Verbosity -gt 0) `
+            -ActiveRunPath $ActiveRunFile -ActiveMetadata $activeMetadata
 
         if ($processResult.ExitCode -ne 0) {
             Show-ProcessDiagnostics -Stdout $suiteStdout -Stderr $suiteStderr
@@ -1021,6 +1375,10 @@ function Show-Status {
         if ($null -ne $environment.lmStudio.maximumContextSize) { Write-Host "Maximum context: $($environment.lmStudio.maximumContextSize)" }
         Write-Host "Reasoning options: $(@($environment.lmStudio.reasoningOptions) -join ',')"
         Write-Host "Reasoning: $($environment.lmStudio.requestedReasoning)"
+        if ($null -ne $environment.benchmark.commonIssues) {
+            Write-Host "Common issues: $($environment.benchmark.commonIssues.mode) -> $($environment.benchmark.commonIssues.path)"
+            if ($environment.benchmark.commonIssues.auditPath) { Write-Host "Learning audit: $($environment.benchmark.commonIssues.auditPath)" }
+        }
         Write-Host "Repository commit: $($environment.repositoryCommit)"
     }
 }
@@ -1034,6 +1392,10 @@ if ($ContextSize -ne 0 -and $ContextSize -lt 4096) { throw '-ContextSize must be
 if ($MaximumOutputTokens -lt 512) { throw '-MaximumOutputTokens is implausibly small.' }
 
 switch ($Mode) {
+    'Stop' {
+        Stop-BenchmarkRun
+        break
+    }
     'Clean' {
         Remove-GeneratedWork
         Write-Host "Generated work removed. Preserved resources: $ResourcesDirectory"
