@@ -25,7 +25,7 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 
 { #category : 'building' }
 PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety [
-	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget compactedResult finalMessages omitted omittedMessages |
+	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget minimalResult minimumMessageTokens compactedResult finalMessages omitted omittedMessages |
 	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
 	estimator := aModel tokenEstimator ifNil: [ tokenEstimator ].
 	originalMessages := inputMessages asArray.
@@ -57,31 +57,31 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 	messageBudget := rawCompactionBudget - toolTokens.
 	hardMessageBudget := rawInputBudget ifNil: [ nil ] ifNotNil: [ rawInputBudget - toolTokens ].
 
-	messageBudget <= 0
-		ifTrue: [
-			(hardMessageBudget isNil or: [ hardMessageBudget <= 0 ]) ifTrue: [
-				PharoCAContextOverflow signalRequired: (policy calibratedInputTokensForEstimate: toolTokens + 1 model: aModel) available: inputBudget reason: 'tool definitions consume the complete input budget' ].
+	minimalResult := self
+		minimalCompactionForMessages: messages
+		originalMessageCount: originalMessages size
+		model: aModel
+		summaryText: summaryText.
+	minimumMessageTokens := estimator estimateMessages: (minimalResult at: 'messages').
+	(hardMessageBudget notNil and: [ minimumMessageTokens > hardMessageBudget ]) ifTrue: [
+		PharoCAContextOverflow
+		signalRequired: (policy calibratedInputTokensForEstimate: toolTokens + minimumMessageTokens model: aModel)
+		available: inputBudget
+		reason: 'the protected system prompt, compaction representation, and latest conversation turn cannot fit the model hard input budget' ].
+
+	"The configured context limit is a compaction trigger, not a hard cap.
+	If the preferred post-compaction target is smaller than the irreducible protected
+	context, retain only that protected context instead of failing or re-admitting old history."
+	messageBudget < minimumMessageTokens
+		ifTrue: [ compactedResult := minimalResult ]
+		ifFalse: [
 			compactedResult := self
-				minimallyCompactMessages: messages
+				compactMessages: messages
 				originalMessageCount: originalMessages size
-				toTokenBudget: hardMessageBudget
+				toTokenBudget: messageBudget
 				estimator: estimator
 				model: aModel
-				summaryText: summaryText ]
-		ifFalse: [
-			compactedResult := [
-				self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText
-			] on: PharoCAContextOverflow do: [ :overflow |
-				(hardMessageBudget notNil and: [ hardMessageBudget > 0 ])
-					ifTrue: [
-						self
-							minimallyCompactMessages: messages
-							originalMessageCount: originalMessages size
-							toTokenBudget: hardMessageBudget
-							estimator: estimator
-							model: aModel
-							summaryText: summaryText ]
-					ifFalse: [ overflow pass ] ] ].
+				summaryText: summaryText ].
 	finalMessages := compactedResult at: 'messages'.
 	omitted := compactedResult at: 'omittedMessageCount'.
 	omittedMessages := compactedResult at: 'omittedMessages'.
@@ -129,7 +129,7 @@ PharoCAContextBuilder >> compactMessages: messages originalMessageCount: origina
 
 
 { #category : 'private' }
-PharoCAContextBuilder >> minimallyCompactMessages: messages originalMessageCount: originalMessageCount toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText [
+PharoCAContextBuilder >> minimalCompactionForMessages: messages originalMessageCount: originalMessageCount model: aModel summaryText: summaryText [
 	| system nonSystem turns selectedTurns latestTurn retainedOriginal omitted resultMessages omittedTurns omittedMessages |
 	system := (messages select: [ :each | (self roleOf: each) = #system ]) ifEmpty: [ nil ] ifNotEmpty: [ :systems | systems last ].
 	nonSystem := messages reject: [ :each | (self roleOf: each) = #system ].
@@ -139,8 +139,6 @@ PharoCAContextBuilder >> minimallyCompactMessages: messages originalMessageCount
 	retainedOriginal := (system ifNil: [ 0 ] ifNotNil: [ 1 ]) + (selectedTurns inject: 0 into: [ :sum :turn | sum + turn size ]).
 	omitted := originalMessageCount - retainedOriginal.
 	resultMessages := self messagesWithSystem: system selectedTurns: selectedTurns omittedCount: omitted model: aModel summaryText: summaryText.
-	(estimator estimateMessages: resultMessages) > messageBudget ifTrue: [
-		PharoCAContextOverflow signalRequired: (estimator estimateMessages: resultMessages) available: messageBudget reason: 'the current system prompt, compaction representation, and latest conversation turn cannot fit the hard input budget' ].
 	omittedTurns := turns size - selectedTurns size.
 	omittedMessages := OrderedCollection new.
 	1 to: omittedTurns do: [ :index | omittedMessages addAll: (turns at: index) ].
@@ -149,6 +147,20 @@ PharoCAContextBuilder >> minimallyCompactMessages: messages originalMessageCount
 		'omittedMessageCount' -> omitted.
 		'omittedMessages' -> omittedMessages asArray
 	} asDictionary
+]
+
+{ #category : 'private' }
+PharoCAContextBuilder >> minimallyCompactMessages: messages originalMessageCount: originalMessageCount toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText [
+	| result resultMessages |
+	result := self
+		minimalCompactionForMessages: messages
+		originalMessageCount: originalMessageCount
+		model: aModel
+		summaryText: summaryText.
+	resultMessages := result at: 'messages'.
+	(estimator estimateMessages: resultMessages) > messageBudget ifTrue: [
+		PharoCAContextOverflow signalRequired: (estimator estimateMessages: resultMessages) available: messageBudget reason: 'the current system prompt, compaction representation, and latest conversation turn cannot fit the hard input budget' ].
+	^ result
 ]
 
 { #category : 'private' }

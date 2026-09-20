@@ -293,3 +293,31 @@ PharoCAContextBuilderTest >> testImpossiblePreferredTargetKeepsMinimalContextIns
 	self assert: (context messages anySatisfy: [ :each | each textContent = 'current-question' ]).
 	self deny: (context messages anySatisfy: [ :each | each textContent includesSubstring: 'old-question' ])
 ]
+
+{ #category : 'tests-077' }
+PharoCAContextBuilderTest >> testPreferredTargetBelowProtectedContextKeepsMinimumInsteadOfFailing [
+	| builder policy conversation model tools context hardBudget target calibratedFinal contents |
+	builder := PharoCAContextBuilder new.
+	policy := builder policy.
+	policy safetyMarginTokens: nil; compactionTriggerTokens: 6000.
+	model := PharoCAModel named: 'calibrated-small-trigger'.
+	model contextSize: 196608; maximumOutputTokens: 4096.
+	policy observeProviderInputTokens: 1300 estimatedInputTokens: 1000 model: model.
+	conversation := PharoCASession new conversation.
+	conversation addSystem: (String new: 4000 withAll: $s).
+	conversation addUser: (String new: 4000 withAll: $o).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: (String new: 4000 withAll: $a)).
+	conversation addUser: (String new: 4000 withAll: $u).
+	tools := { { 'description' -> (String new: 12800 withAll: $t) } asDictionary }.
+	hardBudget := model contextSize - (policy resolvedReservedOutputTokensFor: model) - (policy resolvedSafetyMarginTokensFor: model).
+	target := policy resolvedCompactionTargetTokensFor: model hardInputBudget: hardBudget.
+	context := builder buildFor: conversation tools: tools model: model.
+	calibratedFinal := policy calibratedInputTokensForEstimate: context estimatedInputTokens model: model.
+	contents := context messages collect: [ :each | each textContent ].
+	self assert: context compacted.
+	self assert: context omittedMessageCount equals: 2.
+	self assert: calibratedFinal > target.
+	self assert: calibratedFinal < hardBudget.
+	self assert: (contents anySatisfy: [ :each | each includesSubstring: (String new: 100 withAll: $u) ]).
+	self deny: (contents anySatisfy: [ :each | each includesSubstring: (String new: 100 withAll: $o) ])
+]

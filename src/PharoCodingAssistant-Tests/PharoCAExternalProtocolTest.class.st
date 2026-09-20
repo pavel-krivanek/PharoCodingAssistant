@@ -1584,6 +1584,8 @@ PharoCAExternalProtocolTest >> testContextStatusReportsHardAndSoftBudgets [
 	self assert: (result at: 'hardInputBudgetTokens') equals: 85000.
 	self assert: (result at: 'compactionTriggerTokens') equals: 80000.
 	self assert: (result at: 'compactionTargetTokens') equals: 72000.
+	self assert: (result at: 'limitSemantics') equals: 'compaction-trigger'.
+	self assert: (result at: 'targetBehavior') equals: 'preferred; protected current context may exceed it'.
 	self assert: (result at: 'tokenAccounting') equals: 'provider-calibrated-estimate'.
 	self assert: (result at: 'inputTokenEstimateScale') equals: 1.0
 ]

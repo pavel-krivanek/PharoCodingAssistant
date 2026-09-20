@@ -793,6 +793,8 @@ PharoCAExternalProtocol >> contextLimitStatusForAgentId: agentId [
 		'defaultPercent' -> policy defaultCompactionTriggerPercent.
 		'compactionTriggerTokens' -> trigger.
 		'compactionTargetTokens' -> target.
+		'limitSemantics' -> 'compaction-trigger'.
+		'targetBehavior' -> 'preferred; protected current context may exceed it'.
 		'hardInputBudgetTokens' -> hardBudget.
 		'reservedOutputTokens' -> reserved.
 		'safetyMarginTokens' -> safety.
