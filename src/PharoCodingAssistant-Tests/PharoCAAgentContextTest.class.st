@@ -189,3 +189,21 @@ PharoCAAgentContextTest >> testContextOverflowIsRetriedAfterTelemetryOnlyStreamE
 	self assert: provider attempts equals: 2.
 	self assert: (run events anySatisfy: [ :each | each type = #contextOverflowRecoveryScheduled ])
 ]
+
+
+{ #category : 'tests-076' }
+PharoCAAgentContextTest >> testProviderMetricsCalibrateFutureContextEstimates [
+	| agent model context event policy |
+	agent := PharoCAAgent new.
+	model := PharoCAModel named: 'test-calibration'.
+	context := PharoCAContext new
+		estimatedMessageTokens: 4000;
+		toolTokens: 1000;
+		yourself.
+	event := PharoCALLMStreamEvent
+		type: #providerMetrics
+		payload: ({ 'inputContextTokens' -> 7500 } asDictionary).
+	agent observeProviderInputTelemetryFrom: event context: context model: model.
+	policy := agent contextBuilder policy.
+	self assert: ((policy inputTokenEstimateScaleFor: model) closeTo: 1.5 precision: 0.0001)
+]

@@ -12,7 +12,8 @@ Class {
 		'compactionTriggerPercent',
 		'summarizationEnabled',
 		'overflowRecoveryAttempts',
-		'overflowSafetyMarginIncrementTokens'
+		'overflowSafetyMarginIncrementTokens',
+		'inputTokenCalibrationByModel'
 	],
 	#category : 'PharoCodingAssistant-Context',
 	#package : 'PharoCodingAssistant',
@@ -104,7 +105,8 @@ PharoCAContextPolicy >> initialize [
 	"Summarization performs an additional provider request and is therefore explicit/opt-in."
 	summarizationEnabled := false.
 	overflowRecoveryAttempts := 1.
-	overflowSafetyMarginIncrementTokens := 1024
+	overflowSafetyMarginIncrementTokens := 1024.
+	inputTokenCalibrationByModel := Dictionary new
 ]
 
 { #category : 'accessing' }
@@ -199,4 +201,61 @@ PharoCAContextPolicy >> summarizationEnabled [ ^ summarizationEnabled
 
 { #category : 'accessing' }
 PharoCAContextPolicy >> summarizationEnabled: aBoolean [ summarizationEnabled := aBoolean
+]
+
+
+{ #category : 'calibration' }
+PharoCAContextPolicy >> calibratedInputTokensForEstimate: estimatedTokens model: aModel [
+	| scale |
+	estimatedTokens ifNil: [ ^ nil ].
+	scale := self inputTokenEstimateScaleFor: aModel.
+	^ (estimatedTokens * scale) ceiling asInteger
+]
+
+{ #category : 'calibration' }
+PharoCAContextPolicy >> inputTokenCalibrationFor: aModel [
+	| key |
+	inputTokenCalibrationByModel ifNil: [ inputTokenCalibrationByModel := Dictionary new ].
+	key := aModel name ifNil: [ '<unnamed>' ].
+	^ inputTokenCalibrationByModel
+		at: key
+		ifAbsentPut: [ {
+			'scale' -> 1.0.
+			'lastProviderInputTokens' -> nil.
+			'lastEstimatedInputTokens' -> nil
+		} asDictionary ]
+]
+
+{ #category : 'calibration' }
+PharoCAContextPolicy >> inputTokenCalibrationStatusFor: aModel [
+	^ (self inputTokenCalibrationFor: aModel) copy
+]
+
+{ #category : 'calibration' }
+PharoCAContextPolicy >> inputTokenEstimateScaleFor: aModel [
+	^ (self inputTokenCalibrationFor: aModel) at: 'scale'
+]
+
+{ #category : 'calibration' }
+PharoCAContextPolicy >> observeProviderInputTokens: providerTokens estimatedInputTokens: estimatedTokens model: aModel [
+	| calibration observedScale previousScale |
+	((providerTokens isNumber and: [ providerTokens > 0 ])
+		and: [ estimatedTokens isNumber and: [ estimatedTokens > 0 ] ]) ifFalse: [ ^ self inputTokenEstimateScaleFor: aModel ].
+	calibration := self inputTokenCalibrationFor: aModel.
+	observedScale := providerTokens asFloat / estimatedTokens asFloat.
+	previousScale := calibration at: 'scale'.
+	calibration
+		at: 'scale' put: (previousScale max: observedScale);
+		at: 'lastProviderInputTokens' put: providerTokens;
+		at: 'lastEstimatedInputTokens' put: estimatedTokens.
+	^ calibration at: 'scale'
+]
+
+{ #category : 'calibration' }
+PharoCAContextPolicy >> rawEstimateBudgetForProviderTokens: providerTokenBudget model: aModel [
+	| scale |
+	providerTokenBudget ifNil: [ ^ nil ].
+	scale := self inputTokenEstimateScaleFor: aModel.
+	scale <= 0 ifTrue: [ scale := 1.0 ].
+	^ ((providerTokenBudget asFloat / scale) floor asInteger) max: 1
 ]

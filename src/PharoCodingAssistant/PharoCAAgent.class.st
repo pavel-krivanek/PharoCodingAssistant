@@ -455,6 +455,24 @@ PharoCAAgent >> observabilitySnapshot [
 	} asDictionary
 ]
 
+
+{ #category : 'context-calibration' }
+PharoCAAgent >> observeProviderInputTelemetryFrom: event context: context model: activeModel [
+	| providerTokens payload |
+	providerTokens := nil.
+	event type = #providerMetrics ifTrue: [
+		payload := event payload.
+		payload isDictionary ifTrue: [ providerTokens := payload at: 'inputContextTokens' ifAbsent: [ nil ] ] ].
+	event type = #usage ifTrue: [
+		payload := event payload.
+		(payload respondsTo: #promptTokens) ifTrue: [ providerTokens := payload promptTokens ] ].
+	(providerTokens isNumber and: [ providerTokens > 0 ]) ifTrue: [
+		contextBuilder policy
+			observeProviderInputTokens: providerTokens
+			estimatedInputTokens: context estimatedInputTokens
+			model: activeModel ]
+]
+
 { #category : 'compatibility' }
 PharoCAAgent >> payloadFor: aConversation tools: tools model: aModel [
 	"Pre-016 compatibility: this now answers the canonical request rather than a provider payload."
@@ -537,6 +555,7 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 						streamRequest: request
 						eventsDo: [ :event |
 							(self streamEventCarriesAssistantOutput: event) ifTrue: [ semanticEventEmitted := true ].
+							self observeProviderInputTelemetryFrom: event context: context model: activeModel.
 							run recordLLMEvent: event ]
 						cancellation: requestToken
 						retryDo: [ :retry | run emit: #providerRetryScheduled payload: retry ]

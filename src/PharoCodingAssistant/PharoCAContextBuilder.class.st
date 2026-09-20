@@ -25,7 +25,7 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 
 { #category : 'building' }
 PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety [
-	| estimator originalMessages messages contextSize reserved safety inputBudget toolTokens messageTokens totalTokens compactionTrigger compactionTarget compactionInputBudget messageBudget hardMessageBudget compactedResult finalMessages omitted omittedMessages |
+	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget compactedResult finalMessages omitted omittedMessages |
 	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
 	estimator := aModel tokenEstimator ifNil: [ tokenEstimator ].
 	originalMessages := inputMessages asArray.
@@ -36,39 +36,52 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 	toolTokens := estimator estimateObject: tools.
 	messageTokens := estimator estimateMessages: messages.
 	totalTokens := messageTokens + toolTokens.
+	calibratedTotalTokens := policy calibratedInputTokensForEstimate: totalTokens model: aModel.
 
 	inputBudget := contextSize ifNil: [ nil ] ifNotNil: [ contextSize - reserved - safety ].
 	(inputBudget notNil and: [ inputBudget <= 0 ]) ifTrue: [
 		PharoCAContextOverflow signalRequired: reserved + safety + 1 available: contextSize reason: 'output reserve and safety margin leave no room for input' ].
+	rawInputBudget := policy rawEstimateBudgetForProviderTokens: inputBudget model: aModel.
 	compactionTrigger := policy resolvedCompactionTriggerTokensFor: aModel hardInputBudget: inputBudget.
-	(compactionTrigger isNil or: [ totalTokens <= compactionTrigger ]) ifTrue: [
+	(compactionTrigger isNil or: [ calibratedTotalTokens <= compactionTrigger ]) ifTrue: [
 		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
 
 	policy compactionEnabled ifFalse: [
-		(inputBudget notNil and: [ totalTokens > inputBudget ]) ifTrue: [
-			PharoCAContextOverflow signalRequired: totalTokens available: inputBudget reason: 'input exceeds the model budget and compaction is disabled' ].
+		(inputBudget notNil and: [ calibratedTotalTokens > inputBudget ]) ifTrue: [
+			PharoCAContextOverflow signalRequired: calibratedTotalTokens available: inputBudget reason: 'input exceeds the model budget and compaction is disabled' ].
 		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
 
 	compactionTarget := policy resolvedCompactionTargetTokensFor: aModel hardInputBudget: inputBudget.
 	compactionTarget ifNil: [ compactionTarget := inputBudget ].
-	compactionInputBudget := compactionTarget.
-	messageBudget := compactionInputBudget - toolTokens.
-	messageBudget <= 0 ifTrue: [
-		(inputBudget notNil and: [ inputBudget > compactionInputBudget ])
-			ifTrue: [ compactionInputBudget := inputBudget. messageBudget := compactionInputBudget - toolTokens ]
-			ifFalse: [ PharoCAContextOverflow signalRequired: toolTokens + 1 available: compactionInputBudget reason: 'tool definitions consume the complete compaction budget' ] ].
-	messageBudget <= 0 ifTrue: [
-		PharoCAContextOverflow signalRequired: toolTokens + 1 available: compactionInputBudget reason: 'tool definitions consume the complete input budget' ].
+	rawCompactionBudget := policy rawEstimateBudgetForProviderTokens: compactionTarget model: aModel.
+	messageBudget := rawCompactionBudget - toolTokens.
+	hardMessageBudget := rawInputBudget ifNil: [ nil ] ifNotNil: [ rawInputBudget - toolTokens ].
 
-	compactedResult := [
-		self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText
-	] on: PharoCAContextOverflow do: [ :overflow |
-		(inputBudget notNil and: [ compactionInputBudget < inputBudget ])
-			ifTrue: [
-				hardMessageBudget := inputBudget - toolTokens.
-				hardMessageBudget <= 0 ifTrue: [ overflow pass ].
-				self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: hardMessageBudget estimator: estimator model: aModel summaryText: summaryText ]
-			ifFalse: [ overflow pass ] ].
+	messageBudget <= 0
+		ifTrue: [
+			(hardMessageBudget isNil or: [ hardMessageBudget <= 0 ]) ifTrue: [
+				PharoCAContextOverflow signalRequired: (policy calibratedInputTokensForEstimate: toolTokens + 1 model: aModel) available: inputBudget reason: 'tool definitions consume the complete input budget' ].
+			compactedResult := self
+				minimallyCompactMessages: messages
+				originalMessageCount: originalMessages size
+				toTokenBudget: hardMessageBudget
+				estimator: estimator
+				model: aModel
+				summaryText: summaryText ]
+		ifFalse: [
+			compactedResult := [
+				self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText
+			] on: PharoCAContextOverflow do: [ :overflow |
+				(hardMessageBudget notNil and: [ hardMessageBudget > 0 ])
+					ifTrue: [
+						self
+							minimallyCompactMessages: messages
+							originalMessageCount: originalMessages size
+							toTokenBudget: hardMessageBudget
+							estimator: estimator
+							model: aModel
+							summaryText: summaryText ]
+					ifFalse: [ overflow pass ] ] ].
 	finalMessages := compactedResult at: 'messages'.
 	omitted := compactedResult at: 'omittedMessageCount'.
 	omittedMessages := compactedResult at: 'omittedMessages'.
@@ -104,6 +117,30 @@ PharoCAContextBuilder >> compactMessages: messages originalMessageCount: origina
 	retainedOriginal := (system ifNil: [ 0 ] ifNotNil: [ 1 ]) + (selectedTurns inject: 0 into: [ :sum :turn | sum + turn size ]).
 	omitted := originalMessageCount - retainedOriginal.
 	resultMessages := self messagesWithSystem: system selectedTurns: selectedTurns omittedCount: omitted model: aModel summaryText: summaryText.
+	omittedTurns := turns size - selectedTurns size.
+	omittedMessages := OrderedCollection new.
+	1 to: omittedTurns do: [ :index | omittedMessages addAll: (turns at: index) ].
+	^ {
+		'messages' -> resultMessages asArray.
+		'omittedMessageCount' -> omitted.
+		'omittedMessages' -> omittedMessages asArray
+	} asDictionary
+]
+
+
+{ #category : 'private' }
+PharoCAContextBuilder >> minimallyCompactMessages: messages originalMessageCount: originalMessageCount toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText [
+	| system nonSystem turns selectedTurns latestTurn retainedOriginal omitted resultMessages omittedTurns omittedMessages |
+	system := (messages select: [ :each | (self roleOf: each) = #system ]) ifEmpty: [ nil ] ifNotEmpty: [ :systems | systems last ].
+	nonSystem := messages reject: [ :each | (self roleOf: each) = #system ].
+	turns := self turnsFrom: nonSystem.
+	selectedTurns := OrderedCollection new.
+	turns ifNotEmpty: [ latestTurn := turns last. selectedTurns addFirst: latestTurn ].
+	retainedOriginal := (system ifNil: [ 0 ] ifNotNil: [ 1 ]) + (selectedTurns inject: 0 into: [ :sum :turn | sum + turn size ]).
+	omitted := originalMessageCount - retainedOriginal.
+	resultMessages := self messagesWithSystem: system selectedTurns: selectedTurns omittedCount: omitted model: aModel summaryText: summaryText.
+	(estimator estimateMessages: resultMessages) > messageBudget ifTrue: [
+		PharoCAContextOverflow signalRequired: (estimator estimateMessages: resultMessages) available: messageBudget reason: 'the current system prompt, compaction representation, and latest conversation turn cannot fit the hard input budget' ].
 	omittedTurns := turns size - selectedTurns size.
 	omittedMessages := OrderedCollection new.
 	1 to: omittedTurns do: [ :index | omittedMessages addAll: (turns at: index) ].

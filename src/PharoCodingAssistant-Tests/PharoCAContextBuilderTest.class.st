@@ -258,3 +258,38 @@ PharoCAContextBuilderTest >> testDisabledCompactionMayCrossSoftTriggerButNotHard
 	self deny: context compacted.
 	self assert: context fits
 ]
+
+
+{ #category : 'tests-076' }
+PharoCAContextBuilderTest >> testProviderCalibrationCanTriggerCompactionWhenRawEstimateIsBelowLimit [
+	| builder conversation model estimator rawTotal context |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	estimator := builder tokenEstimator.
+	rawTotal := (estimator estimateMessages: conversation asArray) + (estimator estimateObject: #()).
+	builder policy compactionTriggerTokens: rawTotal + 10.
+	builder policy observeProviderInputTokens: rawTotal * 2 estimatedInputTokens: rawTotal model: model.
+	context := builder buildFor: conversation tools: #() model: model.
+	self assert: context compacted.
+	self assert: context omittedMessageCount > 0
+]
+
+{ #category : 'tests-076' }
+PharoCAContextBuilderTest >> testImpossiblePreferredTargetKeepsMinimalContextInsteadOfRefillingHistory [
+	| builder conversation model context |
+	builder := PharoCAContextBuilder new.
+	builder policy
+		safetyMarginTokens: 0;
+		compactionTriggerTokens: 20.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	context := builder buildFor: conversation tools: #() model: model.
+	self assert: context compacted.
+	self assert: context omittedMessageCount equals: 2.
+	self assert: (context messages anySatisfy: [ :each | each textContent = 'current-question' ]).
+	self deny: (context messages anySatisfy: [ :each | each textContent includesSubstring: 'old-question' ])
+]

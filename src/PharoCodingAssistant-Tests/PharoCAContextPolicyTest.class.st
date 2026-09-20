@@ -91,3 +91,18 @@ PharoCAContextPolicyTest >> testCompactionTriggerNeverExceedsHardBudget [
 	self assert: (policy resolvedCompactionTriggerTokensFor: model hardInputBudget: 100000) equals: 100000.
 	self assert: (policy resolvedCompactionTargetTokensFor: model hardInputBudget: 100000) equals: 90000
 ]
+
+
+{ #category : 'tests-076' }
+PharoCAContextPolicyTest >> testProviderInputCalibrationRaisesButDoesNotLowerEstimateScale [
+	| policy model scale |
+	policy := PharoCAContextPolicy new.
+	model := PharoCAModel named: 'test'.
+	self assert: (policy inputTokenEstimateScaleFor: model) equals: 1.0.
+	scale := policy observeProviderInputTokens: 7100 estimatedInputTokens: 5000 model: model.
+	self assert: (scale closeTo: 1.42 precision: 0.0001).
+	self assert: (policy calibratedInputTokensForEstimate: 5000 model: model) equals: 7100.
+	self assert: (policy rawEstimateBudgetForProviderTokens: 6000 model: model) equals: 4225.
+	policy observeProviderInputTokens: 5000 estimatedInputTokens: 5000 model: model.
+	self assert: ((policy inputTokenEstimateScaleFor: model) closeTo: 1.42 precision: 0.0001)
+]

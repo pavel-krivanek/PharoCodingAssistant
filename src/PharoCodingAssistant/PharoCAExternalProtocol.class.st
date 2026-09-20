@@ -772,7 +772,7 @@ PharoCAExternalProtocol >> contextLimitCommand: params [
 
 { #category : 'commands-private' }
 PharoCAExternalProtocol >> contextLimitStatusForAgentId: agentId [
-	| agent model policy contextSize reserved safety hardBudget trigger target |
+	| agent model policy contextSize reserved safety hardBudget trigger target calibration |
 	agent := harness agentManager agentNamed: agentId.
 	model := agent model.
 	policy := agent contextBuilder policy.
@@ -782,6 +782,7 @@ PharoCAExternalProtocol >> contextLimitStatusForAgentId: agentId [
 	hardBudget := contextSize ifNil: [ nil ] ifNotNil: [ (contextSize - reserved - safety) max: 0 ].
 	trigger := policy resolvedCompactionTriggerTokensFor: model hardInputBudget: hardBudget.
 	target := policy resolvedCompactionTargetTokensFor: model hardInputBudget: hardBudget.
+	calibration := policy inputTokenCalibrationStatusFor: model.
 	^ {
 		'agentId' -> agentId.
 		'model' -> model name.
@@ -796,7 +797,11 @@ PharoCAExternalProtocol >> contextLimitStatusForAgentId: agentId [
 		'reservedOutputTokens' -> reserved.
 		'safetyMarginTokens' -> safety.
 		'safetyMarginMode' -> (policy safetyMarginTokens ifNil: [ 'auto' ] ifNotNil: [ 'tokens' ]).
-		'compactionEnabled' -> policy compactionEnabled
+		'compactionEnabled' -> policy compactionEnabled.
+		'tokenAccounting' -> 'provider-calibrated-estimate'.
+		'inputTokenEstimateScale' -> (calibration at: 'scale').
+		'lastObservedProviderInputTokens' -> (calibration at: 'lastProviderInputTokens').
+		'lastObservedEstimatedInputTokens' -> (calibration at: 'lastEstimatedInputTokens')
 	} asDictionary
 ]
 
