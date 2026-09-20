@@ -1105,6 +1105,7 @@ The current built-in command set includes:
 /max-iterations [off|N]
 /context
 /context-limit [auto|N|N%]
+/compact [instructions]
 /checkpoint [label]
 /checkpoints
 ```
@@ -1124,6 +1125,8 @@ Compaction never removes prior message entries from the durable session. `sessio
 PCA's local token estimator cannot exactly reproduce every provider/model chat template, especially the rendered tool-schema prompt. The first request therefore uses the local estimate. When the provider reports real prompt/input tokens (for example llama.cpp/LM Studio `inputContextTokens`), PCA learns a conservative per-model calibration factor and applies it to subsequent compaction decisions. The learned factor only increases, so a provider-observed 7.1k prompt from a locally estimated 5.5k request causes a 6k trigger to compact the next request. `/context` reports this factor and the last observed provider/local token counts.
 
 Use `/context` to inspect the detected model window, output reserve, safety reserve, hard input budget, proactive trigger, post-compaction target, and token-accounting calibration. Use `/context-limit 80%` (or another percentage), `/context-limit 150000` (absolute provider-token-space trigger after calibration), and `/context-limit auto` to restore the model-aware default for the current agent. Persistent equivalents are `context.compactionTriggerPercent` and `context.compactionTriggerTokens` in settings.
+
+Use `/compact` to request the same rolling-summary compaction explicitly without sending a new conversational prompt. `/compact Focus on API decisions and unresolved failures` supplies one-time emphasis to the summarizer. Manual compaction does not change the automatic context limit, does not delete durable transcript entries, and still keeps the recent tail verbatim. If the active provider context is already at or below the normal post-compaction target, the command reports that there is nothing useful to compact and creates no checkpoint.
 
 The run status line is deliberately stable: its core slots are always visible rather than appearing and disappearing as telemetry arrives. It shows `phase`, `ctx`, `limit`, `cmp`, `cache`, `pp`, `tg`, `out`, `reason`, and `TTFT`; unavailable values render as `—` and counters render as zero. `cmp` is shown as `branch/session`, so the selected-branch count and the overall durable session compaction count are both always visible. The UI distinguishes:
 
@@ -1422,3 +1425,20 @@ Compaction now follows the checkpoint pattern used by mature agent harnesses suc
 The web protocol now returns `transcriptEntries`, allowing reload to render every original message together with compaction markers without collapsing old blocks. An empty/failed summary is never treated as a successful compaction: when possible PCA sends the un-compacted active context and retries summarization later; otherwise it reports a real hard-context failure. Rolling summarization is enabled by default.
 
 The run status strip is now structurally stable and always shows all core telemetry slots: `phase · ctx · limit · cmp branch/session · cache · pp · tg · out · reason · TTFT`. Compaction notices use `summarized` terminology for rolling checkpoints and report recent messages kept verbatim plus the cumulative number represented by the summary.
+
+## Iteration 081 — turn-boundary control and unambiguous context telemetry
+
+The web composer now distinguishes an actually active run from a stale client-side `runId` before sending steering. `runs.steer`/`runs.followUp` return the stable `run_not_active` protocol error for completed or cancelled runs, and the browser transparently treats that condition as the next ordinary turn instead of losing the user's text. This closes the race where a model response had already terminated server-side while the browser still displayed the composer as steering-capable.
+
+Context telemetry is now explicit about two different quantities. `ctx` is the provider prompt/input size used when deciding whether the next request needs compaction; it is monotonic within a model call so the display cannot shrink merely because a later telemetry source reports a smaller number. `kv` is the server-reported prompt-plus-generated context when llama.cpp/LM Studio exposes it. The configured compaction limit continues to apply to `ctx`, not to generated output retroactively; an answer that makes the conversation exceed the limit triggers compaction at the beginning of the following model request.
+
+The rolling-summary prompt was also tightened and now uses real Smalltalk line breaks rather than literal `\\n` text. It explicitly asks for a selective, self-contained working-state checkpoint, preserving facts needed for continuation while dropping filler, repetition, superseded exploration and low-value intermediate narrative.
+
+
+## Iteration 082 — explicit manual compaction
+
+- Adds `/compact [instructions]` for Pi-style manual rolling compaction.
+- Manual compaction uses the same durable checkpoint + recent verbatim tail path as automatic compaction.
+- Optional instructions focus the checkpoint summary for that invocation without replacing the required structured state-preservation contract.
+- Manual compaction remains available even when automatic compaction is disabled.
+- The command never deletes durable transcript entries and creates no checkpoint when no eligible older prefix needs compaction.

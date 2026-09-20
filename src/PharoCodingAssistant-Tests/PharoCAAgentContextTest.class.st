@@ -307,3 +307,36 @@ PharoCAAgentContextTest >> testEmptyCompactionSummaryPreservesFullActiveContextW
 	self assert: (session entries select: [ :each | each type = #compaction ]) isEmpty.
 	self assert: (run events anySatisfy: [ :each | each type = #compactionSummaryFallback ])
 ]
+
+
+{ #category : 'tests-082' }
+PharoCAAgentContextTest >> testExplicitCompactionCreatesRollingCheckpointWithoutAddingConversationMessage [
+	| agent provider model session conversation beforeMessages result compaction summaryRequest durableMessages |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: '## Goal', String lf, 'Keep the implementation state and API decisions.').
+	model := PharoCAModel named: 'manual-compact-model'.
+	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
+	agent := PharoCA new provider: provider; model: model; yourself.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true; compactionEnabled: false.
+	session := agent newSession.
+	conversation := session conversation.
+	conversation addSystem: agent configuration systemPrompt.
+	conversation addUser: ('old-question-' , (String new: 16000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 16000 withAll: $y))).
+	conversation addUser: 'recent question'.
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: 'recent answer').
+	beforeMessages := session messageEntriesEndingAt: session currentLeafId.
+	result := agent compactConversation: conversation customInstructions: 'Focus on API decisions'.
+	self assert: (result at: 'compacted').
+	self assert: (result at: 'status') equals: 'compacted'.
+	self assert: (result at: 'manual').
+	self assert: (result at: 'customInstructionsUsed').
+	self assert: provider requests size equals: 1.
+	summaryRequest := provider requests first.
+	self assert: (summaryRequest messages first textContent includesSubstring: 'Focus on API decisions').
+	compaction := session lastCompactionEndingAt: session currentLeafId.
+	self assert: (compaction payload at: 'strategy') equals: 'rolling-summary-v1'.
+	durableMessages := session messageEntriesEndingAt: session currentLeafId.
+	self assert: durableMessages size equals: beforeMessages size.
+	self assert: (durableMessages anySatisfy: [ :each | each payload textContent includesSubstring: 'old-question-' ])
+]

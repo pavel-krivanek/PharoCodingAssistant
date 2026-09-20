@@ -407,3 +407,32 @@ PharoCAContextBuilderTest >> testFullContextBuilderIgnoresSoftTriggerButEnforces
 	self assert: context messages size equals: conversation asArray size.
 	self assert: context compactionTriggerTokens equals: 20
 ]
+
+
+{ #category : 'tests-082' }
+PharoCAContextBuilderTest >> testForcedCompactionBypassesSoftTriggerAndAutomaticEnableFlag [
+	| builder model messages normal forced |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; compactionEnabled: false.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	messages := {
+		PharoCALLMMessage user: (String new: 7000 withAll: $a).
+		PharoCALLMMessage assistant: (String new: 7000 withAll: $b).
+		PharoCALLMMessage user: (String new: 7000 withAll: $c).
+		PharoCALLMMessage assistant: (String new: 7000 withAll: $d) }.
+	normal := builder buildForMessages: messages tools: #() model: model.
+	self deny: normal compacted.
+	self assert: normal estimatedInputTokens < 10000.
+	self assert: normal estimatedInputTokens > 9000.
+	forced := builder
+		buildForMessages: messages
+		tools: #()
+		model: model
+		summaryText: 'manual checkpoint'
+		additionalSafetyMarginTokens: 0
+		forceCompaction: true.
+	self assert: forced compacted.
+	self assert: forced omittedMessageCount > 0.
+	self assert: forced compactionSummaryUsed
+]

@@ -51,3 +51,26 @@ PharoCACompactionSummarizerTest >> testLargeAgedOutHistoryIsRolledThroughSequent
 	self assert: (secondSource includesSubstring: 'last-').
 	self assert: result equals: 'checkpoint-two'
 ]
+
+{ #category : 'tests-081' }
+PharoCACompactionSummarizerTest >> testStructuredSummaryPromptUsesRealLineBreaksAndCheckpointContract [
+	| prompt |
+	prompt := PharoCACompactionSummarizer new structuredSummaryPrompt.
+	self assert: (prompt includesSubstring: String cr, String cr).
+	self deny: (prompt includesSubstring: '\n').
+	self assert: (prompt includesSubstring: 'selective, self-contained working-state summary').
+	self assert: (prompt includesSubstring: 'Discard conversational filler').
+	self assert: (prompt includesSubstring: '## Requirements and constraints').
+	self assert: (prompt includesSubstring: '## Next steps')
+]
+
+
+{ #category : 'tests-082' }
+PharoCACompactionSummarizerTest >> testManualCustomInstructionsAreAddedAsFocusWithoutReplacingSafetyContract [
+	| prompt |
+	prompt := PharoCACompactionSummarizer new structuredSummaryPromptWithInstructions: 'Focus on API decisions and failed tests'.
+	self assert: (prompt includesSubstring: 'selective, self-contained working-state summary').
+	self assert: (prompt includesSubstring: 'Additional focus requested for this manual compaction:').
+	self assert: (prompt includesSubstring: 'Focus on API decisions and failed tests').
+	self assert: (prompt includesSubstring: 'Do not discard other information')
+]

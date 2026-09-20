@@ -65,6 +65,17 @@ PharoCAContextBuilder >> buildFullContextForMessages: inputMessages tools: tools
 
 { #category : 'building' }
 PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety [
+	^ self
+		buildForMessages: inputMessages
+		tools: tools
+		model: aModel
+		summaryText: summaryText
+		additionalSafetyMarginTokens: additionalSafety
+		forceCompaction: false
+]
+
+{ #category : 'building' }
+PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety forceCompaction: forceCompaction [
 	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget minimalResult minimumMessageTokens compactedResult finalMessages omitted omittedMessages resultContext protectedFloorUsed |
 	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
 	estimator := aModel tokenEstimator ifNil: [ tokenEstimator ].
@@ -84,19 +95,22 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 	rawInputBudget := policy rawEstimateBudgetForProviderTokens: inputBudget model: aModel.
 	compactionTrigger := policy resolvedCompactionTriggerTokensFor: aModel hardInputBudget: inputBudget.
 	compactionTarget := policy resolvedCompactionTargetTokensFor: aModel hardInputBudget: inputBudget.
-	(compactionTrigger isNil or: [ calibratedTotalTokens <= compactionTrigger ]) ifTrue: [
+	(forceCompaction not and: [ compactionTrigger isNil or: [ calibratedTotalTokens <= compactionTrigger ] ]) ifTrue: [
 		resultContext := self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false.
 		resultContext compactionTriggerTokens: compactionTrigger; compactionTargetTokens: compactionTarget.
 		^ resultContext ].
 
-	policy compactionEnabled ifFalse: [
+	(policy compactionEnabled not and: [ forceCompaction not ]) ifTrue: [
 		(inputBudget notNil and: [ calibratedTotalTokens > inputBudget ]) ifTrue: [
 			PharoCAContextOverflow signalRequired: calibratedTotalTokens available: inputBudget reason: 'input exceeds the model budget and compaction is disabled' ].
 		resultContext := self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false.
 		resultContext compactionTriggerTokens: compactionTrigger; compactionTargetTokens: compactionTarget.
 		^ resultContext ].
 
-	compactionTarget ifNil: [ compactionTarget := inputBudget ].
+	compactionTarget ifNil: [
+		compactionTarget := forceCompaction
+			ifTrue: [ ((calibratedTotalTokens * 90) // 100) max: 1 ]
+			ifFalse: [ inputBudget ] ].
 	rawCompactionBudget := policy rawEstimateBudgetForProviderTokens: compactionTarget model: aModel.
 	messageBudget := rawCompactionBudget - toolTokens.
 	hardMessageBudget := rawInputBudget ifNil: [ nil ] ifNotNil: [ rawInputBudget - toolTokens ].

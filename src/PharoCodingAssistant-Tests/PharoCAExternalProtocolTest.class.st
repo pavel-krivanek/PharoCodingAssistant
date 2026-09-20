@@ -214,7 +214,7 @@ PharoCAExternalProtocolTest >> testProtocolCanRegisterConfiguredProviderAndModel
 
 { #category : 'tests' }
 PharoCAExternalProtocolTest >> testProtocolCancelControlsActiveRunAndProducesReplayableFinalEvent [
-	| blocking blockingHarness blockingProtocol sessionId started runId cancelled run replay |
+	| blocking blockingHarness blockingProtocol sessionId started runId cancelled run replay steerRejected |
 	blocking := PharoCATestBlockingLLMProvider new.
 	blockingHarness := PharoCACodingHarness new
 		workspace: workspace;
@@ -234,6 +234,10 @@ PharoCAExternalProtocolTest >> testProtocolCancelControlsActiveRunAndProducesRep
 	[ run isFinished ] whileFalse: [ (Delay forMilliseconds: 1) wait ].
 	blockingHarness sessionManager waitForAutosaves.
 	self assert: run status equals: #cancelled.
+	steerRejected := blockingProtocol handleRequest: (self request: 'runs.steer' params: ({ 'runId' -> runId. 'message' -> 'must become a new turn' } asDictionary)).
+	self deny: (steerRejected at: 'ok').
+	self assert: ((steerRejected at: 'error') at: 'code') equals: 'run_not_active'.
+	self assert: ((((steerRejected at: 'error') at: 'details') at: 'status')) equals: 'cancelled'.
 	replay := (blockingProtocol handleRequest: (self request: 'runs.events' params: ({ 'runId' -> runId } asDictionary))) at: 'result'.
 	self assert: ((replay at: 'items') anySatisfy: [ :event | ((event at: 'data') at: 'type') = 'cancelled' ])
 ]
@@ -1650,4 +1654,54 @@ PharoCAExternalProtocolTest >> testSessionReloadReturnsFullTranscriptAcrossCompa
 	types := timeline collect: [ :each | each at: 'type' ].
 	self assert: types asArray equals: #('message' 'message' 'compaction' 'message').
 	self assert: (((timeline third at: 'payload') at: 'summary') includesSubstring: 'checkpoint')
+]
+
+{ #category : 'tests-081' }
+PharoCAExternalProtocolTest >> testProtocolSteerOnCompletedRunReturnsRunNotActive [
+	| sessionId started runId run response |
+	provider queueResponse: (self completionWith: 'done').
+	sessionId := ((protocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Finished steering' } asDictionary))) at: 'result') at: 'id'.
+	started := protocol handleRequest: (self request: 'runs.start' params: ({ 'prompt' -> 'finish'. 'sessionId' -> sessionId } asDictionary)).
+	runId := (started at: 'result') at: 'id'.
+	run := protocol runNamed: runId.
+	self assert: (run waitTimeoutMilliseconds: 1000).
+	self assert: run status equals: #completed.
+	response := protocol handleRequest: (self request: 'runs.steer' params: ({ 'runId' -> runId. 'message' -> 'next turn' } asDictionary)).
+	self deny: (response at: 'ok').
+	self assert: ((response at: 'error') at: 'code') equals: 'run_not_active'.
+	self assert: ((((response at: 'error') at: 'details') at: 'status')) equals: 'completed'
+]
+
+
+{ #category : 'tests-082' }
+PharoCAExternalProtocolTest >> testCompactCommandCreatesManualCheckpointAndAcceptsFocusInstructions [
+	| agent manager session conversation response result completion items completions |
+	agent := harness agent.
+	agent model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true.
+	provider queueResponse: (self completionWith: '## Goal', String lf, 'Preserve the command-focused state.').
+	manager := harness sessionManagerForAgentId: 'default'.
+	session := manager ensureCurrentSession.
+	conversation := session conversation.
+	conversation addSystem: agent configuration systemPrompt.
+	conversation addUser: ('old-' , (String new: 16000 withAll: $a)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('answer-' , (String new: 16000 withAll: $b))).
+	conversation addUser: 'recent'.
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/compact Focus on API decisions'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self assert: (result at: 'compacted').
+	self assert: (result at: 'manual').
+	self assert: (result at: 'customInstructionsUsed').
+	self assert: session compactionCount equals: 1.
+	completion := protocol handleRequest: (self request: 'commands.complete' params: ({
+		'line' -> '/comp'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	items := (completion at: 'result') at: 'items'.
+	completions := items collect: [ :each | each at: 'completion' ].
+	self assert: (completions includes: '/compact ')
 ]

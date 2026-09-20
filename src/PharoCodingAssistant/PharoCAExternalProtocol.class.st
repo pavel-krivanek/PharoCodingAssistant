@@ -744,6 +744,24 @@ PharoCAExternalProtocol >> inspectTargetForKind: kind params: params [
 ]
 
 { #category : 'commands-private' }
+PharoCAExternalProtocol >> compactCommand: params [
+	| agentId agent manager session instructions result |
+	agentId := self agentIdentifierFromParams: params required: false.
+	agent := harness agentManager agentNamed: agentId.
+	manager := harness sessionManagerForAgentId: agentId.
+	session := manager currentSession.
+	session ifNil: [ PharoCAProtocolError code: 'no_session' message: 'There is no current session to compact' ].
+	(self activeRunForSessionId: session id) ifNotNil: [
+		PharoCAProtocolError code: 'session_busy' message: 'Wait for the active run to finish before compacting the session' ].
+	instructions := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
+	result := agent
+		compactConversation: session conversation
+		customInstructions: (instructions isEmpty ifTrue: [ nil ] ifFalse: [ instructions ]).
+	manager saveCurrentSession.
+	^ result
+]
+
+{ #category : 'commands-private' }
 PharoCAExternalProtocol >> contextLimitCommand: params [
 	| argument normalized agentId agent policy value numberText |
 	argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
@@ -1002,6 +1020,8 @@ PharoCAExternalProtocol >> registerDefaultCommands [
 		self contextLimitStatusForAgentId: (self agentIdentifierFromParams: params required: false) ]).
 	commandRegistry register: (PharoCACommand named: 'context-limit' description: 'Show or set the proactive compaction trigger by token count or model-context percentage' usage: '/context-limit [auto|N|N%]' handler: [ :params |
 		self contextLimitCommand: params ]).
+	commandRegistry register: (PharoCACommand named: 'compact' description: 'Manually summarize older context into a rolling checkpoint; optional text focuses the summary' usage: '/compact [instructions]' handler: [ :params |
+		self compactCommand: params ]).
 	commandRegistry register: (PharoCACommand named: 'checkpoint' description: 'Create a semantic image checkpoint' usage: '/checkpoint [label]' handler: [ :params |
 		| argument p |
 		argument := params at: 'argument' ifAbsent: [ '' ].
@@ -1066,8 +1086,26 @@ PharoCAExternalProtocol >> runsControl: operation params: params [
 	run := self runNamed: (self requiredString: 'runId' from: params).
 	operation = #cancel ifTrue: [ run cancel. ^ self runSnapshot: run ].
 	message := self requiredString: 'message' from: params.
-	operation = #steer ifTrue: [ run steer: message. ^ self runSnapshot: run ].
-	operation = #followUp ifTrue: [ run followUp: message. ^ self runSnapshot: run ].
+	(operation = #steer or: [ operation = #followUp ]) ifTrue: [
+		(run isFinished or: [ run cancelled or: [ run status ~= #running ] ]) ifTrue: [
+			PharoCAProtocolError
+				code: 'run_not_active'
+				message: 'The referenced run is no longer active; start a new run for this message'
+				details: (self runSnapshot: run) ].
+		[ operation = #steer
+			ifTrue: [ run steer: message ]
+			ifFalse: [ run followUp: message ] ]
+			on: Error
+			do: [ :error |
+				((error messageText beginsWith: 'Cannot steer a ')
+					or: [ error messageText beginsWith: 'Cannot queue a follow-up on a ' ])
+					ifTrue: [
+						PharoCAProtocolError
+							code: 'run_not_active'
+							message: 'The referenced run is no longer active; start a new run for this message'
+							details: (self runSnapshot: run) ]
+					ifFalse: [ error pass ] ].
+		^ self runSnapshot: run ].
 	PharoCAProtocolError code: 'invalid_params' message: 'Unknown run control operation'
 ]
 

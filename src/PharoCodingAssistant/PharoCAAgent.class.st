@@ -1093,7 +1093,82 @@ PharoCAAgent >> annotateContext: finalContext fromCompactionPlan: planningContex
 	^ finalContext
 ]
 { #category : 'context-compaction' }
+PharoCAAgent >> compactConversation: conversation customInstructions: customInstructions [
+	| activeModel activeProvider run tools token preparation context payload entry result nonSystemMessages |
+	nonSystemMessages := conversation messages reject: [ :each | each role = #system ].
+	nonSystemMessages size < 2 ifTrue: [
+		^ {
+			'status' -> 'nothing_to_compact'.
+			'compacted' -> false.
+			'message' -> 'There is not enough conversation history to compact.'
+		} asDictionary ].
+	self synchronizeLegacyConfiguration.
+	activeModel := model.
+	activeProvider := provider.
+	conversation ensureSystem: configuration systemPrompt.
+	run := PharoCARun new
+		prompt: '/compact';
+		agent: self;
+		model: activeModel;
+		provider: activeProvider;
+		environment: environment;
+		session: conversation session;
+		conversation: conversation;
+		status: #running;
+		yourself.
+	tools := activeModel supportsTools
+		ifTrue: [ toolRegistry llmDefinitionsForSession: conversation session ]
+		ifFalse: [ #() ].
+	token := PharoCACancellationToken new.
+	preparation := self
+		contextPreparationForRun: run
+		conversation: conversation
+		tools: tools
+		model: activeModel
+		provider: activeProvider
+		cancellation: token
+		additionalSafetyMarginTokens: 0
+		forceCompaction: true
+		customInstructions: customInstructions.
+	context := preparation at: 'context'.
+	payload := preparation at: 'compactionPayload'.
+	payload ifNil: [
+		^ {
+			'status' -> 'nothing_to_compact'.
+			'compacted' -> false.
+			'inputTokens' -> (contextBuilder policy calibratedInputTokensForEstimate: context estimatedInputTokens model: activeModel).
+			'compactionTargetTokens' -> context compactionTargetTokens.
+			'message' -> 'No eligible older context exceeds the current compaction target; no checkpoint was created.'
+		} asDictionary ].
+	payload
+		at: 'manual' put: true;
+		at: 'conversationCompactionCount' put: (conversation session compactionCountEndingAt: conversation leafId) + 1;
+		at: 'sessionCompactionCount' put: conversation session compactionCount + 1.
+	entry := conversation addCompactionSnapshot: payload.
+	payload at: 'compactionEntryId' put: entry id.
+	result := payload copy.
+	result
+		at: 'status' put: 'compacted';
+		at: 'compacted' put: true.
+	^ result
+]
+
+{ #category : 'context-compaction' }
 PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: tools model: activeModel provider: activeProvider cancellation: requestToken additionalSafetyMarginTokens: additionalSafety [
+	^ self
+		contextPreparationForRun: run
+		conversation: conversation
+		tools: tools
+		model: activeModel
+		provider: activeProvider
+		cancellation: requestToken
+		additionalSafetyMarginTokens: additionalSafety
+		forceCompaction: false
+		customInstructions: nil
+]
+
+{ #category : 'context-compaction' }
+PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: tools model: activeModel provider: activeProvider cancellation: requestToken additionalSafetyMarginTokens: additionalSafety forceCompaction: forceCompaction customInstructions: customInstructions [
 	| seed activeEntries previousSummary previousCheckpoint contextMessages context planningContext omittedEntries retainedEntries summaryText finalMessages finalContext retryPayload attempts additionalEntries previousPayload previousSummarizedCount payload allBranchMessages |
 	seed := self compactionSeedForConversation: conversation.
 	activeEntries := seed at: 'messageEntries'.
@@ -1105,8 +1180,9 @@ PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: 
 		tools: tools
 		model: activeModel
 		summaryText: nil
-		additionalSafetyMarginTokens: additionalSafety.
-	(context compacted and: [ contextBuilder policy summarizationEnabled ]) ifFalse: [
+		additionalSafetyMarginTokens: additionalSafety
+		forceCompaction: forceCompaction.
+	(context compacted and: [ forceCompaction or: [ contextBuilder policy summarizationEnabled ] ]) ifFalse: [
 		^ {
 			'context' -> context.
 			'compactionPayload' -> nil
@@ -1118,7 +1194,8 @@ PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: 
 		tools: tools
 		model: activeModel
 		summaryText: self compactionReservationText
-		additionalSafetyMarginTokens: additionalSafety.
+		additionalSafetyMarginTokens: additionalSafety
+		forceCompaction: forceCompaction.
 	omittedEntries := (self omittedPrefixEntriesFrom: activeEntries omittedMessages: planningContext omittedMessages) asOrderedCollection.
 	omittedEntries isEmpty ifTrue: [
 		run emit: #compactionSummaryFallback payload: 'no stable durable prefix selected; preserving active context'.
@@ -1151,6 +1228,7 @@ PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: 
 		summaryText := compactionSummarizer
 			summarizeMessages: (omittedEntries collect: [ :each | each payload ]) asArray
 			previousSummary: previousSummary
+			customInstructions: customInstructions
 			model: activeModel
 			provider: activeProvider
 			cancellation: requestToken
@@ -1214,7 +1292,9 @@ PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: 
 		at: 'summarizedMessageCount' put: previousSummarizedCount + omittedEntries size;
 		at: 'keptRecentMessageCount' put: retainedEntries size;
 		at: 'fullTranscriptMessageCount' put: allBranchMessages size;
-		at: 'previousSummaryUsed' put: (previousSummary notNil and: [ previousSummary notEmpty ]).
+		at: 'previousSummaryUsed' put: (previousSummary notNil and: [ previousSummary notEmpty ]);
+		at: 'manual' put: forceCompaction;
+		at: 'customInstructionsUsed' put: (customInstructions notNil and: [ customInstructions trimBoth notEmpty ]).
 	^ {
 		'context' -> finalContext.
 		'compactionPayload' -> payload

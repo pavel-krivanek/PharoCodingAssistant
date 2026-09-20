@@ -17,7 +17,7 @@ Class {
 { #category : 'private' }
 PharoCACompactionSummarizer >> boundedSummary: aString [
 	aString size <= maximumSummaryCharacters ifTrue: [ ^ aString ].
-	^ (aString copyFrom: 1 to: maximumSummaryCharacters), '\n[summary truncated to configured bound]'
+	^ (aString copyFrom: 1 to: maximumSummaryCharacters), String lf, '[summary truncated to configured bound]'
 ]
 
 { #category : 'private' }
@@ -27,7 +27,7 @@ PharoCACompactionSummarizer >> boundedTranscriptFor: messages [
 	transcript size <= maximumSourceCharacters ifTrue: [ ^ transcript ].
 	half := maximumSourceCharacters // 2.
 	^ (transcript copyFrom: 1 to: half),
-		'\n...[middle of compacted history omitted from summarizer input]...\n',
+		String lf, '...[middle of compacted history omitted from summarizer input]...', String lf,
 		(transcript copyFrom: transcript size - half + 1 to: transcript size)
 ]
 
@@ -85,16 +85,54 @@ PharoCACompactionSummarizer >> clipped: aString to: maximumCharacters [
 	| text |
 	text := aString ifNil: [ '' ].
 	text size <= maximumCharacters ifTrue: [ ^ text ].
-	^ (text copyFrom: 1 to: maximumCharacters), '\n...[truncated]'
+	^ (text copyFrom: 1 to: maximumCharacters), String lf, '...[truncated]'
 ]
 
 { #category : 'private' }
 PharoCACompactionSummarizer >> structuredSummaryPrompt [
-	^ 'You maintain a rolling context checkpoint for a coding agent. Summarize only information needed to continue the work accurately. Merge the previous checkpoint, when present, with the newly aged-out conversation. Preserve exact class/method/file names, commands, error text, API facts, user constraints, decisions and their rationale, completed work, current partial work, blockers, and concrete next steps. Remove superseded or repetitive detail unless the fact that it changed matters. Never invent facts. Do not answer the user and do not describe the act of summarizing. Use the language of the conversation when practical.\n\nReturn exactly these sections:\n## Goal\n## Requirements and constraints\n## Key decisions\n## Completed work\n## Current state\n## Errors and blockers\n## Relevant code, files, commands and exact facts\n## Next steps'
+	^ String streamContents: [ :stream |
+		stream
+			nextPutAll: 'You maintain a rolling context checkpoint for a coding agent. This checkpoint will replace older conversation messages in the model-visible context, while the original transcript remains stored separately.'; cr; cr;
+			nextPutAll: 'Produce a selective, self-contained working-state summary. Merge <previous-checkpoint>, when present, with <new-history>. Preserve information that can affect correct continuation: user goals and explicit constraints; decisions and their rationale; completed changes; current partial work; unresolved questions and blockers; exact class, method, package, file and symbol names; materially relevant commands, settings, API facts, test results and error text; and concrete next steps.'; cr; cr;
+			nextPutAll: 'Discard conversational filler, repeated explanations, obsolete exploration, superseded proposals, and low-value intermediate detail. When a later fact supersedes an earlier one, keep the current fact and mention the change only if that history matters. Preserve exact snippets or command text only when they are materially useful for continuing the task. Distinguish clearly between completed work and work that is merely planned or attempted. Never invent facts, infer success that was not observed, or turn uncertain information into certainty.'; cr; cr;
+			nextPutAll: 'Do not answer the user. Do not give advice to the user. Do not describe the act of summarizing. Write the checkpoint in the language of the conversation when practical.'; cr; cr;
+			nextPutAll: 'Return exactly these sections, omitting detail inside a section only when there is genuinely nothing useful to retain:'; cr;
+			nextPutAll: '## Goal'; cr;
+			nextPutAll: '## Requirements and constraints'; cr;
+			nextPutAll: '## Key decisions'; cr;
+			nextPutAll: '## Completed work'; cr;
+			nextPutAll: '## Current state'; cr;
+			nextPutAll: '## Errors and blockers'; cr;
+			nextPutAll: '## Relevant code, files, commands and exact facts'; cr;
+			nextPutAll: '## Next steps' ]
+]
+
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> structuredSummaryPromptWithInstructions: customInstructions [
+	| instructions |
+	instructions := customInstructions ifNil: [ '' ] ifNotNil: [ customInstructions trimBoth ].
+	instructions isEmpty ifTrue: [ ^ self structuredSummaryPrompt ].
+	^ self structuredSummaryPrompt, String cr, String cr,
+		'Additional focus requested for this manual compaction:', String cr,
+		instructions, String cr, String cr,
+		'Treat this as emphasis only. Do not discard other information that is required for accurate continuation.'
 ]
 
 { #category : 'summarizing' }
 PharoCACompactionSummarizer >> summarizeMessages: messages previousSummary: previousSummary model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
+	^ self
+		summarizeMessages: messages
+		previousSummary: previousSummary
+		customInstructions: nil
+		model: aModel
+		provider: aProvider
+		cancellation: aToken
+		retryDo: retryBlock
+]
+
+{ #category : 'summarizing' }
+PharoCACompactionSummarizer >> summarizeMessages: messages previousSummary: previousSummary customInstructions: customInstructions model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
 	| batches rollingSummary |
 	(messages isEmpty and: [ previousSummary isNil or: [ previousSummary isEmpty ] ]) ifTrue: [ ^ '' ].
 	batches := self summaryBatchesFor: messages.
@@ -104,6 +142,7 @@ PharoCACompactionSummarizer >> summarizeMessages: messages previousSummary: prev
 		rollingSummary := self
 			summarizeBatch: batch
 			previousSummary: rollingSummary
+			customInstructions: customInstructions
 			model: aModel
 			provider: aProvider
 			cancellation: aToken
@@ -132,9 +171,21 @@ PharoCACompactionSummarizer >> summaryBatchesFor: messages [
 
 { #category : 'private' }
 PharoCACompactionSummarizer >> summarizeBatch: messages previousSummary: previousSummary model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
+	^ self
+		summarizeBatch: messages
+		previousSummary: previousSummary
+		customInstructions: nil
+		model: aModel
+		provider: aProvider
+		cancellation: aToken
+		retryDo: retryBlock
+]
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> summarizeBatch: messages previousSummary: previousSummary customInstructions: customInstructions model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
 	| transcript prompt request response outputLimit source |
 	transcript := self boundedTranscriptFor: messages.
-	prompt := self structuredSummaryPrompt.
+	prompt := self structuredSummaryPromptWithInstructions: customInstructions.
 	source := String streamContents: [ :stream |
 		(previousSummary notNil and: [ previousSummary notEmpty ]) ifTrue: [
 			stream nextPutAll: '<previous-checkpoint>'; cr;
