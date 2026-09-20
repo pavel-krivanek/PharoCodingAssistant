@@ -208,13 +208,26 @@ PharoCAContextBuilder >> messagesWithSystem: system selectedTurns: selectedTurns
 
 { #category : 'private' }
 PharoCAContextBuilder >> messagesWithSystem: system selectedTurns: selectedTurns omittedCount: omitted model: aModel summaryText: summaryText [
-	| result |
+	| result representation mergedSystem |
 	result := OrderedCollection new.
-	system ifNotNil: [ result add: system ].
-	omitted > 0 ifTrue: [
-		result add: (summaryText
-			ifNil: [ self compactionNoticeFor: omitted model: aModel ]
-			ifNotNil: [ self compactionSummaryMessageFor: summaryText omittedCount: omitted model: aModel ]) ].
+	omitted > 0
+		ifFalse: [ system ifNotNil: [ result add: system ] ]
+		ifTrue: [
+			representation := summaryText
+				ifNil: [ self compactionNoticeFor: omitted model: aModel ]
+				ifNotNil: [ self compactionSummaryMessageFor: summaryText omittedCount: omitted model: aModel ].
+			aModel supportsSystemMessages
+				ifTrue: [
+					system
+						ifNil: [ result add: representation ]
+						ifNotNil: [
+							mergedSystem := system copy.
+							mergedSystem contentParts: (system contentParts, {
+								PharoCALLMContentPart text: (String lf, String lf, representation textContent) }).
+							result add: mergedSystem ] ]
+				ifFalse: [
+					system ifNotNil: [ result add: system ].
+					result add: representation ] ].
 	selectedTurns do: [ :turn | result addAll: turn ].
 	^ result asArray
 ]

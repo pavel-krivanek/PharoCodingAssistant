@@ -1401,3 +1401,7 @@ Fresh supplied Pharo 14 gates for the frozen source are **893/893** normally and
 ## Headless Pharo benchmark
 
 The repository includes an opt-in headless benchmark under `benchmark/` and the `PharoCodingAssistant-Benchmarks*` packages. It reuses the production PCA harness/tools/skills, runs every task in a disposable image, supports supervisor-private hidden evaluation, isolated provider/model profiles, and Linux/Windows launchers. See `benchmark/README.md` for setup and suite execution. The default baseline remains `Core`; load `BenchmarkDevelopment` when developing the benchmark. Benchmark console verbosity is selectable from 0 (quiet) through 3 (live streamed model output/reasoning) and is emitted through `Stdio stdout`; every benchmark VM process is explicitly started with `--headless`.
+
+## Iteration 078 — Qwen-safe compaction message ordering
+
+Context compaction now preserves strict chat-template system-message ordering. For models that support system messages, PCA merges the compaction notice or generated history summary into the existing leading system message instead of inserting a second `system` message after it. This is required by Qwen 3.8 / LM Studio templates that reject any system-role message that is not at the beginning. Models without system-message support continue to receive the compaction representation as a user message.

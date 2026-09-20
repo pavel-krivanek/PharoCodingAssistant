@@ -76,7 +76,7 @@ PharoCAContextBuilderTest >> testCompactionKeepsLatestTurnAndSessionRemainsLossl
 	contents := context messages collect: [ :each | each at: 'content' ifAbsent: [ '' ] ].
 	self assert: context compacted.
 	self assert: context omittedMessageCount equals: 2.
-	self assert: (contents includes: 'system').
+	self assert: (contents anySatisfy: [ :each | each includesSubstring: 'system' ]).
 	self assert: (contents includes: 'current-question').
 	self assert: (contents anySatisfy: [ :each | each includesSubstring: 'Context compacted' ]).
 	self deny: (contents anySatisfy: [ :each | each includesSubstring: 'old-question' ]).
@@ -320,4 +320,44 @@ PharoCAContextBuilderTest >> testPreferredTargetBelowProtectedContextKeepsMinimu
 	self assert: calibratedFinal < hardBudget.
 	self assert: (contents anySatisfy: [ :each | each includesSubstring: (String new: 100 withAll: $u) ]).
 	self deny: (contents anySatisfy: [ :each | each includesSubstring: (String new: 100 withAll: $o) ])
+]
+{ #category : 'tests-078' }
+PharoCAContextBuilderTest >> testCompactionKeepsExactlyOneLeadingSystemMessage [
+	| builder conversation model context systems |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0; compactionTriggerTokens: 20.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	context := builder buildFor: conversation tools: #() model: model.
+	systems := context messages select: [ :each | each role = #system ].
+	self assert: context compacted.
+	self assert: systems size equals: 1.
+	self assert: context messages first role equals: #system.
+	self assert: (context messages first textContent includesSubstring: 'system').
+	self assert: (context messages first textContent includesSubstring: 'Context compacted').
+	self deny: (context messages allButFirst anySatisfy: [ :each | each role = #system ])
+]
+
+{ #category : 'tests-078' }
+PharoCAContextBuilderTest >> testCompactionSummaryIsMergedIntoLeadingSystemMessage [
+	| builder conversation model context systems |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0; compactionTriggerTokens: 20.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	context := builder
+		buildForMessages: conversation asArray
+		tools: #()
+		model: model
+		summaryText: 'Earlier decision: preserve Qwen chat-template ordering.'
+		additionalSafetyMarginTokens: 0.
+	systems := context messages select: [ :each | each role = #system ].
+	self assert: context compacted.
+	self assert: context compactionSummaryUsed.
+	self assert: systems size equals: 1.
+	self assert: context messages first role equals: #system.
+	self assert: (context messages first textContent includesSubstring: 'Earlier decision: preserve Qwen chat-template ordering.').
+	self deny: (context messages allButFirst anySatisfy: [ :each | each role = #system ])
 ]
