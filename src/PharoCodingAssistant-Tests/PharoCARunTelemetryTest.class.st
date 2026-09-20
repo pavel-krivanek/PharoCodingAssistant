@@ -208,3 +208,19 @@ PharoCARunTelemetryTest >> testPromptProgressIsRetainedOnCurrentModelCall [
 	call := (telemetry at: 'modelCalls') first.
 	self assert: ((call at: 'promptProgress') at: 'promptTokensProcessed') equals: 500
 ]
+{ #category : 'tests-079' }
+PharoCARunTelemetryTest >> testTelemetryCountsActualContextCompactionsAndRetainsLatestStatistics [
+	| run telemetry |
+	run := PharoCARun new status: #running; yourself.
+	run emit: #started payload: 'work'.
+	run emit: #modelRequestStarted payload: 1.
+	run emit: #contextCompacted payload: ({
+		'conversationCompactionCount' -> 3.
+		'compactionSourceInputTokens' -> 12000.
+		'compactionResultInputTokens' -> 8500.
+		'omittedMessageCount' -> 7 } asDictionary).
+	telemetry := run telemetry asDictionary.
+	self assert: (telemetry at: 'contextCompactionCount') equals: 1.
+	self assert: ((telemetry at: 'lastCompaction') at: 'conversationCompactionCount') equals: 3.
+	self assert: ((telemetry at: 'lastCompaction') at: 'omittedMessageCount') equals: 7
+]

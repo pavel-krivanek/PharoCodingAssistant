@@ -70,6 +70,25 @@ PharoCASession >> changesInEnvironment: anEnvironment [
 	^ anEnvironment changeJournal entriesForSessionId: id
 ]
 
+
+{ #category : 'accessing' }
+PharoCASession >> compactionCount [
+	^ entries count: [ :each | each type = #compaction ]
+]
+
+{ #category : 'accessing' }
+PharoCASession >> compactionCountEndingAt: anEntryId [
+	^ (self entriesEndingAt: anEntryId) count: [ :each | each type = #compaction ]
+]
+
+{ #category : 'accessing' }
+PharoCASession >> lastCompactionEndingAt: anEntryId [
+	^ (self entriesEndingAt: anEntryId)
+		reversed
+		detect: [ :each | each type = #compaction ]
+		ifNone: [ nil ]
+]
+
 { #category : 'accessing' }
 PharoCASession >> conversation [
 	^ PharoCAConversation onSession: self leafId: currentLeafId

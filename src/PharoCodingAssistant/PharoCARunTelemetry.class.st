@@ -24,6 +24,8 @@ Class {
 		'reasoningTokens',
 		'providerRetryCount',
 		'compactionSummaryCount',
+		'contextCompactionCount',
+		'lastCompaction',
 		'contextOverflowRecoveryCount',
 		'mutex'
 	],
@@ -87,6 +89,8 @@ PharoCARunTelemetry >> asDictionary [
 			'serverGenerationTokensPerSecond' -> serverGenerationRate.
 			'providerRetryCount' -> providerRetryCount.
 			'compactionSummaryCount' -> compactionSummaryCount.
+			'contextCompactionCount' -> contextCompactionCount.
+			'lastCompaction' -> lastCompaction.
 			'contextOverflowRecoveryCount' -> contextOverflowRecoveryCount.
 			'modelCalls' -> calls asArray.
 			'toolCalls' -> tools asArray
@@ -135,6 +139,8 @@ PharoCARunTelemetry >> initialize [
 	reasoningTokens := 0.
 	providerRetryCount := 0.
 	compactionSummaryCount := 0.
+	contextCompactionCount := 0.
+	lastCompaction := nil.
 	contextOverflowRecoveryCount := 0.
 	mutex := Semaphore forMutualExclusion
 ]
@@ -181,6 +187,9 @@ PharoCARunTelemetry >> recordEventUnlocked: anEvent [
 	type = #providerMetrics ifTrue: [ self recordProviderMetrics: payload ].
 	type = #providerRetryScheduled ifTrue: [ self recordProviderRetry: payload ].
 	type = #compactionSummaryCompleted ifTrue: [ compactionSummaryCount := compactionSummaryCount + 1 ].
+	type = #contextCompacted ifTrue: [
+		contextCompactionCount := contextCompactionCount + 1.
+		lastCompaction := payload isDictionary ifTrue: [ payload copy ] ifFalse: [ payload ] ].
 	type = #contextOverflowRecoveryScheduled ifTrue: [ contextOverflowRecoveryCount := contextOverflowRecoveryCount + 1 ].
 	type = #modelResponseCompleted ifTrue: [ self finishCurrentModelCall: #completed at: anEvent timestamp ].
 	type = #assistantResponseInterrupted ifTrue: [ self finishCurrentModelCall: #interrupted at: anEvent timestamp ].

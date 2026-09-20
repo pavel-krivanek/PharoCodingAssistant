@@ -361,3 +361,18 @@ PharoCAContextBuilderTest >> testCompactionSummaryIsMergedIntoLeadingSystemMessa
 	self assert: (context messages first textContent includesSubstring: 'Earlier decision: preserve Qwen chat-template ordering.').
 	self deny: (context messages allButFirst anySatisfy: [ :each | each role = #system ])
 ]
+{ #category : 'tests-079' }
+PharoCAContextBuilderTest >> testCompactionReportsBeforeAfterAndThresholdStatistics [
+	| builder conversation model context |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0; compactionTriggerTokens: 20.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	context := builder buildFor: conversation tools: #() model: model.
+	self assert: context compacted.
+	self assert: context compactionSourceInputTokens > context compactionResultInputTokens.
+	self assert: context compactionTriggerTokens equals: 20.
+	self assert: context compactionTargetTokens equals: 18.
+	self assert: (context asDictionary at: 'compactionResultInputTokens') equals: context compactionResultInputTokens
+]

@@ -1228,12 +1228,17 @@ PharoCAExternalProtocol >> sessionManagerFromParams: params [
 
 { #category : 'sessions-private' }
 PharoCAExternalProtocol >> sessionSnapshot: session name: name ephemeral: ephemeral [
+	| lastCompaction |
+	lastCompaction := session lastCompactionEndingAt: session currentLeafId.
 	^ {
 		'id' -> session id.
 		'name' -> name.
 		'ephemeral' -> ephemeral.
 		'entryCount' -> session entries size.
-		'currentLeafId' -> session currentLeafId
+		'currentLeafId' -> session currentLeafId.
+		'compactionCount' -> (session compactionCountEndingAt: session currentLeafId).
+		'sessionCompactionCount' -> session compactionCount.
+		'lastCompaction' -> (lastCompaction ifNil: [ nil ] ifNotNil: [ lastCompaction payload ])
 	} asDictionary
 ]
 
@@ -1355,7 +1360,9 @@ PharoCAExternalProtocol >> sessionsGet: params [
 	conversation := session conversationAt: entryId.
 	result
 		at: 'viewLeafId' put: entryId;
-		at: 'messages' put: ((conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray).
+		at: 'messages' put: ((conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray);
+		at: 'compactionCount' put: (session compactionCountEndingAt: entryId);
+		at: 'lastCompaction' put: ((session lastCompactionEndingAt: entryId) ifNil: [ nil ] ifNotNil: [ :entry | entry payload ]).
 	^ result
 ]
 
@@ -1423,7 +1430,9 @@ PharoCAExternalProtocol >> sessionsSelectEntry: params [
 		ephemeral: manager currentSessionIsEphemeral.
 	result
 		at: 'viewLeafId' put: entryId;
-		at: 'messages' put: ((session conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray).
+		at: 'messages' put: ((session conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray);
+		at: 'compactionCount' put: (session compactionCountEndingAt: entryId);
+		at: 'lastCompaction' put: ((session lastCompactionEndingAt: entryId) ifNil: [ nil ] ifNotNil: [ :entry | entry payload ]).
 	^ result
 ]
 

@@ -15,7 +15,12 @@ Class {
 		'omittedMessageCount',
 		'omittedMessages',
 		'compacted',
-		'compactionSummaryUsed'
+		'compactionSummaryUsed',
+		'compactionSourceInputTokens',
+		'compactionResultInputTokens',
+		'compactionTriggerTokens',
+		'compactionTargetTokens',
+		'compactionProtectedFloorUsed'
 	],
 	#category : 'PharoCodingAssistant-Context',
 	#package : 'PharoCodingAssistant',
@@ -35,6 +40,11 @@ PharoCAContext >> asDictionary [
 		'omittedMessageCount' -> omittedMessageCount.
 		'compacted' -> compacted.
 		'compactionSummaryUsed' -> compactionSummaryUsed.
+		'compactionSourceInputTokens' -> compactionSourceInputTokens.
+		'compactionResultInputTokens' -> compactionResultInputTokens.
+		'compactionTriggerTokens' -> compactionTriggerTokens.
+		'compactionTargetTokens' -> compactionTargetTokens.
+		'compactionProtectedFloorUsed' -> compactionProtectedFloorUsed.
 		'messageCount' -> messages size
 	} asDictionary
 ]
@@ -45,6 +55,47 @@ PharoCAContext >> compacted [ ^ compacted
 
 { #category : 'accessing' }
 PharoCAContext >> compacted: aBoolean [ compacted := aBoolean
+]
+
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionProtectedFloorUsed [ ^ compactionProtectedFloorUsed
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionProtectedFloorUsed: aBoolean [ compactionProtectedFloorUsed := aBoolean
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionResultInputTokens [ ^ compactionResultInputTokens
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionResultInputTokens: anIntegerOrNil [ compactionResultInputTokens := anIntegerOrNil
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionSourceInputTokens [ ^ compactionSourceInputTokens
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionSourceInputTokens: anIntegerOrNil [ compactionSourceInputTokens := anIntegerOrNil
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionTargetTokens [ ^ compactionTargetTokens
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionTargetTokens: anIntegerOrNil [ compactionTargetTokens := anIntegerOrNil
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionTriggerTokens [ ^ compactionTriggerTokens
+]
+
+{ #category : 'accessing' }
+PharoCAContext >> compactionTriggerTokens: anIntegerOrNil [ compactionTriggerTokens := anIntegerOrNil
 ]
 
 { #category : 'accessing' }
@@ -85,7 +136,9 @@ PharoCAContext >> initialize [
 	messages := #(). estimatedMessageTokens := 0. toolTokens := 0.
 	inputBudgetTokens := nil. reservedOutputTokens := 0. safetyMarginTokens := 0.
 	contextSize := nil. omittedMessageCount := 0. omittedMessages := #().
-	compacted := false. compactionSummaryUsed := false
+	compacted := false. compactionSummaryUsed := false.
+	compactionSourceInputTokens := nil. compactionResultInputTokens := nil.
+	compactionTriggerTokens := nil. compactionTargetTokens := nil. compactionProtectedFloorUsed := false
 ]
 
 { #category : 'accessing' }

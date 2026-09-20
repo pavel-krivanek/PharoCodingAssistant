@@ -1405,3 +1405,9 @@ The repository includes an opt-in headless benchmark under `benchmark/` and the 
 ## Iteration 078 — Qwen-safe compaction message ordering
 
 Context compaction now preserves strict chat-template system-message ordering. For models that support system messages, PCA merges the compaction notice or generated history summary into the existing leading system message instead of inserting a second `system` message after it. This is required by Qwen 3.8 / LM Studio templates that reject any system-role message that is not at the beginning. Models without system-message support continue to receive the compaction representation as a user message.
+
+## Iteration 079 — visible compaction telemetry
+
+Context compaction is now surfaced as a first-class UI event. When a request is compacted, the web transcript shows the cumulative branch compaction number, calibrated before/after input-token estimates, tokens and percentage saved, omitted-message count, and summary/protected-floor details when applicable. The run-bar telemetry shows `cmp N`; its tooltip includes the latest compaction trigger/target and statistics.
+
+Compaction counters are derived from persisted `#compaction` session entries rather than an ephemeral process counter. The current branch count therefore survives reloads and follows branch selection correctly; a separate session-wide count is retained for diagnostics. Run telemetry also records the number of actual context compactions and the latest compaction payload.

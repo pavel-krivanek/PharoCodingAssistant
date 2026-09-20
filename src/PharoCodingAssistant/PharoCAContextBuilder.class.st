@@ -25,7 +25,7 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 
 { #category : 'building' }
 PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety [
-	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget minimalResult minimumMessageTokens compactedResult finalMessages omitted omittedMessages |
+	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget minimalResult minimumMessageTokens compactedResult finalMessages omitted omittedMessages resultContext protectedFloorUsed |
 	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
 	estimator := aModel tokenEstimator ifNil: [ tokenEstimator ].
 	originalMessages := inputMessages asArray.
@@ -72,7 +72,8 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 	"The configured context limit is a compaction trigger, not a hard cap.
 	If the preferred post-compaction target is smaller than the irreducible protected
 	context, retain only that protected context instead of failing or re-admitting old history."
-	messageBudget < minimumMessageTokens
+	protectedFloorUsed := messageBudget < minimumMessageTokens.
+	protectedFloorUsed
 		ifTrue: [ compactedResult := minimalResult ]
 		ifFalse: [
 			compactedResult := self
@@ -85,7 +86,14 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 	finalMessages := compactedResult at: 'messages'.
 	omitted := compactedResult at: 'omittedMessageCount'.
 	omittedMessages := compactedResult at: 'omittedMessages'.
-	^ self contextWithMessages: finalMessages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: omitted omittedMessages: omittedMessages summaryUsed: (summaryText notNil and: [ omitted > 0 ])
+	resultContext := self contextWithMessages: finalMessages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: omitted omittedMessages: omittedMessages summaryUsed: (summaryText notNil and: [ omitted > 0 ]).
+	resultContext
+		compactionSourceInputTokens: calibratedTotalTokens;
+		compactionResultInputTokens: (policy calibratedInputTokensForEstimate: resultContext estimatedInputTokens model: aModel);
+		compactionTriggerTokens: compactionTrigger;
+		compactionTargetTokens: compactionTarget;
+		compactionProtectedFloorUsed: protectedFloorUsed.
+	^ resultContext
 ]
 
 { #category : 'private' }

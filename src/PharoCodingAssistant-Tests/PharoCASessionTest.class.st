@@ -97,3 +97,21 @@ PharoCASessionTest >> testEntriesEndingAtReturnsRootToLeafOrder [
 	ids := conversation entries collect: [ :each | each id ].
 	self assert: ids asArray equals: #('entry-1' 'entry-2' 'entry-3')
 ]
+{ #category : 'tests-079' }
+PharoCASessionTest >> testCompactionCountsAreDurableAndBranchAware [
+	| session main rootId branch |
+	session := PharoCASession new.
+	main := session conversation.
+	main addUser: 'root'.
+	rootId := main leafId.
+	main addCompactionSnapshot: ({ 'omittedMessageCount' -> 2 } asDictionary).
+	main addUser: 'main'.
+	self assert: session compactionCount equals: 1.
+	self assert: (session compactionCountEndingAt: main leafId) equals: 1.
+	self assert: (session lastCompactionEndingAt: main leafId) payload equals: ({ 'omittedMessageCount' -> 2 } asDictionary).
+	branch := session conversationAt: rootId.
+	branch addCompactionSnapshot: ({ 'omittedMessageCount' -> 5 } asDictionary).
+	self assert: session compactionCount equals: 2.
+	self assert: (session compactionCountEndingAt: main leafId) equals: 1.
+	self assert: (session compactionCountEndingAt: branch leafId) equals: 1
+]

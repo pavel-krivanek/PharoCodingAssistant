@@ -207,3 +207,28 @@ PharoCAAgentContextTest >> testProviderMetricsCalibrateFutureContextEstimates [
 	policy := agent contextBuilder policy.
 	self assert: ((policy inputTokenEstimateScaleFor: model) closeTo: 1.5 precision: 0.0001)
 ]
+{ #category : 'tests-079' }
+PharoCAAgentContextTest >> testCompactionEmitsStatisticsAndCumulativeCounts [
+	| agent provider model session conversation run event payload telemetry |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: 'answer').
+	model := PharoCAModel named: 'compaction-statistics-model'.
+	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
+	agent := PharoCA new provider: provider; model: model; yourself.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 100.
+	session := agent newSession.
+	conversation := session conversation.
+	conversation addSystem: agent configuration systemPrompt.
+	conversation addUser: ('old-question-' , (String new: 2000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 2000 withAll: $y))).
+	run := agent run: 'current-question' inSession: session.
+	self assert: run status equals: #completed.
+	event := run events detect: [ :each | each type = #contextCompacted ].
+	payload := event payload.
+	self assert: (payload at: 'conversationCompactionCount') equals: 1.
+	self assert: (payload at: 'sessionCompactionCount') equals: 1.
+	self assert: (payload at: 'compactionSourceInputTokens') > (payload at: 'compactionResultInputTokens').
+	self assert: (payload at: 'omittedMessageCount') > 0.
+	telemetry := run telemetry asDictionary.
+	self assert: (telemetry at: 'contextCompactionCount') equals: 1
+]

@@ -486,7 +486,7 @@ PharoCAAgent >> payloadForContext: aContext tools: tools model: aModel [
 
 { #category : 'control-private' }
 PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools: tools model: activeModel provider: activeProvider [
-	| context response requestToken interrupted contextMessages request additionalSafety overflowAttempt recoverOverflow semanticEventEmitted summaryText summaryContext retryPayload |
+	| context response requestToken interrupted contextMessages request additionalSafety overflowAttempt recoverOverflow semanticEventEmitted summaryText summaryContext retryPayload compactionEntry compactionPayload |
 	contextMessages := self instructionAdjustedMessagesFor: conversation asArray run: run model: activeModel.
 	contextMessages := extensionRegistry contextMessages: contextMessages run: run agent: self.
 	requestToken := run beginModelRequestCancellationToken.
@@ -546,7 +546,15 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 
 				run recordContext: context.
 				run emit: #contextPrepared payload: context asDictionary.
-				context compacted ifTrue: [ self recordConversationEntry: (conversation addCompactionSnapshot: context asDictionary) onRun: run ].
+				context compacted ifTrue: [
+					compactionPayload := context asDictionary copy.
+					compactionPayload
+						at: 'conversationCompactionCount' put: (conversation session compactionCountEndingAt: conversation leafId) + 1;
+						at: 'sessionCompactionCount' put: conversation session compactionCount + 1.
+					compactionEntry := conversation addCompactionSnapshot: compactionPayload.
+					self recordConversationEntry: compactionEntry onRun: run.
+					compactionPayload at: 'compactionEntryId' put: compactionEntry id.
+					run emit: #contextCompacted payload: compactionPayload ].
 				request := self requestForContext: context tools: tools model: activeModel.
 				request := self extensionAdjustedProviderRequest: request run: run.
 				semanticEventEmitted := false.

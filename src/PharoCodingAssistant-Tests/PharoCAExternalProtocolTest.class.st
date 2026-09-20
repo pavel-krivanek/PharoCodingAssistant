@@ -1601,3 +1601,25 @@ PharoCAExternalProtocolTest >> testContextLimitSlashCommandRejectsInvalidValues 
 		self deny: (response at: 'ok').
 		self assert: ((response at: 'error') at: 'code') equals: 'invalid_params' ]
 ]
+
+{ #category : 'tests-079' }
+PharoCAExternalProtocolTest >> testSessionSnapshotExposesPersistentCompactionStatistics [
+	| created sessionId session conversation response result |
+	created := protocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Compaction stats' } asDictionary)).
+	sessionId := (created at: 'result') at: 'id'.
+	session := harness sessionManager sessionForId: sessionId.
+	conversation := session conversation.
+	conversation addUser: 'first'.
+	conversation addCompactionSnapshot: ({
+		'conversationCompactionCount' -> 1.
+		'sessionCompactionCount' -> 1.
+		'compactionSourceInputTokens' -> 12000.
+		'compactionResultInputTokens' -> 8500.
+		'omittedMessageCount' -> 7 } asDictionary).
+	response := protocol handleRequest: (self request: 'sessions.get' params: ({ 'sessionId' -> sessionId } asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self assert: (result at: 'compactionCount') equals: 1.
+	self assert: (result at: 'sessionCompactionCount') equals: 1.
+	self assert: ((result at: 'lastCompaction') at: 'compactionResultInputTokens') equals: 8500
+]
