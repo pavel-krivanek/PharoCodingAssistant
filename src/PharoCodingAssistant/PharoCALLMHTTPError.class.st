@@ -26,9 +26,9 @@ PharoCALLMHTTPError class >> statusCode: anInteger responseBody: anObject [
 { #category : 'testing' }
 PharoCALLMHTTPError >> looksLikeContextOverflow [
 	| body markers |
-	(#(400 413) includes: statusCode) ifFalse: [ ^ false ].
+	(#(400 413 500) includes: statusCode) ifFalse: [ ^ false ].
 	body := self responseBodyText asLowercase.
-	markers := #('context length' 'context_length' 'maximum context' 'context window' 'too many tokens' 'prompt is too long' 'input is too long' 'token limit').
+	markers := #('context length' 'context_length' 'maximum context' 'context window' 'context size' 'context_size' 'exceed_context_size' 'exceeds the available context' 'too many tokens' 'prompt is too long' 'input is too long' 'token limit').
 	^ markers anySatisfy: [ :marker | body includesSubstring: marker ]
 ]
 

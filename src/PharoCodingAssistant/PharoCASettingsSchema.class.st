@@ -24,6 +24,8 @@ PharoCASettingsSchema >> knownKeys [
 		'systemPrompt'
 		'context.reservedOutputTokens'
 		'context.safetyMarginTokens'
+		'context.compactionTriggerPercent'
+		'context.compactionTriggerTokens'
 		'context.compactionEnabled'
 		'context.summarizationEnabled'
 		'context.overflowRecoveryAttempts'
@@ -52,7 +54,9 @@ PharoCASettingsSchema >> validationErrorForKey: aKey value: value [
 	key = 'reasoningEffort' ifTrue: [ ^ (value isString or: [ value isSymbol ]) ifFalse: [ 'Must be a string or symbol' ] ].
 	key = 'systemPrompt' ifTrue: [ ^ value isString ifFalse: [ 'Must be a string' ] ].
 	key = 'context.reservedOutputTokens' ifTrue: [ ^ (value isNil or: [ value isInteger and: [ value >= 0 ] ]) ifFalse: [ 'Must be nil or a non-negative integer' ] ].
-	key = 'context.safetyMarginTokens' ifTrue: [ ^ (value isInteger and: [ value >= 0 ]) ifFalse: [ 'Must be a non-negative integer' ] ].
+	key = 'context.safetyMarginTokens' ifTrue: [ ^ (value isNil or: [ value isInteger and: [ value >= 0 ] ]) ifFalse: [ 'Must be nil or a non-negative integer' ] ].
+	key = 'context.compactionTriggerPercent' ifTrue: [ ^ (value isNil or: [ value isInteger and: [ value between: 1 and: 100 ] ]) ifFalse: [ 'Must be nil or an integer from 1 through 100' ] ].
+	key = 'context.compactionTriggerTokens' ifTrue: [ ^ (value isNil or: [ value isInteger and: [ value > 0 ] ]) ifFalse: [ 'Must be nil or a positive integer' ] ].
 	key = 'context.compactionEnabled' ifTrue: [ ^ (value == true or: [ value == false ]) ifFalse: [ 'Must be a boolean' ] ].
 	key = 'context.summarizationEnabled' ifTrue: [ ^ (value == true or: [ value == false ]) ifFalse: [ 'Must be a boolean' ] ].
 	key = 'context.overflowRecoveryAttempts' ifTrue: [ ^ (value isInteger and: [ value >= 0 ]) ifFalse: [ 'Must be a non-negative integer' ] ].

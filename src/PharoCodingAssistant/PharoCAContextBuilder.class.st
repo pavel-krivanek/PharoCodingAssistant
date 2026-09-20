@@ -25,35 +25,50 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 
 { #category : 'building' }
 PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety [
-	| estimator originalMessages messages contextSize reserved safety inputBudget toolTokens messageTokens messageBudget compactedResult finalMessages omitted omittedMessages |
+	| estimator originalMessages messages contextSize reserved safety inputBudget toolTokens messageTokens totalTokens compactionTrigger compactionTarget compactionInputBudget messageBudget hardMessageBudget compactedResult finalMessages omitted omittedMessages |
 	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
 	estimator := aModel tokenEstimator ifNil: [ tokenEstimator ].
 	originalMessages := inputMessages asArray.
 	messages := self normalizedMessagesFrom: originalMessages.
 	contextSize := aModel contextSize.
 	reserved := policy resolvedReservedOutputTokensFor: aModel.
-	safety := policy safetyMarginTokens + additionalSafety.
+	safety := (policy resolvedSafetyMarginTokensFor: aModel) + additionalSafety.
 	toolTokens := estimator estimateObject: tools.
 	messageTokens := estimator estimateMessages: messages.
+	totalTokens := messageTokens + toolTokens.
 
-	contextSize ifNil: [
-		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: nil inputBudget: nil reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
-
-	inputBudget := contextSize - reserved - safety.
-	inputBudget <= 0 ifTrue: [
+	inputBudget := contextSize ifNil: [ nil ] ifNotNil: [ contextSize - reserved - safety ].
+	(inputBudget notNil and: [ inputBudget <= 0 ]) ifTrue: [
 		PharoCAContextOverflow signalRequired: reserved + safety + 1 available: contextSize reason: 'output reserve and safety margin leave no room for input' ].
-
-	(messageTokens + toolTokens <= inputBudget) ifTrue: [
+	compactionTrigger := policy resolvedCompactionTriggerTokensFor: aModel hardInputBudget: inputBudget.
+	(compactionTrigger isNil or: [ totalTokens <= compactionTrigger ]) ifTrue: [
 		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
 
 	policy compactionEnabled ifFalse: [
-		PharoCAContextOverflow signalRequired: messageTokens + toolTokens available: inputBudget reason: 'input exceeds the model budget and compaction is disabled' ].
+		(inputBudget notNil and: [ totalTokens > inputBudget ]) ifTrue: [
+			PharoCAContextOverflow signalRequired: totalTokens available: inputBudget reason: 'input exceeds the model budget and compaction is disabled' ].
+		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
 
-	messageBudget := inputBudget - toolTokens.
+	compactionTarget := policy resolvedCompactionTargetTokensFor: aModel hardInputBudget: inputBudget.
+	compactionTarget ifNil: [ compactionTarget := inputBudget ].
+	compactionInputBudget := compactionTarget.
+	messageBudget := compactionInputBudget - toolTokens.
 	messageBudget <= 0 ifTrue: [
-		PharoCAContextOverflow signalRequired: toolTokens + 1 available: inputBudget reason: 'tool definitions consume the complete input budget' ].
+		(inputBudget notNil and: [ inputBudget > compactionInputBudget ])
+			ifTrue: [ compactionInputBudget := inputBudget. messageBudget := compactionInputBudget - toolTokens ]
+			ifFalse: [ PharoCAContextOverflow signalRequired: toolTokens + 1 available: compactionInputBudget reason: 'tool definitions consume the complete compaction budget' ] ].
+	messageBudget <= 0 ifTrue: [
+		PharoCAContextOverflow signalRequired: toolTokens + 1 available: compactionInputBudget reason: 'tool definitions consume the complete input budget' ].
 
-	compactedResult := self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText.
+	compactedResult := [
+		self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: messageBudget estimator: estimator model: aModel summaryText: summaryText
+	] on: PharoCAContextOverflow do: [ :overflow |
+		(inputBudget notNil and: [ compactionInputBudget < inputBudget ])
+			ifTrue: [
+				hardMessageBudget := inputBudget - toolTokens.
+				hardMessageBudget <= 0 ifTrue: [ overflow pass ].
+				self compactMessages: messages originalMessageCount: originalMessages size toTokenBudget: hardMessageBudget estimator: estimator model: aModel summaryText: summaryText ]
+			ifFalse: [ overflow pass ] ].
 	finalMessages := compactedResult at: 'messages'.
 	omitted := compactedResult at: 'omittedMessageCount'.
 	omittedMessages := compactedResult at: 'omittedMessages'.

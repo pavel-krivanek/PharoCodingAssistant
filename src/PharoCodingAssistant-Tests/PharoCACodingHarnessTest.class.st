@@ -307,3 +307,30 @@ PharoCACodingHarnessTest >> testToolAllowSettingIsAtomicWhenOneToolNameIsUnknown
 	self deny: (harness agent toolProfile allowsTool: PharoCAToolDebugStart).
 	self assert: (harness resources diagnostics anySatisfy: [ :each | each code = #invalidEffectiveSetting ])
 ]
+
+{ #category : 'tests' }
+PharoCACodingHarnessTest >> testReloadAppliesContextCompactionTriggerSettings [
+	| fixture harness global |
+	fixture := self harnessFixture.
+	harness := fixture first.
+	global := fixture second.
+	self write: '{"context.compactionTriggerPercent":75,"context.safetyMarginTokens":null}' to: global / 'settings.json'.
+	harness reloadResources.
+	self assert: harness agent contextBuilder policy compactionTriggerMode equals: 'percent'.
+	self assert: harness agent contextBuilder policy compactionTriggerPercent equals: 75.
+	self assert: harness agent contextBuilder policy compactionTriggerTokens isNil.
+	self assert: harness agent contextBuilder policy safetyMarginTokens isNil
+]
+
+{ #category : 'tests' }
+PharoCACodingHarnessTest >> testReloadAppliesTokenContextCompactionTriggerSetting [
+	| fixture harness global |
+	fixture := self harnessFixture.
+	harness := fixture first.
+	global := fixture second.
+	self write: '{"context.compactionTriggerTokens":123456}' to: global / 'settings.json'.
+	harness reloadResources.
+	self assert: harness agent contextBuilder policy compactionTriggerMode equals: 'tokens'.
+	self assert: harness agent contextBuilder policy compactionTriggerTokens equals: 123456.
+	self assert: harness agent contextBuilder policy compactionTriggerPercent isNil
+]

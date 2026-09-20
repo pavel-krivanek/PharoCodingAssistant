@@ -175,3 +175,17 @@ PharoCAAgentContextTest >> testContextOverflowIsNotRetriedAfterSemanticStreamOut
 	self assert: provider attempts equals: 1.
 	self deny: (run events anySatisfy: [ :each | each type = #contextOverflowRecoveryScheduled ])
 ]
+
+{ #category : 'tests' }
+PharoCAAgentContextTest >> testContextOverflowIsRetriedAfterTelemetryOnlyStreamEvent [
+	| agent provider model run |
+	provider := PharoCATestContextOverflowProvider new emitTelemetryBeforeFailure: true; yourself.
+	model := PharoCAModel named: 'overflow-telemetry-model'.
+	model supportsTools: false; contextSize: 5000; maximumOutputTokens: 0.
+	agent := PharoCA new provider: provider; model: model; yourself.
+	agent contextBuilder policy safetyMarginTokens: 0; overflowRecoveryAttempts: 1.
+	run := agent run: 'question'.
+	self assert: run status equals: #completed.
+	self assert: provider attempts equals: 2.
+	self assert: (run events anySatisfy: [ :each | each type = #contextOverflowRecoveryScheduled ])
+]

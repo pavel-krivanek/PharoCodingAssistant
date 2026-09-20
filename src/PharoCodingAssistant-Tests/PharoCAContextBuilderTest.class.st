@@ -48,7 +48,8 @@ PharoCAContextBuilderTest >> testWithinBudgetKeepsAllMessages [
 	estimator := builder tokenEstimator.
 	toolTokens := estimator estimateObject: #().
 	messageTokens := estimator estimateMessages: conversation asArray.
-	model contextSize: messageTokens + toolTokens + 10.
+	"Keep this test below the proactive 80% trigger; it verifies the no-compaction path."
+	model contextSize: (((messageTokens + toolTokens) * 100) // 70) + 10.
 	context := builder buildFor: conversation tools: #() model: model.
 	self deny: context compacted.
 	self assert: context omittedMessageCount equals: 0.
@@ -223,4 +224,37 @@ PharoCAContextBuilderTest >> testLargeImageDataURLUsesImageBudgetRatherThanBase6
 	context := builder buildFor: conversation tools: #() model: model.
 	self assert: context fits.
 	self assert: context estimatedMessageTokens < 3000
+]
+
+{ #category : 'tests' }
+PharoCAContextBuilderTest >> testProactiveCompactionCreatesHeadroomBeforeHardLimit [
+	| builder conversation model estimator totalTokens context hardBudget target |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	estimator := builder tokenEstimator.
+	totalTokens := (estimator estimateMessages: conversation asArray) + (estimator estimateObject: #()).
+	model contextSize: (((totalTokens * 110) // 100) max: totalTokens + 1).
+	hardBudget := model contextSize.
+	target := builder policy resolvedCompactionTargetTokensFor: model hardInputBudget: hardBudget.
+	context := builder buildFor: conversation tools: #() model: model.
+	self assert: context compacted.
+	self assert: context estimatedInputTokens <= target.
+	self assert: (context messages anySatisfy: [ :each | each textContent = 'current-question' ])
+]
+
+{ #category : 'tests' }
+PharoCAContextBuilderTest >> testDisabledCompactionMayCrossSoftTriggerButNotHardBudget [
+	| builder conversation model estimator totalTokens context |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0; compactionEnabled: false.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	estimator := builder tokenEstimator.
+	totalTokens := (estimator estimateMessages: conversation asArray) + (estimator estimateObject: #()).
+	model contextSize: totalTokens + 10.
+	context := builder buildFor: conversation tools: #() model: model.
+	self deny: context compacted.
+	self assert: context fits
 ]

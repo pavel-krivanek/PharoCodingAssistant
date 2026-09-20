@@ -1,7 +1,7 @@
 Class {
 	#name : 'PharoCATestContextOverflowProvider',
 	#superclass : 'PharoCALLMProvider',
-	#instVars : [ 'attempts', 'failuresBeforeSuccess', 'emitBeforeFailure', 'requests' ],
+	#instVars : [ 'attempts', 'failuresBeforeSuccess', 'emitBeforeFailure', 'emitTelemetryBeforeFailure', 'requests' ],
 	#category : 'PharoCodingAssistant-Tests-Support',
 	#package : 'PharoCodingAssistant-Tests',
 	#tag : 'Support'
@@ -13,6 +13,7 @@ PharoCATestContextOverflowProvider >> initialize [
 	attempts := 0.
 	failuresBeforeSuccess := 1.
 	emitBeforeFailure := false.
+	emitTelemetryBeforeFailure := false.
 	requests := OrderedCollection new
 ]
 
@@ -23,6 +24,8 @@ PharoCATestContextOverflowProvider >> failuresBeforeSuccess: anInteger [ failure
 { #category : 'accessing' }
 PharoCATestContextOverflowProvider >> emitBeforeFailure: aBoolean [ emitBeforeFailure := aBoolean ]
 { #category : 'accessing' }
+PharoCATestContextOverflowProvider >> emitTelemetryBeforeFailure: aBoolean [ emitTelemetryBeforeFailure := aBoolean ]
+{ #category : 'accessing' }
 PharoCATestContextOverflowProvider >> requests [ ^ requests ]
 
 { #category : 'requesting' }
@@ -30,6 +33,7 @@ PharoCATestContextOverflowProvider >> streamRequest: aRequest eventsDo: aBlock c
 	attempts := attempts + 1.
 	requests add: aRequest.
 	attempts <= failuresBeforeSuccess ifTrue: [
+		emitTelemetryBeforeFailure ifTrue: [ aBlock value: (PharoCALLMStreamEvent type: #providerPromptProgress payload: Dictionary new) ].
 		emitBeforeFailure ifTrue: [ aBlock value: (PharoCALLMStreamEvent type: #textDelta payload: 'partial') ].
 		PharoCALLMHTTPError statusCode: 400 responseBody: 'maximum context length exceeded: too many tokens' ].
 	aBlock value: (PharoCALLMStreamEvent type: #textDelta payload: 'ok').

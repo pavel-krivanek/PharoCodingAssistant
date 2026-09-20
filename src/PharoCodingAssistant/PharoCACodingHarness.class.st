@@ -76,6 +76,9 @@ PharoCACodingHarness >> applyEffectiveSettingsTo: anAgent [
 	self applySetting: 'systemPrompt' from: settings do: [ :value | anAgent configuration systemPrompt: value ].
 	self applySetting: 'context.reservedOutputTokens' from: settings do: [ :value | anAgent contextBuilder policy reservedOutputTokens: value ].
 	self applySetting: 'context.safetyMarginTokens' from: settings do: [ :value | anAgent contextBuilder policy safetyMarginTokens: value ].
+	"Percentage is applied first so an explicitly configured token limit wins if both settings are present."
+	self applySetting: 'context.compactionTriggerPercent' from: settings do: [ :value | anAgent contextBuilder policy compactionTriggerPercent: value ].
+	self applySetting: 'context.compactionTriggerTokens' from: settings do: [ :value | anAgent contextBuilder policy compactionTriggerTokens: value ].
 	self applySetting: 'context.compactionEnabled' from: settings do: [ :value | anAgent contextBuilder policy compactionEnabled: value ].
 	self applySetting: 'context.summarizationEnabled' from: settings do: [ :value | anAgent contextBuilder policy summarizationEnabled: value ].
 	self applySetting: 'context.overflowRecoveryAttempts' from: settings do: [ :value | anAgent contextBuilder policy overflowRecoveryAttempts: value ].

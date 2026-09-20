@@ -1302,7 +1302,7 @@ PharoCAExternalProtocolTest >> testFreshSessionKeepsCompleteSlashCommandCatalogI
 	} asDictionary)).
 	self assert: (completion at: 'ok').
 	labels := (((completion at: 'result') at: 'items') collect: [ :each | each at: 'label' ]) asSet.
-	#('/help' '/status' '/sessions' '/new [name]' '/continue' '/templates' '/models' '/model [modelId]' '/skills' '/reasoning [provider-default|MODEL-OPTION]' '/max-iterations [off|N]' '/checkpoint [label]' '/checkpoints')
+	#('/help' '/status' '/sessions' '/new [name]' '/continue' '/templates' '/models' '/model [modelId]' '/skills' '/reasoning [provider-default|MODEL-OPTION]' '/max-iterations [off|N]' '/context' '/context-limit [auto|N|N%]' '/checkpoint [label]' '/checkpoints')
 		do: [ :usage | self assert: (labels includes: usage) ].
 	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
 		'line' -> '/skills'.
@@ -1521,4 +1521,79 @@ PharoCAExternalProtocolTest >> testReasoningCommandCompletionUsesAdvertisedModel
 	self assert: (values includes: '/reasoning on').
 	self deny: (values includes: '/reasoning high').
 	self deny: (values includes: '/reasoning max')
+]
+
+{ #category : 'tests-075' }
+PharoCAExternalProtocolTest >> testContextLimitSlashCommandSupportsPercentTokensAutoAndCompletion [
+	| response result completion items completions policy |
+	harness agent model contextSize: 200000; maximumOutputTokens: 0.
+	policy := harness agent contextBuilder policy.
+	policy safetyMarginTokens: 0.
+
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/context-limit 75%'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self assert: (result at: 'mode') equals: 'percent'.
+	self assert: (result at: 'compactionTriggerTokens') equals: 150000.
+	self assert: (result at: 'compactionTargetTokens') equals: 135000.
+
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/context-limit 120000'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self assert: (result at: 'mode') equals: 'tokens'.
+	self assert: (result at: 'compactionTriggerTokens') equals: 120000.
+	self assert: (result at: 'compactionTargetTokens') equals: 108000.
+
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/context-limit auto'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self assert: (result at: 'mode') equals: 'auto'.
+	self assert: (result at: 'compactionTriggerTokens') equals: 160000.
+	self assert: (result at: 'compactionTargetTokens') equals: 144000.
+
+	completion := protocol handleRequest: (self request: 'commands.complete' params: ({
+		'line' -> '/context-limit 8'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	items := (completion at: 'result') at: 'items'.
+	completions := items collect: [ :each | each at: 'completion' ].
+	self assert: (completions includes: '/context-limit 80%').
+	self assert: (completions includes: '/context-limit 85%')
+]
+
+{ #category : 'tests-075' }
+PharoCAExternalProtocolTest >> testContextStatusReportsHardAndSoftBudgets [
+	| response result |
+	harness agent model contextSize: 100000; maximumOutputTokens: 10000.
+	harness agent contextBuilder policy safetyMarginTokens: 5000.
+	response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+		'line' -> '/context'.
+		'agentId' -> 'default'
+	} asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	self assert: (result at: 'hardInputBudgetTokens') equals: 85000.
+	self assert: (result at: 'compactionTriggerTokens') equals: 80000.
+	self assert: (result at: 'compactionTargetTokens') equals: 72000
+]
+
+{ #category : 'tests-075' }
+PharoCAExternalProtocolTest >> testContextLimitSlashCommandRejectsInvalidValues [
+	| response |
+	#('/context-limit 0' '/context-limit 101%' '/context-limit nope') do: [ :line |
+		response := protocol handleRequest: (self request: 'commands.executeLine' params: ({
+			'line' -> line.
+			'agentId' -> 'default'
+		} asDictionary)).
+		self deny: (response at: 'ok').
+		self assert: ((response at: 'error') at: 'code') equals: 'invalid_params' ]
 ]

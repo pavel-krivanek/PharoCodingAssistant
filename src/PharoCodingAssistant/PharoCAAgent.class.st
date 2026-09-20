@@ -535,7 +535,9 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 				[
 					response := activeProvider
 						streamRequest: request
-						eventsDo: [ :event | semanticEventEmitted := true. run recordLLMEvent: event ]
+						eventsDo: [ :event |
+							(self streamEventCarriesAssistantOutput: event) ifTrue: [ semanticEventEmitted := true ].
+							run recordLLMEvent: event ]
 						cancellation: requestToken
 						retryDo: [ :retry | run emit: #providerRetryScheduled payload: retry ]
 				] on: PharoCALLMHTTPError do: [ :error |
@@ -565,6 +567,12 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 		'interrupted' -> interrupted.
 		'response' -> response
 	} asDictionary
+]
+
+{ #category : 'context-private' }
+PharoCAAgent >> streamEventCarriesAssistantOutput: event [
+	"Only model output commits the stream. Prompt progress, timing/metrics and usage telemetry may precede a provider-side context rejection and are safe to retry."
+	^ #(#textDelta #reasoningDelta #toolCallDelta) includes: event type
 ]
 
 { #category : 'control-private' }

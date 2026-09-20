@@ -352,6 +352,17 @@ PharoCAExternalProtocol >> commandCompletionSuggestionsForLine: line params: par
 				'label' -> value.
 				'description' -> 'disable the model-iteration guard'
 			} asDictionary ]) asArray ].
+	commandName = 'context-limit' ifTrue: [
+		candidates := #('auto' '70%' '75%' '80%' '85%' '90%') select: [ :value | value beginsWith: argumentPrefix ].
+		^ (candidates collect: [ :value |
+			{
+				'kind' -> 'contextLimit'.
+				'completion' -> ('/context-limit ', value).
+				'label' -> value.
+				'description' -> ((value = 'auto')
+					ifTrue: [ 'restore the model-aware automatic compaction trigger' ]
+					ifFalse: [ 'compact before the estimated input reaches this percentage of the model context' ])
+			} asDictionary ]) asArray ].
 	commandName = 'model' ifFalse: [ ^ #() ].
 	agentId := self agentIdentifierFromParams: params required: false.
 	currentModel := (self agentDescriptorNamed: agentId) at: 'model'.
@@ -733,6 +744,63 @@ PharoCAExternalProtocol >> inspectTargetForKind: kind params: params [
 ]
 
 { #category : 'commands-private' }
+PharoCAExternalProtocol >> contextLimitCommand: params [
+	| argument normalized agentId agent policy value numberText |
+	argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
+	agentId := self agentIdentifierFromParams: params required: false.
+	agent := harness agentManager agentNamed: agentId.
+	policy := agent contextBuilder policy.
+	argument isEmpty ifFalse: [
+		normalized := argument asLowercase.
+		normalized = 'auto'
+			ifTrue: [ policy clearCompactionTriggerOverride ]
+			ifFalse: [
+				argument last = $%
+					ifTrue: [
+						numberText := argument allButLast trimBoth.
+						value := [ numberText asInteger ] on: Error do: [ :error | nil ].
+						(value isInteger and: [ value between: 1 and: 100 ]) ifFalse: [
+							PharoCAProtocolError code: 'invalid_params' message: 'context-limit percentage must be an integer from 1% through 100%' ].
+						policy compactionTriggerPercent: value ]
+					ifFalse: [
+						value := [ argument asInteger ] on: Error do: [ :error | nil ].
+						(value isInteger and: [ value > 0 ]) ifFalse: [
+							PharoCAProtocolError code: 'invalid_params' message: 'context-limit token count must be positive' ].
+						policy compactionTriggerTokens: value ] ] ].
+	^ self contextLimitStatusForAgentId: agentId
+]
+
+{ #category : 'commands-private' }
+PharoCAExternalProtocol >> contextLimitStatusForAgentId: agentId [
+	| agent model policy contextSize reserved safety hardBudget trigger target |
+	agent := harness agentManager agentNamed: agentId.
+	model := agent model.
+	policy := agent contextBuilder policy.
+	contextSize := model contextSize.
+	reserved := policy resolvedReservedOutputTokensFor: model.
+	safety := policy resolvedSafetyMarginTokensFor: model.
+	hardBudget := contextSize ifNil: [ nil ] ifNotNil: [ (contextSize - reserved - safety) max: 0 ].
+	trigger := policy resolvedCompactionTriggerTokensFor: model hardInputBudget: hardBudget.
+	target := policy resolvedCompactionTargetTokensFor: model hardInputBudget: hardBudget.
+	^ {
+		'agentId' -> agentId.
+		'model' -> model name.
+		'modelContextTokens' -> contextSize.
+		'mode' -> policy compactionTriggerMode.
+		'configuredTokens' -> policy compactionTriggerTokens.
+		'configuredPercent' -> policy compactionTriggerPercent.
+		'defaultPercent' -> policy defaultCompactionTriggerPercent.
+		'compactionTriggerTokens' -> trigger.
+		'compactionTargetTokens' -> target.
+		'hardInputBudgetTokens' -> hardBudget.
+		'reservedOutputTokens' -> reserved.
+		'safetyMarginTokens' -> safety.
+		'safetyMarginMode' -> (policy safetyMarginTokens ifNil: [ 'auto' ] ifNotNil: [ 'tokens' ]).
+		'compactionEnabled' -> policy compactionEnabled
+	} asDictionary
+]
+
+{ #category : 'commands-private' }
 PharoCAExternalProtocol >> maxIterationsCommand: params [
 	| argument agentId agent normalized value |
 	argument := (params at: 'argument' ifAbsent: [ '' ]) trimBoth.
@@ -923,6 +991,10 @@ PharoCAExternalProtocol >> registerDefaultCommands [
 				self agentsSetReasoningEffort: p ] ]).
 	commandRegistry register: (PharoCACommand named: 'max-iterations' description: 'Show, enable, or disable the optional model-iteration guard for the current agent' usage: '/max-iterations [off|N]' handler: [ :params |
 		self maxIterationsCommand: params ]).
+	commandRegistry register: (PharoCACommand named: 'context' description: 'Show context window, reserves, and compaction thresholds for the current agent' usage: '/context' handler: [ :params |
+		self contextLimitStatusForAgentId: (self agentIdentifierFromParams: params required: false) ]).
+	commandRegistry register: (PharoCACommand named: 'context-limit' description: 'Show or set the proactive compaction trigger by token count or model-context percentage' usage: '/context-limit [auto|N|N%]' handler: [ :params |
+		self contextLimitCommand: params ]).
 	commandRegistry register: (PharoCACommand named: 'checkpoint' description: 'Create a semantic image checkpoint' usage: '/checkpoint [label]' handler: [ :params |
 		| argument p |
 		argument := params at: 'argument' ifAbsent: [ '' ].

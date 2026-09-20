@@ -624,7 +624,8 @@ A simple project `.pharo-ca/settings.json` can look like:
   "toolTimeoutMilliseconds": 60000,
   "reasoningEffort": "medium",
   "context.reservedOutputTokens": 8192,
-  "context.safetyMarginTokens": 512,
+  "context.safetyMarginTokens": null,
+  "context.compactionTriggerPercent": 80,
   "context.compactionEnabled": true,
   "context.summarizationEnabled": false,
   "skill.discoveryCharacterBudget": 4000,
@@ -641,7 +642,9 @@ Known settings are:
 - `reasoningEffort`
 - `systemPrompt`
 - `context.reservedOutputTokens`
-- `context.safetyMarginTokens`
+- `context.safetyMarginTokens` — explicit safety reserve; `null` uses the automatic reserve (8% of the model context, at least 256 tokens)
+- `context.compactionTriggerPercent` — optional proactive compaction trigger as 1–100% of the model context
+- `context.compactionTriggerTokens` — optional proactive compaction trigger as an absolute token count; if both trigger settings are supplied, the token setting wins
 - `context.compactionEnabled`
 - `context.summarizationEnabled`
 - `context.overflowRecoveryAttempts`
@@ -1100,6 +1103,8 @@ The current built-in command set includes:
 /skills
 /reasoning [provider-default|MODEL-OPTION]
 /max-iterations [off|N]
+/context
+/context-limit [auto|N|N%]
 /checkpoint [label]
 /checkpoints
 ```
@@ -1109,6 +1114,10 @@ The root `/` completion is queried from the server rather than being hard-coded 
 ## Context and token telemetry
 
 For useful context-fill information PCA uses `PharoCAModel>>contextSize`. With current LM Studio, model discovery fills this automatically from the **loaded instance** context and separately records `maximumContextSize`; manual configuration is needed only when the provider does not expose usable metadata or when you intentionally override it.
+
+Context compaction deliberately leaves headroom instead of packing the next request up to the provider limit. By default PCA reserves 8% of the physical model context as a safety margin, begins proactive compaction at 80% of the physical context (capped by the hard input budget after output reserve and safety margin), and compacts toward 90% of that trigger. This creates hysteresis so a large tool result or the next turn does not immediately force another compaction. The latest active conversation turn/tool chain remains protected; if it cannot fit the preferred target, PCA may use the larger hard budget rather than discard active work.
+
+Use `/context` to inspect the detected model window, output reserve, safety reserve, hard input budget, proactive trigger and post-compaction target. Use `/context-limit 80%` (or another percentage), `/context-limit 150000` (absolute estimated input tokens), and `/context-limit auto` to restore the model-aware default for the current agent. Persistent equivalents are `context.compactionTriggerPercent` and `context.compactionTriggerTokens` in settings.
 
 The UI distinguishes:
 
@@ -1263,7 +1272,9 @@ Remember that the runtime profile is loaded once per harness. A new harness will
 
 ### Wrong context percentage
 
-Set the actual model context size:
+First use `/context` to distinguish the provider/model physical context window from PCA's proactive compaction trigger. `/context-limit` changes only when PCA compacts; it does not falsify the model's actual context size.
+
+If the detected physical context itself is wrong, set the actual model context size:
 
 ```smalltalk
 (harness modelRegistry modelNamed: 'my-model-api-id')

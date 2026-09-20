@@ -169,7 +169,7 @@ PharoCAResourceLoader >> initialize [
 		'timeout' -> 3600.
 		'temperature' -> 0.0.
 		'toolTimeoutMilliseconds' -> 60000.
-		'context.safetyMarginTokens' -> 256.
+		'context.safetyMarginTokens' -> nil.
 		'context.compactionEnabled' -> true.
 		'context.summarizationEnabled' -> false.
 		'context.overflowRecoveryAttempts' -> 1.
