@@ -106,3 +106,8 @@ PharoCAContextPolicyTest >> testProviderInputCalibrationRaisesButDoesNotLowerEst
 	policy observeProviderInputTokens: 5000 estimatedInputTokens: 5000 model: model.
 	self assert: ((policy inputTokenEstimateScaleFor: model) closeTo: 1.42 precision: 0.0001)
 ]
+
+{ #category : 'tests-080' }
+PharoCAContextPolicyTest >> testRollingSummarizationIsEnabledByDefault [
+	self assert: PharoCAContextPolicy new summarizationEnabled
+]

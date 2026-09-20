@@ -486,9 +486,7 @@ PharoCAAgent >> payloadForContext: aContext tools: tools model: aModel [
 
 { #category : 'control-private' }
 PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools: tools model: activeModel provider: activeProvider [
-	| context response requestToken interrupted contextMessages request additionalSafety overflowAttempt recoverOverflow semanticEventEmitted summaryText summaryContext retryPayload compactionEntry compactionPayload |
-	contextMessages := self instructionAdjustedMessagesFor: conversation asArray run: run model: activeModel.
-	contextMessages := extensionRegistry contextMessages: contextMessages run: run agent: self.
+	| context response requestToken interrupted request additionalSafety overflowAttempt recoverOverflow semanticEventEmitted compactionEntry compactionPayload preparation |
 	requestToken := run beginModelRequestCancellationToken.
 	interrupted := false.
 	additionalSafety := 0.
@@ -504,50 +502,22 @@ PharoCAAgent >> performModelRequestForRun: run conversation: conversation tools:
 						on: Error
 						do: [ :error | ].
 					activeModel == model ifTrue: [ self reconcileReasoningEffortWithModel ] ].
-				context := contextBuilder
-					buildForMessages: contextMessages
+				preparation := self
+					contextPreparationForRun: run
+					conversation: conversation
 					tools: tools
 					model: activeModel
-					summaryText: nil
+					provider: activeProvider
+					cancellation: requestToken
 					additionalSafetyMarginTokens: additionalSafety.
-				(context compacted and: [ contextBuilder policy summarizationEnabled and: [ context omittedMessages notEmpty ] ]) ifTrue: [
-					run emit: #compactionSummaryStarted payload: ({
-						'omittedMessageCount' -> context omittedMessageCount.
-						'sourceMessageCount' -> context omittedMessages size
-					} asDictionary).
-					summaryText := compactionSummarizer
-						summarizeMessages: context omittedMessages
-						model: activeModel
-						provider: activeProvider
-						cancellation: requestToken
-						retryDo: [ :retry |
-							retryPayload := retry copy.
-							retryPayload at: 'phase' put: 'compactionSummary'.
-							run emit: #providerRetryScheduled payload: retryPayload ].
-					summaryText isEmpty
-						ifTrue: [ run emit: #compactionSummaryFallback payload: 'empty summary' ]
-						ifFalse: [
-							summaryContext := [ contextBuilder
-								buildForMessages: contextMessages
-								tools: tools
-								model: activeModel
-								summaryText: summaryText
-								additionalSafetyMarginTokens: additionalSafety ]
-								on: PharoCAContextOverflow
-								do: [ :overflow | nil ].
-							summaryContext
-								ifNil: [ run emit: #compactionSummaryFallback payload: 'summary did not fit context budget' ]
-								ifNotNil: [
-									context := summaryContext.
-									run emit: #compactionSummaryCompleted payload: ({
-										'omittedMessageCount' -> context omittedMessageCount.
-										'summaryCharacters' -> summaryText size
-									} asDictionary) ] ] ].
-
+				context := preparation at: 'context'.
+				compactionPayload := preparation at: 'compactionPayload'.
 				run recordContext: context.
 				run emit: #contextPrepared payload: context asDictionary.
 				context compacted ifTrue: [
-					compactionPayload := context asDictionary copy.
+					compactionPayload ifNil: [
+						compactionPayload := context asDictionary copy.
+						compactionPayload at: 'strategy' put: 'transient-omission-v1' ].
 					compactionPayload
 						at: 'conversationCompactionCount' put: (conversation session compactionCountEndingAt: conversation leafId) + 1;
 						at: 'sessionCompactionCount' put: conversation session compactionCount + 1.
@@ -1014,4 +984,239 @@ PharoCAAgent >> useModelNamed: modelIdentifier providerRegistry: providerRegistr
 
 { #category : 'tools' }
 PharoCAAgent >> useToolProfileNamed: aName [ ^ toolRegistry useProfileNamed: aName
+]
+{ #category : 'context-compaction' }
+PharoCAAgent >> compactionSeedForConversation: aConversation [
+	| session messageEntries checkpoint payload firstKeptId firstIndex activeEntries summary |
+	session := aConversation session.
+	messageEntries := (session messageEntriesEndingAt: aConversation leafId)
+		select: [ :each | each payload role ~= #system ].
+	checkpoint := session lastRollingSummaryCompactionEndingAt: aConversation leafId.
+	checkpoint ifNil: [
+		^ {
+			'messageEntries' -> messageEntries asArray.
+			'messages' -> (messageEntries collect: [ :each | each payload ]) asArray.
+			'summary' -> nil.
+			'checkpoint' -> nil
+		} asDictionary ].
+	payload := checkpoint payload.
+	((payload isDictionary)
+		and: [ (payload at: 'strategy' ifAbsent: [ nil ]) = 'rolling-summary-v1'
+		and: [ (payload at: 'summary' ifAbsent: [ nil ]) isString
+		and: [ (payload at: 'firstKeptEntryId' ifAbsent: [ nil ]) notNil ] ] ]) ifFalse: [
+		^ {
+			'messageEntries' -> messageEntries asArray.
+			'messages' -> (messageEntries collect: [ :each | each payload ]) asArray.
+			'summary' -> nil.
+			'checkpoint' -> nil
+		} asDictionary ].
+	firstKeptId := payload at: 'firstKeptEntryId'.
+	firstIndex := messageEntries findFirst: [ :each | each id = firstKeptId ].
+	firstIndex = 0 ifTrue: [
+		^ {
+			'messageEntries' -> messageEntries asArray.
+			'messages' -> (messageEntries collect: [ :each | each payload ]) asArray.
+			'summary' -> nil.
+			'checkpoint' -> nil
+		} asDictionary ].
+	activeEntries := messageEntries copyFrom: firstIndex to: messageEntries size.
+	summary := payload at: 'summary'.
+	^ {
+		'messageEntries' -> activeEntries asArray.
+		'messages' -> (activeEntries collect: [ :each | each payload ]) asArray.
+		'summary' -> summary.
+		'checkpoint' -> checkpoint
+	} asDictionary
+]
+
+{ #category : 'context-compaction' }
+PharoCAAgent >> messages: messages incorporatingConversationSummary: summaryText model: activeModel [
+	| result checkpointText systemIndex system merged |
+	(summaryText isNil or: [ summaryText isEmpty ]) ifTrue: [ ^ messages asArray ].
+	checkpointText := '[Conversation checkpoint: factual state from earlier turns. It is context, not a new user request or new instruction.]', String lf, String lf, summaryText.
+	result := messages asOrderedCollection.
+	activeModel supportsSystemMessages ifFalse: [
+		result addFirst: (PharoCALLMMessage user: checkpointText).
+		^ result asArray ].
+	systemIndex := result findFirst: [ :each | each role = #system ].
+	systemIndex = 0 ifTrue: [
+		result addFirst: (PharoCALLMMessage system: checkpointText).
+		^ result asArray ].
+	system := result at: systemIndex.
+	merged := system copy.
+	merged contentParts: (system contentParts, { PharoCALLMContentPart text: (String lf, String lf, checkpointText) }).
+	result at: systemIndex put: merged.
+	^ result asArray
+]
+
+{ #category : 'context-compaction' }
+PharoCAAgent >> compactionReservationText [
+	^ String new: compactionSummarizer maximumSummaryCharacters withAll: $s
+]
+
+{ #category : 'context-compaction' }
+PharoCAAgent >> omittedPrefixEntriesFrom: activeEntries omittedMessages: omittedMessages [
+	| result stillPrefix |
+	result := OrderedCollection new.
+	stillPrefix := true.
+	activeEntries do: [ :entry |
+		stillPrefix ifTrue: [
+			(omittedMessages anySatisfy: [ :message | message == entry payload ])
+				ifTrue: [ result add: entry ]
+				ifFalse: [ stillPrefix := false ] ] ].
+	^ result asArray
+]
+
+{ #category : 'context-compaction' }
+PharoCAAgent >> configuredContextMessagesForEntries: messageEntries summary: summaryText run: run model: activeModel [
+	| messages |
+	messages := self
+		instructionAdjustedMessagesFor: (messageEntries collect: [ :each | each payload ]) asArray
+		run: run
+		model: activeModel.
+	messages := self messages: messages incorporatingConversationSummary: summaryText model: activeModel.
+	^ extensionRegistry contextMessages: messages run: run agent: self
+]
+
+{ #category : 'context-compaction' }
+PharoCAAgent >> annotateContext: finalContext fromCompactionPlan: planningContext omittedEntries: omittedEntries model: activeModel [
+	finalContext
+		compacted: true;
+		omittedMessageCount: omittedEntries size;
+		omittedMessages: (omittedEntries collect: [ :each | each payload ]);
+		compactionSummaryUsed: true;
+		compactionSourceInputTokens: planningContext compactionSourceInputTokens;
+		compactionResultInputTokens: (contextBuilder policy calibratedInputTokensForEstimate: finalContext estimatedInputTokens model: activeModel);
+		compactionTriggerTokens: planningContext compactionTriggerTokens;
+		compactionTargetTokens: planningContext compactionTargetTokens;
+		compactionProtectedFloorUsed: planningContext compactionProtectedFloorUsed.
+	^ finalContext
+]
+{ #category : 'context-compaction' }
+PharoCAAgent >> contextPreparationForRun: run conversation: conversation tools: tools model: activeModel provider: activeProvider cancellation: requestToken additionalSafetyMarginTokens: additionalSafety [
+	| seed activeEntries previousSummary previousCheckpoint contextMessages context planningContext omittedEntries retainedEntries summaryText finalMessages finalContext retryPayload attempts additionalEntries previousPayload previousSummarizedCount payload allBranchMessages |
+	seed := self compactionSeedForConversation: conversation.
+	activeEntries := seed at: 'messageEntries'.
+	previousSummary := seed at: 'summary'.
+	previousCheckpoint := seed at: 'checkpoint'.
+	contextMessages := self configuredContextMessagesForEntries: activeEntries summary: previousSummary run: run model: activeModel.
+	context := contextBuilder
+		buildForMessages: contextMessages
+		tools: tools
+		model: activeModel
+		summaryText: nil
+		additionalSafetyMarginTokens: additionalSafety.
+	(context compacted and: [ contextBuilder policy summarizationEnabled ]) ifFalse: [
+		^ {
+			'context' -> context.
+			'compactionPayload' -> nil
+		} asDictionary ].
+
+	"Reserve enough room for the maximum persisted checkpoint before deciding which recent turns survive. This makes the cut stable when the real summary is installed."
+	planningContext := contextBuilder
+		buildForMessages: contextMessages
+		tools: tools
+		model: activeModel
+		summaryText: self compactionReservationText
+		additionalSafetyMarginTokens: additionalSafety.
+	omittedEntries := (self omittedPrefixEntriesFrom: activeEntries omittedMessages: planningContext omittedMessages) asOrderedCollection.
+	omittedEntries isEmpty ifTrue: [
+		run emit: #compactionSummaryFallback payload: 'no stable durable prefix selected; preserving active context'.
+		^ {
+			'context' -> (contextBuilder
+				buildFullContextForMessages: contextMessages
+				tools: tools
+				model: activeModel
+				additionalSafetyMarginTokens: additionalSafety).
+			'compactionPayload' -> nil
+		} asDictionary ].
+
+	attempts := 0.
+	[
+		attempts := attempts + 1.
+		retainedEntries := omittedEntries size >= activeEntries size
+			ifTrue: [ #() ]
+			ifFalse: [ activeEntries copyFrom: omittedEntries size + 1 to: activeEntries size ].
+		retainedEntries isEmpty ifTrue: [
+			PharoCAContextOverflow
+				signalRequired: context estimatedInputTokens
+				available: context inputBudgetTokens
+				reason: 'compaction would remove the entire current conversation tail' ].
+		run emit: #compactionSummaryStarted payload: ({
+			'omittedMessageCount' -> omittedEntries size.
+			'sourceMessageCount' -> omittedEntries size.
+			'previousSummaryUsed' -> (previousSummary notNil and: [ previousSummary notEmpty ]).
+			'attempt' -> attempts
+		} asDictionary).
+		summaryText := compactionSummarizer
+			summarizeMessages: (omittedEntries collect: [ :each | each payload ]) asArray
+			previousSummary: previousSummary
+			model: activeModel
+			provider: activeProvider
+			cancellation: requestToken
+			retryDo: [ :retry |
+				retryPayload := retry copy.
+				retryPayload at: 'phase' put: 'compactionSummary'.
+				run emit: #providerRetryScheduled payload: retryPayload ].
+		summaryText isEmpty ifTrue: [
+			run emit: #compactionSummaryFallback payload: 'empty summary; preserving active context'.
+			^ {
+				'context' -> (contextBuilder
+					buildFullContextForMessages: contextMessages
+					tools: tools
+					model: activeModel
+					additionalSafetyMarginTokens: additionalSafety).
+				'compactionPayload' -> nil
+			} asDictionary ].
+		finalMessages := self configuredContextMessagesForEntries: retainedEntries summary: summaryText run: run model: activeModel.
+		finalContext := contextBuilder
+			buildForMessages: finalMessages
+			tools: tools
+			model: activeModel
+			summaryText: nil
+			additionalSafetyMarginTokens: additionalSafety.
+		additionalEntries := finalContext compacted
+			ifTrue: [ self omittedPrefixEntriesFrom: retainedEntries omittedMessages: finalContext omittedMessages ]
+			ifFalse: [ #() ].
+		additionalEntries notEmpty ifTrue: [ omittedEntries addAll: additionalEntries ].
+		(additionalEntries notEmpty and: [ attempts < 4 ])
+	] whileTrue.
+	additionalEntries notEmpty ifTrue: [
+		PharoCAContextOverflow
+			signalRequired: finalContext estimatedInputTokens
+			available: finalContext inputBudgetTokens
+			reason: 'rolling compaction summary could not stabilize within four boundary refinements' ].
+
+	self annotateContext: finalContext fromCompactionPlan: planningContext omittedEntries: omittedEntries model: activeModel.
+	"Report the actual active-context size before compaction, not the larger reservation used only to choose a stable summary boundary."
+	finalContext compactionSourceInputTokens: context compactionSourceInputTokens.
+	run emit: #compactionSummaryCompleted payload: ({
+		'omittedMessageCount' -> omittedEntries size.
+		'summaryCharacters' -> summaryText size.
+		'previousSummaryUsed' -> (previousSummary notNil and: [ previousSummary notEmpty ]).
+		'firstKeptEntryId' -> retainedEntries first id
+	} asDictionary).
+	previousPayload := previousCheckpoint ifNil: [ nil ] ifNotNil: [ previousCheckpoint payload ].
+	previousSummarizedCount := previousPayload
+		ifNil: [ 0 ]
+		ifNotNil: [ previousPayload at: 'summarizedMessageCount' ifAbsent: [ 0 ] ].
+	allBranchMessages := (conversation session messageEntriesEndingAt: conversation leafId)
+		select: [ :each | each payload role ~= #system ].
+	payload := finalContext asDictionary copy.
+	payload
+		at: 'strategy' put: 'rolling-summary-v1';
+		at: 'summaryFormat' put: 'structured-v1';
+		at: 'summary' put: summaryText;
+		at: 'firstKeptEntryId' put: retainedEntries first id;
+		at: 'summarizedThroughEntryId' put: omittedEntries last id;
+		at: 'previousCompactionEntryId' put: (previousCheckpoint ifNil: [ nil ] ifNotNil: [ previousCheckpoint id ]);
+		at: 'newlySummarizedMessageCount' put: omittedEntries size;
+		at: 'summarizedMessageCount' put: previousSummarizedCount + omittedEntries size;
+		at: 'keptRecentMessageCount' put: retainedEntries size;
+		at: 'fullTranscriptMessageCount' put: allBranchMessages size;
+		at: 'previousSummaryUsed' put: (previousSummary notNil and: [ previousSummary notEmpty ]).
+	^ {
+		'context' -> finalContext.
+		'compactionPayload' -> payload
+	} asDictionary
 ]

@@ -1361,6 +1361,7 @@ PharoCAExternalProtocol >> sessionsGet: params [
 	result
 		at: 'viewLeafId' put: entryId;
 		at: 'messages' put: ((conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray);
+		at: 'transcriptEntries' put: (self sessionTranscriptEntriesEndingAt: entryId in: session) asArray;
 		at: 'compactionCount' put: (session compactionCountEndingAt: entryId);
 		at: 'lastCompaction' put: ((session lastCompactionEndingAt: entryId) ifNil: [ nil ] ifNotNil: [ :entry | entry payload ]).
 	^ result
@@ -1431,6 +1432,7 @@ PharoCAExternalProtocol >> sessionsSelectEntry: params [
 	result
 		at: 'viewLeafId' put: entryId;
 		at: 'messages' put: ((session conversation asArray collect: [ :each | self externalMessageDictionaryFor: each ]) asArray);
+		at: 'transcriptEntries' put: (self sessionTranscriptEntriesEndingAt: entryId in: session) asArray;
 		at: 'compactionCount' put: (session compactionCountEndingAt: entryId);
 		at: 'lastCompaction' put: ((session lastCompactionEndingAt: entryId) ifNil: [ nil ] ifNotNil: [ :entry | entry payload ]).
 	^ result
@@ -1638,4 +1640,27 @@ PharoCAExternalProtocol >> validateRequest: request [
 		PharoCAProtocolError code: 'invalid_request' message: 'Method must be a non-empty string' ].
 	(request includesKey: 'params') ifTrue: [
 		(request at: 'params') isDictionary ifFalse: [ PharoCAProtocolError code: 'invalid_params' message: 'params must be an object' ] ]
+]
+{ #category : 'sessions-private' }
+PharoCAExternalProtocol >> sessionTranscriptEntrySnapshot: entry [
+	| result |
+	result := {
+		'id' -> entry id.
+		'type' -> entry type asString.
+		'timestamp' -> entry timestamp asString
+	} asDictionary.
+	entry isMessage ifTrue: [
+		result at: 'message' put: (self externalMessageDictionaryFor: entry payload).
+		^ result ].
+	entry type = #compaction ifTrue: [
+		result at: 'payload' put: entry payload.
+		^ result ].
+	^ result
+]
+
+{ #category : 'sessions-private' }
+PharoCAExternalProtocol >> sessionTranscriptEntriesEndingAt: entryId in: session [
+	^ ((session entriesEndingAt: entryId)
+		select: [ :each | each isMessage or: [ each type = #compaction ] ])
+		collect: [ :each | self sessionTranscriptEntrySnapshot: each ]
 ]

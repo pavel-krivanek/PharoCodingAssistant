@@ -102,8 +102,8 @@ PharoCAContextPolicy >> initialize [
 	compactionEnabled := true.
 	compactionTriggerTokens := nil.
 	compactionTriggerPercent := nil.
-	"Summarization performs an additional provider request and is therefore explicit/opt-in."
-	summarizationEnabled := false.
+	"Compaction normally creates a rolling structured summary. It may still be disabled explicitly for deterministic omission-only operation."
+	summarizationEnabled := true.
 	overflowRecoveryAttempts := 1.
 	overflowSafetyMarginIncrementTokens := 1024.
 	inputTokenCalibrationByModel := Dictionary new

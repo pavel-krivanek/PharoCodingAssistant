@@ -45,37 +45,38 @@ PharoCAAgentContextTest >> testRunRecordsPreparedContextAndEmitsAccountingEvent 
 	self assert: ((provider payloads first) at: 'max_tokens') equals: 1000
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests-080' }
 PharoCAAgentContextTest >> testAgentCompactsProviderContextWithoutDestroyingSessionHistory [
-	| agent provider model session conversation run payload contents |
+	| agent provider model session conversation run mainRequest contents durableContents compaction |
 	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: '## Goal\nContinue the current task while preserving earlier decisions.').
 	provider queueResponse: (self completionWith: 'answer').
-	model := PharoCAModel named: 'small-context-model'.
-	model
-		supportsTools: false;
-		contextSize: 500;
-		maximumOutputTokens: 0.
-	agent := PharoCA new
-		provider: provider;
-		model: model;
-		yourself.
-	agent contextBuilder policy safetyMarginTokens: 0.
+	model := PharoCAModel named: 'rolling-context-model'.
+	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
+	agent := PharoCA new provider: provider; model: model; yourself.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true.
 	session := agent newSession.
 	conversation := session conversation.
 	conversation addSystem: agent configuration systemPrompt.
-	conversation addUser: ('old-question-' , (String new: 1000 withAll: $x)).
-	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 1000 withAll: $y))).
+	conversation addUser: ('old-question-' , (String new: 16000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 16000 withAll: $y))).
 	run := agent run: 'current-question' inSession: session.
 	self assert: run status equals: #completed.
 	self assert: run lastContext compacted.
-	payload := provider payloads first.
-	contents := (payload at: 'messages') collect: [ :each | each at: 'content' ifAbsent: [ '' ] ].
-	self assert: (contents includes: 'current-question').
-	self deny: (contents anySatisfy: [ :each | each includesSubstring: 'old-question' ]).
-	self assert: (session messagesEndingAt: session currentLeafId) size > (payload at: 'messages') size.
-	self assert: (session entries anySatisfy: [ :entry | entry type = #compaction ])
+	self assert: provider payloads size equals: 2.
+	mainRequest := provider requests second.
+	contents := mainRequest messages collect: [ :each | each textContent ].
+	self assert: (contents anySatisfy: [ :each | each includesSubstring: 'current-question' ]).
+	self assert: (contents anySatisfy: [ :each | each includesSubstring: 'Continue the current task' ]).
+	self deny: (contents anySatisfy: [ :each | each includesSubstring: 'old-question-' ]).
+	durableContents := (session messagesEndingAt: session currentLeafId) collect: [ :each | each textContent ].
+	self assert: (durableContents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'old-question-' ] ]).
+	self assert: (durableContents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'old-answer-' ] ]).
+	compaction := session lastCompactionEndingAt: session currentLeafId.
+	self assert: (compaction payload at: 'strategy') equals: 'rolling-summary-v1'.
+	self assert: (compaction payload includesKey: 'summary').
+	self assert: (compaction payload includesKey: 'firstKeptEntryId')
 ]
-
 { #category : 'tests' }
 PharoCAAgentContextTest >> testContextOverflowFailsRunBeforeProviderRequest [
 	| agent provider model run |
@@ -116,33 +117,39 @@ PharoCAAgentContextTest >> testProviderRetryIsVisibleInRunEventsAndTelemetry [
 	self assert: ((((telemetry at: 'modelCalls') first) at: 'providerRetries') first at: 'attempt') equals: 1
 ]
 
-{ #category : 'tests' }
+{ #category : 'tests-080' }
 PharoCAAgentContextTest >> testOptionalCompactionSummarizationUsesAuxiliaryProviderRequest [
-	| agent provider model session conversation run mainRequest contents |
+	| agent provider model session conversation run summaryRequest mainRequest contents compaction |
 	provider := PharoCATestLLMProvider new.
-	provider queueResponse: (self completionWith: 'Earlier goal: preserve the semantic journal and continue with checkpoints.').
+	provider queueResponse: (self completionWith: '## Goal\nEarlier goal: preserve the semantic journal and continue with checkpoints.').
 	provider queueResponse: (self completionWith: 'final-answer').
 	model := PharoCAModel named: 'summary-model'.
-	model supportsTools: false; contextSize: 700; maximumOutputTokens: 0.
+	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
 	agent := PharoCA new provider: provider; model: model; yourself.
-	agent contextBuilder policy safetyMarginTokens: 0; summarizationEnabled: true.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true.
 	session := agent newSession.
 	conversation := session conversation.
 	conversation addSystem: agent configuration systemPrompt.
-	conversation addUser: ('old-question-' , (String new: 1000 withAll: $x)).
-	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 1000 withAll: $y))).
+	conversation addUser: ('old-question-' , (String new: 16000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 16000 withAll: $y))).
 	run := agent run: 'current-question' inSession: session.
 	self assert: run status equals: #completed.
 	self assert: provider requests size equals: 2.
+	summaryRequest := provider requests first.
+	self assert: (summaryRequest messages first textContent includesSubstring: '## Key decisions').
+	self assert: (summaryRequest messages first textContent includesSubstring: '## Relevant code, files, commands and exact facts').
+	self assert: (summaryRequest messages second textContent includesSubstring: 'old-question-').
 	mainRequest := provider requests second.
 	contents := mainRequest messages collect: [ :each | each textContent ].
 	self assert: run lastContext compactionSummaryUsed.
 	self assert: (contents anySatisfy: [ :each | each includesSubstring: 'Earlier goal: preserve the semantic journal' ]).
 	self deny: (contents anySatisfy: [ :each | each includesSubstring: 'old-question-' ]).
+	compaction := session lastCompactionEndingAt: session currentLeafId.
+	self assert: (compaction payload at: 'strategy') equals: 'rolling-summary-v1'.
+	self assert: ((compaction payload at: 'summary') includesSubstring: 'Earlier goal: preserve the semantic journal').
 	self assert: (run events anySatisfy: [ :each | each type = #compactionSummaryStarted ]).
 	self assert: (run events anySatisfy: [ :each | each type = #compactionSummaryCompleted ])
 ]
-
 { #category : 'tests' }
 PharoCAAgentContextTest >> testProviderReportedContextOverflowRebuildsWithLargerSafetyMarginAndRetries [
 	| agent provider model run recovery |
@@ -207,20 +214,21 @@ PharoCAAgentContextTest >> testProviderMetricsCalibrateFutureContextEstimates [
 	policy := agent contextBuilder policy.
 	self assert: ((policy inputTokenEstimateScaleFor: model) closeTo: 1.5 precision: 0.0001)
 ]
-{ #category : 'tests-079' }
+{ #category : 'tests-080' }
 PharoCAAgentContextTest >> testCompactionEmitsStatisticsAndCumulativeCounts [
 	| agent provider model session conversation run event payload telemetry |
 	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: '## Goal\nPreserve the prior task state.').
 	provider queueResponse: (self completionWith: 'answer').
 	model := PharoCAModel named: 'compaction-statistics-model'.
 	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
 	agent := PharoCA new provider: provider; model: model; yourself.
-	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 100.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true.
 	session := agent newSession.
 	conversation := session conversation.
 	conversation addSystem: agent configuration systemPrompt.
-	conversation addUser: ('old-question-' , (String new: 2000 withAll: $x)).
-	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 2000 withAll: $y))).
+	conversation addUser: ('old-question-' , (String new: 16000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 16000 withAll: $y))).
 	run := agent run: 'current-question' inSession: session.
 	self assert: run status equals: #completed.
 	event := run events detect: [ :each | each type = #contextCompacted ].
@@ -229,6 +237,73 @@ PharoCAAgentContextTest >> testCompactionEmitsStatisticsAndCumulativeCounts [
 	self assert: (payload at: 'sessionCompactionCount') equals: 1.
 	self assert: (payload at: 'compactionSourceInputTokens') > (payload at: 'compactionResultInputTokens').
 	self assert: (payload at: 'omittedMessageCount') > 0.
+	self assert: (payload at: 'strategy') equals: 'rolling-summary-v1'.
 	telemetry := run telemetry asDictionary.
 	self assert: (telemetry at: 'contextCompactionCount') equals: 1
+]
+
+{ #category : 'tests-080' }
+PharoCAAgentContextTest >> testSubsequentCompactionCarriesPreviousSummaryForwardAndKeepsFullTranscript [
+	| agent provider model session conversation firstRun secondRun compactions secondSummaryRequest secondMainRequest durableContents |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: '## Goal\nG1 prior checkpoint').
+	provider queueResponse: (self completionWith: ('first-answer-' , (String new: 40000 withAll: $z))).
+	provider queueResponse: (self completionWith: '## Goal\nG1+G2 updated checkpoint').
+	provider queueResponse: (self completionWith: 'second-answer').
+	model := PharoCAModel named: 'rolling-summary-model'.
+	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
+	agent := PharoCA new provider: provider; model: model; yourself.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true.
+	session := agent newSession.
+	conversation := session conversation.
+	conversation addSystem: agent configuration systemPrompt.
+	conversation addUser: ('old-question-' , (String new: 16000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 16000 withAll: $y))).
+	firstRun := agent run: 'first-current-question' inSession: session.
+	self assert: firstRun status equals: #completed.
+	secondRun := agent run: 'second-current-question' inSession: session.
+	self assert: secondRun status equals: #completed.
+	self assert: provider requests size equals: 4.
+	compactions := session entries select: [ :each | each type = #compaction ].
+	self assert: compactions size equals: 2.
+	self assert: (compactions second payload at: 'previousCompactionEntryId') equals: compactions first id.
+	self assert: (compactions second payload at: 'previousSummaryUsed').
+	self assert: (compactions second payload at: 'summarizedMessageCount') > (compactions first payload at: 'summarizedMessageCount').
+	secondSummaryRequest := provider requests third.
+	self assert: (secondSummaryRequest messages second textContent includesSubstring: '<previous-checkpoint>').
+	self assert: (secondSummaryRequest messages second textContent includesSubstring: 'G1 prior checkpoint').
+	secondMainRequest := provider requests fourth.
+	self assert: (secondMainRequest messages anySatisfy: [ :each | each textContent includesSubstring: 'G1+G2 updated checkpoint' ]).
+	self deny: (secondMainRequest messages anySatisfy: [ :each | each textContent includesSubstring: 'old-question-' ]).
+	durableContents := (session messagesEndingAt: session currentLeafId) collect: [ :each | each textContent ].
+	self assert: (durableContents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'old-question-' ] ]).
+	self assert: (durableContents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'first-current-question' ] ]).
+	self assert: (durableContents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'second-current-question' ] ])
+]
+
+{ #category : 'tests-080' }
+PharoCAAgentContextTest >> testEmptyCompactionSummaryPreservesFullActiveContextWithoutCheckpoint [
+	| agent provider model session conversation run mainRequest contents |
+	provider := PharoCATestLLMProvider new.
+	provider queueResponse: (self completionWith: '').
+	provider queueResponse: (self completionWith: 'final-answer').
+	model := PharoCAModel named: 'summary-fallback-model'.
+	model supportsTools: false; contextSize: 100000; maximumOutputTokens: 0.
+	agent := PharoCA new provider: provider; model: model; yourself.
+	agent contextBuilder policy safetyMarginTokens: 0; compactionTriggerTokens: 10000; summarizationEnabled: true.
+	session := agent newSession.
+	conversation := session conversation.
+	conversation addSystem: agent configuration systemPrompt.
+	conversation addUser: ('old-question-' , (String new: 16000 withAll: $x)).
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: ('old-answer-' , (String new: 16000 withAll: $y))).
+	run := agent run: 'current-question' inSession: session.
+	self assert: run status equals: #completed.
+	self assert: provider requests size equals: 2.
+	mainRequest := provider requests second.
+	contents := mainRequest messages collect: [ :each | each textContent ].
+	self assert: (contents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'old-question-' ] ]).
+	self assert: (contents anySatisfy: [ :each | each isString and: [ each includesSubstring: 'old-answer-' ] ]).
+	self deny: run lastContext compacted.
+	self assert: (session entries select: [ :each | each type = #compaction ]) isEmpty.
+	self assert: (run events anySatisfy: [ :each | each type = #compactionSummaryFallback ])
 ]

@@ -115,3 +115,25 @@ PharoCASessionTest >> testCompactionCountsAreDurableAndBranchAware [
 	self assert: (session compactionCountEndingAt: main leafId) equals: 1.
 	self assert: (session compactionCountEndingAt: branch leafId) equals: 1
 ]
+
+{ #category : 'tests-080' }
+PharoCASessionTest >> testCompactionSnapshotNeverRemovesDurableMessages [
+	| session conversation before after |
+	session := PharoCASession new.
+	conversation := session conversation.
+	conversation addUser: 'old user'.
+	conversation addAssistantMessage: (self assistantMessage: 'old assistant').
+	conversation addUser: 'current user'.
+	before := session messageEntriesEndingAt: conversation leafId.
+	conversation addCompactionSnapshot: ({
+		'strategy' -> 'rolling-summary-v1'.
+		'summary' -> 'checkpoint'.
+		'firstKeptEntryId' -> before last id } asDictionary).
+	after := session messageEntriesEndingAt: conversation leafId.
+	self assert: after size equals: before size.
+	self assert: (after collect: [ :each | each id ]) asArray equals: (before collect: [ :each | each id ]) asArray.
+	conversation addAssistantMessage: (self assistantMessage: 'new assistant').
+	after := session messageEntriesEndingAt: conversation leafId.
+	self assert: after size equals: before size + 1.
+	self assert: (after first: before size) asArray equals: before asArray
+]

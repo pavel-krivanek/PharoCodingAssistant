@@ -1623,3 +1623,31 @@ PharoCAExternalProtocolTest >> testSessionSnapshotExposesPersistentCompactionSta
 	self assert: (result at: 'sessionCompactionCount') equals: 1.
 	self assert: ((result at: 'lastCompaction') at: 'compactionResultInputTokens') equals: 8500
 ]
+
+{ #category : 'tests-080' }
+PharoCAExternalProtocolTest >> testSessionReloadReturnsFullTranscriptAcrossCompactionCheckpoint [
+	| created sessionId session conversation response result timeline types messages |
+	created := protocol handleRequest: (self request: 'sessions.new' params: ({ 'name' -> 'Rolling transcript' } asDictionary)).
+	sessionId := (created at: 'result') at: 'id'.
+	session := harness sessionManager sessionForId: sessionId.
+	conversation := session conversation.
+	conversation addUser: 'old user'.
+	conversation addAssistantMessage: (PharoCALLMMessage assistant: 'old assistant').
+	conversation addCompactionSnapshot: ({
+		'strategy' -> 'rolling-summary-v1'.
+		'summary' -> 'checkpoint'.
+		'firstKeptEntryId' -> conversation leafId } asDictionary).
+	conversation addUser: 'new user'.
+	response := protocol handleRequest: (self request: 'sessions.get' params: ({ 'sessionId' -> sessionId } asDictionary)).
+	self assert: (response at: 'ok').
+	result := response at: 'result'.
+	messages := result at: 'messages'.
+	self assert: messages size equals: 3.
+	self assert: ((((messages first at: 'contentParts') first) at: 'value') includesSubstring: 'old user').
+	self assert: ((((messages second at: 'contentParts') first) at: 'value') includesSubstring: 'old assistant').
+	self assert: ((((messages third at: 'contentParts') first) at: 'value') includesSubstring: 'new user').
+	timeline := result at: 'transcriptEntries'.
+	types := timeline collect: [ :each | each at: 'type' ].
+	self assert: types asArray equals: #('message' 'message' 'compaction' 'message').
+	self assert: (((timeline third at: 'payload') at: 'summary') includesSubstring: 'checkpoint')
+]

@@ -627,7 +627,7 @@ A simple project `.pharo-ca/settings.json` can look like:
   "context.safetyMarginTokens": null,
   "context.compactionTriggerPercent": 80,
   "context.compactionEnabled": true,
-  "context.summarizationEnabled": false,
+  "context.summarizationEnabled": true,
   "skill.discoveryCharacterBudget": 4000,
   "tools.profile": "coding"
 }
@@ -1115,13 +1115,17 @@ The root `/` completion is queried from the server rather than being hard-coded 
 
 For useful context-fill information PCA uses `PharoCAModel>>contextSize`. With current LM Studio, model discovery fills this automatically from the **loaded instance** context and separately records `maximumContextSize`; manual configuration is needed only when the provider does not expose usable metadata or when you intentionally override it.
 
-Context compaction deliberately leaves headroom instead of packing the next request up to the provider limit. By default PCA reserves 8% of the physical model context as a safety margin, begins proactive compaction at 80% of the physical context (capped by the hard input budget after output reserve and safety margin), and compacts toward 90% of that trigger. This creates hysteresis so a large tool result or the next turn does not immediately force another compaction. The latest active conversation turn/tool chain remains protected. The configured `/context-limit` is a compaction trigger, not a hard request cap: if the irreducible protected context cannot fit the preferred target (or even the trigger), PCA keeps only that smallest protected context and sends it as long as it still fits the real model hard input budget. It does not fail merely because the preferred post-compaction target is unattainable, and it does not re-admit older history just to fill the larger hard budget.
+Context compaction deliberately leaves headroom instead of packing the next request up to the provider limit. By default PCA reserves 8% of the physical model context as a safety margin, begins proactive compaction at 80% of the physical context (capped by the hard input budget after output reserve and safety margin), and aims for 90% of that trigger after compaction. This creates hysteresis so a large tool result or the next turn does not immediately force another compaction. The configured `/context-limit` is a compaction trigger, not a hard request cap.
+
+Normal compaction is **rolling summarization**, not deletion. The `PharoCASession` remains an append-only, lossless transcript. When older turns must leave provider context, PCA asks the model for a structured checkpoint covering goals, constraints, decisions, completed/current work, blockers, exact code/file/command facts, and next steps. A persisted `#compaction` entry stores that summary plus `firstKeptEntryId`; provider context is then reconstructed as `leading system instructions + rolling checkpoint + recent verbatim tail`. The latest active user/tool turn is protected, including synthetic runtime guidance attached to that turn. On a later compaction, the previous checkpoint is supplied to the summarizer together with only the newly aged-out turns, so the summary rolls forward instead of repeatedly summarizing or discarding the whole conversation.
+
+Compaction never removes prior message entries from the durable session. `sessions.get` returns the complete message history and a chronological `transcriptEntries` timeline containing both original messages and persisted compaction markers, so reloading the browser shows the full conversation. The `firstKeptEntryId` boundary affects only model-context reconstruction. If summarization returns no usable checkpoint, PCA does not silently fall back to lossy omission: it preserves the full currently active context when that still fits the model's hard input budget; if it cannot fit, the run fails explicitly rather than pretending history was summarized. A provider error while generating the summary also leaves durable history/checkpoint state untouched and fails normally.
 
 PCA's local token estimator cannot exactly reproduce every provider/model chat template, especially the rendered tool-schema prompt. The first request therefore uses the local estimate. When the provider reports real prompt/input tokens (for example llama.cpp/LM Studio `inputContextTokens`), PCA learns a conservative per-model calibration factor and applies it to subsequent compaction decisions. The learned factor only increases, so a provider-observed 7.1k prompt from a locally estimated 5.5k request causes a 6k trigger to compact the next request. `/context` reports this factor and the last observed provider/local token counts.
 
 Use `/context` to inspect the detected model window, output reserve, safety reserve, hard input budget, proactive trigger, post-compaction target, and token-accounting calibration. Use `/context-limit 80%` (or another percentage), `/context-limit 150000` (absolute provider-token-space trigger after calibration), and `/context-limit auto` to restore the model-aware default for the current agent. Persistent equivalents are `context.compactionTriggerPercent` and `context.compactionTriggerTokens` in settings.
 
-The UI distinguishes:
+The run status line is deliberately stable: its core slots are always visible rather than appearing and disappearing as telemetry arrives. It shows `phase`, `ctx`, `limit`, `cmp`, `cache`, `pp`, `tg`, `out`, `reason`, and `TTFT`; unavailable values render as `—` and counters render as zero. `cmp` is shown as `branch/session`, so the selected-branch count and the overall durable session compaction count are both always visible. The UI distinguishes:
 
 - estimated input/context occupancy (`~` prefix when estimated);
 - provider-reported prompt/completion/reasoning token usage when available;
@@ -1129,7 +1133,7 @@ The UI distinguishes:
 - live prompt/prefill progress when the server exposes it;
 - server-computed prompt-processing (`pp`) and generation (`tg`) token rates;
 - time to first output;
-- model-call count and context-compaction/omission information.
+- rolling-compaction count and before/after statistics.
 
 Provider-reported usage and server timings are authoritative when available. The old wall-clock completion-rate estimate remains only as a fallback and is exposed in telemetry as `clientObservedTokensPerSecond`; `tokensPerSecondSource` states whether the displayed generation rate came from the server or that fallback.
 
@@ -1411,3 +1415,10 @@ Context compaction now preserves strict chat-template system-message ordering. F
 Context compaction is now surfaced as a first-class UI event. When a request is compacted, the web transcript shows the cumulative branch compaction number, calibrated before/after input-token estimates, tokens and percentage saved, omitted-message count, and summary/protected-floor details when applicable. The run-bar telemetry shows `cmp N`; its tooltip includes the latest compaction trigger/target and statistics.
 
 Compaction counters are derived from persisted `#compaction` session entries rather than an ephemeral process counter. The current branch count therefore survives reloads and follows branch selection correctly; a separate session-wide count is retained for diagnostics. Run telemetry also records the number of actual context compactions and the latest compaction payload.
+## Iteration 080 — rolling, lossless compaction
+
+Compaction now follows the checkpoint pattern used by mature agent harnesses such as Pi and OpenCode. Durable session history and model-visible context are separate concerns: the session remains append-only and lossless, while provider context uses a persisted structured rolling summary plus a recent verbatim tail. Every rolling checkpoint records its summary, `firstKeptEntryId`, cumulative/newly summarized message counts, recent-tail size, and previous checkpoint identity. Subsequent compactions merge the prior checkpoint with only newly aged-out turns. The current user/tool turn is always protected; runtime-guidance messages no longer accidentally create a separate turn boundary.
+
+The web protocol now returns `transcriptEntries`, allowing reload to render every original message together with compaction markers without collapsing old blocks. An empty/failed summary is never treated as a successful compaction: when possible PCA sends the un-compacted active context and retries summarization later; otherwise it reports a real hard-context failure. Rolling summarization is enabled by default.
+
+The run status strip is now structurally stable and always shows all core telemetry slots: `phase · ctx · limit · cmp branch/session · cache · pp · tg · out · reason · TTFT`. Compaction notices use `summarized` terminology for rolling checkpoints and report recent messages kept verbatim plus the cumulative number represented by the summary.

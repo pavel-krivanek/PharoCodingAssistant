@@ -198,3 +198,17 @@ PharoCASession >> selectEntryId: anEntryId [
 PharoCASession >> size [
 	^ entries size
 ]
+{ #category : 'accessing' }
+PharoCASession >> messageEntriesEndingAt: anEntryId [
+	^ (self entriesEndingAt: anEntryId) select: [ :each | each isMessage ]
+]
+{ #category : 'accessing' }
+PharoCASession >> lastRollingSummaryCompactionEndingAt: anEntryId [
+	^ (self entriesEndingAt: anEntryId)
+		reversed
+		detect: [ :each |
+			each type = #compaction
+				and: [ each payload isDictionary
+				and: [ (each payload at: 'strategy' ifAbsent: [ nil ]) = 'rolling-summary-v1' ] ] ]
+		ifNone: [ nil ]
+]

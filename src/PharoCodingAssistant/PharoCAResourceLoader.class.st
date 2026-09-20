@@ -171,7 +171,7 @@ PharoCAResourceLoader >> initialize [
 		'toolTimeoutMilliseconds' -> 60000.
 		'context.safetyMarginTokens' -> nil.
 		'context.compactionEnabled' -> true.
-		'context.summarizationEnabled' -> false.
+		'context.summarizationEnabled' -> true.
 		'context.overflowRecoveryAttempts' -> 1.
 		'context.overflowSafetyMarginIncrementTokens' -> 1024.
 		'skill.discoveryCharacterBudget' -> 4000.

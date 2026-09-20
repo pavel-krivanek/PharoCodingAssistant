@@ -24,6 +24,46 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 ]
 
 { #category : 'building' }
+PharoCAContextBuilder >> buildFullContextForMessages: inputMessages tools: tools model: aModel additionalSafetyMarginTokens: additionalSafety [
+	| estimator originalMessages messages contextSize reserved safety inputBudget toolTokens totalTokens calibratedTotalTokens resultContext compactionTrigger compactionTarget |
+	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
+	estimator := aModel tokenEstimator ifNil: [ tokenEstimator ].
+	originalMessages := inputMessages asArray.
+	messages := self normalizedMessagesFrom: originalMessages.
+	contextSize := aModel contextSize.
+	reserved := policy resolvedReservedOutputTokensFor: aModel.
+	safety := (policy resolvedSafetyMarginTokensFor: aModel) + additionalSafety.
+	toolTokens := estimator estimateObject: tools.
+	totalTokens := (estimator estimateMessages: messages) + toolTokens.
+	calibratedTotalTokens := policy calibratedInputTokensForEstimate: totalTokens model: aModel.
+	inputBudget := contextSize ifNil: [ nil ] ifNotNil: [ contextSize - reserved - safety ].
+	(inputBudget notNil and: [ inputBudget <= 0 ]) ifTrue: [
+		PharoCAContextOverflow signalRequired: reserved + safety + 1 available: contextSize reason: 'output reserve and safety margin leave no room for input' ].
+	(inputBudget notNil and: [ calibratedTotalTokens > inputBudget ]) ifTrue: [
+		PharoCAContextOverflow
+			signalRequired: calibratedTotalTokens
+			available: inputBudget
+			reason: 'the un-compacted active context exceeds the model hard input budget; a successful summary is required' ].
+	compactionTrigger := policy resolvedCompactionTriggerTokensFor: aModel hardInputBudget: inputBudget.
+	compactionTarget := policy resolvedCompactionTargetTokensFor: aModel hardInputBudget: inputBudget.
+	resultContext := self
+		contextWithMessages: messages
+		estimator: estimator
+		toolTokens: toolTokens
+		contextSize: contextSize
+		inputBudget: inputBudget
+		reserved: reserved
+		safety: safety
+		omitted: originalMessages size - messages size
+		omittedMessages: #()
+		summaryUsed: false.
+	resultContext
+		compactionTriggerTokens: compactionTrigger;
+		compactionTargetTokens: compactionTarget.
+	^ resultContext
+]
+
+{ #category : 'building' }
 PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aModel summaryText: summaryText additionalSafetyMarginTokens: additionalSafety [
 	| estimator originalMessages messages contextSize reserved safety inputBudget rawInputBudget toolTokens messageTokens totalTokens calibratedTotalTokens compactionTrigger compactionTarget rawCompactionBudget messageBudget hardMessageBudget minimalResult minimumMessageTokens compactedResult finalMessages omitted omittedMessages resultContext protectedFloorUsed |
 	additionalSafety >= 0 ifFalse: [ self error: 'additionalSafetyMarginTokens must not be negative' ].
@@ -43,15 +83,19 @@ PharoCAContextBuilder >> buildForMessages: inputMessages tools: tools model: aMo
 		PharoCAContextOverflow signalRequired: reserved + safety + 1 available: contextSize reason: 'output reserve and safety margin leave no room for input' ].
 	rawInputBudget := policy rawEstimateBudgetForProviderTokens: inputBudget model: aModel.
 	compactionTrigger := policy resolvedCompactionTriggerTokensFor: aModel hardInputBudget: inputBudget.
+	compactionTarget := policy resolvedCompactionTargetTokensFor: aModel hardInputBudget: inputBudget.
 	(compactionTrigger isNil or: [ calibratedTotalTokens <= compactionTrigger ]) ifTrue: [
-		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
+		resultContext := self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false.
+		resultContext compactionTriggerTokens: compactionTrigger; compactionTargetTokens: compactionTarget.
+		^ resultContext ].
 
 	policy compactionEnabled ifFalse: [
 		(inputBudget notNil and: [ calibratedTotalTokens > inputBudget ]) ifTrue: [
 			PharoCAContextOverflow signalRequired: calibratedTotalTokens available: inputBudget reason: 'input exceeds the model budget and compaction is disabled' ].
-		^ self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false ].
+		resultContext := self contextWithMessages: messages estimator: estimator toolTokens: toolTokens contextSize: contextSize inputBudget: inputBudget reserved: reserved safety: safety omitted: originalMessages size - messages size omittedMessages: #() summaryUsed: false.
+		resultContext compactionTriggerTokens: compactionTrigger; compactionTargetTokens: compactionTarget.
+		^ resultContext ].
 
-	compactionTarget := policy resolvedCompactionTargetTokensFor: aModel hardInputBudget: inputBudget.
 	compactionTarget ifNil: [ compactionTarget := inputBudget ].
 	rawCompactionBudget := policy rawEstimateBudgetForProviderTokens: compactionTarget model: aModel.
 	messageBudget := rawCompactionBudget - toolTokens.
@@ -277,8 +321,15 @@ PharoCAContextBuilder >> turnsFrom: messages [
 	current := OrderedCollection new.
 	messages do: [ :message |
 		role := self roleOf: message.
-		(role = #user and: [ current notEmpty ]) ifTrue: [ turns add: current asArray. current := OrderedCollection new ].
+		(role = #user and: [ current notEmpty and: [ (self isRuntimeGuidanceMessage: message) not ] ]) ifTrue: [
+			turns add: current asArray.
+			current := OrderedCollection new ].
 		current add: message ].
 	current ifNotEmpty: [ turns add: current asArray ].
 	^ turns asArray
+]
+{ #category : 'private' }
+PharoCAContextBuilder >> isRuntimeGuidanceMessage: aMessage [
+	^ (self roleOf: aMessage) = #user
+		and: [ aMessage textContent beginsWith: '[Harness runtime guidance for the next assistant response only; this is not a new user request.]' ]
 ]

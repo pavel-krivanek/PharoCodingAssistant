@@ -376,3 +376,34 @@ PharoCAContextBuilderTest >> testCompactionReportsBeforeAfterAndThresholdStatist
 	self assert: context compactionTargetTokens equals: 18.
 	self assert: (context asDictionary at: 'compactionResultInputTokens') equals: context compactionResultInputTokens
 ]
+
+{ #category : 'tests-080' }
+PharoCAContextBuilderTest >> testRuntimeGuidanceRemainsInCurrentTurnForCompaction [
+	| builder turns messages |
+	builder := PharoCAContextBuilder new.
+	messages := {
+		PharoCALLMMessage user: 'old question'.
+		PharoCALLMMessage assistant: 'old answer'.
+		PharoCALLMMessage user: 'current question'.
+		PharoCALLMMessage assistant: 'current partial answer'.
+		PharoCALLMMessage user: '[Harness runtime guidance for the next assistant response only; this is not a new user request.] keep going' }.
+	turns := builder turnsFrom: messages.
+	self assert: turns size equals: 2.
+	self assert: turns second size equals: 3.
+	self assert: turns second first textContent equals: 'current question'.
+	self assert: (turns second last textContent includesSubstring: 'Harness runtime guidance')
+]
+
+{ #category : 'tests-080' }
+PharoCAContextBuilderTest >> testFullContextBuilderIgnoresSoftTriggerButEnforcesHardBudget [
+	| builder conversation model context |
+	builder := PharoCAContextBuilder new.
+	builder policy safetyMarginTokens: 0; compactionTriggerTokens: 20.
+	conversation := self conversationWithOldAndCurrentTurn.
+	model := self modelWithNoReserve.
+	model contextSize: 100000.
+	context := builder buildFullContextForMessages: conversation asArray tools: #() model: model additionalSafetyMarginTokens: 0.
+	self deny: context compacted.
+	self assert: context messages size equals: conversation asArray size.
+	self assert: context compactionTriggerTokens equals: 20
+]

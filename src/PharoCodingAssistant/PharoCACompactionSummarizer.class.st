@@ -1,5 +1,5 @@
 "
-Optional provider-backed summarizer for omitted context. It is deliberately bounded and does not expose its stream as the user's assistant response.
+Provider-backed rolling summarizer for aged-out context. It processes bounded sequential batches so every omitted message contributes to the checkpoint, and it never exposes its stream as the user's assistant response.
 "
 Class {
 	#name : 'PharoCACompactionSummarizer',
@@ -34,9 +34,9 @@ PharoCACompactionSummarizer >> boundedTranscriptFor: messages [
 { #category : 'initialization' }
 PharoCACompactionSummarizer >> initialize [
 	super initialize.
-	maximumSourceCharacters := 24000.
-	maximumSummaryCharacters := 4000.
-	maximumOutputTokens := 768
+	maximumSourceCharacters := 60000.
+	maximumSummaryCharacters := 6000.
+	maximumOutputTokens := 1024
 ]
 
 { #category : 'accessing' }
@@ -65,15 +65,89 @@ PharoCACompactionSummarizer >> maximumSummaryCharacters: anInteger [ maximumSumm
 
 { #category : 'summarizing' }
 PharoCACompactionSummarizer >> summarizeMessages: messages model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
-	| transcript prompt request response outputLimit |
-	messages isEmpty ifTrue: [ ^ '' ].
+	^ self
+		summarizeMessages: messages
+		previousSummary: nil
+		model: aModel
+		provider: aProvider
+		cancellation: aToken
+		retryDo: retryBlock
+]
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> transcriptFor: messages [
+	^ String streamContents: [ :stream |
+		messages do: [ :message |
+			stream nextPutAll: (self transcriptLineFor: message); cr ] ]
+]
+{ #category : 'private' }
+PharoCACompactionSummarizer >> clipped: aString to: maximumCharacters [
+	| text |
+	text := aString ifNil: [ '' ].
+	text size <= maximumCharacters ifTrue: [ ^ text ].
+	^ (text copyFrom: 1 to: maximumCharacters), '\n...[truncated]'
+]
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> structuredSummaryPrompt [
+	^ 'You maintain a rolling context checkpoint for a coding agent. Summarize only information needed to continue the work accurately. Merge the previous checkpoint, when present, with the newly aged-out conversation. Preserve exact class/method/file names, commands, error text, API facts, user constraints, decisions and their rationale, completed work, current partial work, blockers, and concrete next steps. Remove superseded or repetitive detail unless the fact that it changed matters. Never invent facts. Do not answer the user and do not describe the act of summarizing. Use the language of the conversation when practical.\n\nReturn exactly these sections:\n## Goal\n## Requirements and constraints\n## Key decisions\n## Completed work\n## Current state\n## Errors and blockers\n## Relevant code, files, commands and exact facts\n## Next steps'
+]
+
+{ #category : 'summarizing' }
+PharoCACompactionSummarizer >> summarizeMessages: messages previousSummary: previousSummary model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
+	| batches rollingSummary |
+	(messages isEmpty and: [ previousSummary isNil or: [ previousSummary isEmpty ] ]) ifTrue: [ ^ '' ].
+	batches := self summaryBatchesFor: messages.
+	batches isEmpty ifTrue: [ ^ previousSummary ifNil: [ '' ] ].
+	rollingSummary := previousSummary.
+	batches do: [ :batch |
+		rollingSummary := self
+			summarizeBatch: batch
+			previousSummary: rollingSummary
+			model: aModel
+			provider: aProvider
+			cancellation: aToken
+			retryDo: retryBlock.
+		rollingSummary isEmpty ifTrue: [ ^ '' ] ].
+	^ rollingSummary
+]
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> summaryBatchesFor: messages [
+	| batches current currentCharacters lineCharacters |
+	batches := OrderedCollection new.
+	current := OrderedCollection new.
+	currentCharacters := 0.
+	messages do: [ :message |
+		lineCharacters := (self transcriptLineFor: message) size + 1.
+		(current notEmpty and: [ currentCharacters + lineCharacters > maximumSourceCharacters ]) ifTrue: [
+			batches add: current asArray.
+			current := OrderedCollection new.
+			currentCharacters := 0 ].
+		current add: message.
+		currentCharacters := currentCharacters + lineCharacters ].
+	current ifNotEmpty: [ batches add: current asArray ].
+	^ batches asArray
+]
+
+{ #category : 'private' }
+PharoCACompactionSummarizer >> summarizeBatch: messages previousSummary: previousSummary model: aModel provider: aProvider cancellation: aToken retryDo: retryBlock [
+	| transcript prompt request response outputLimit source |
 	transcript := self boundedTranscriptFor: messages.
-	prompt := 'Summarize the compacted conversation history for a coding agent. Preserve user goals, constraints, decisions, code/API facts, errors, unresolved work, and tool results that matter for continuing. Do not invent facts. Be concise and factual.'.
+	prompt := self structuredSummaryPrompt.
+	source := String streamContents: [ :stream |
+		(previousSummary notNil and: [ previousSummary notEmpty ]) ifTrue: [
+			stream nextPutAll: '<previous-checkpoint>'; cr;
+				nextPutAll: previousSummary; cr;
+				nextPutAll: '</previous-checkpoint>'; cr; cr ].
+		stream nextPutAll: '<new-history>'; cr;
+			nextPutAll: transcript; cr;
+			nextPutAll: '</new-history>' ].
 	request := PharoCALLMRequest new
 		model: aModel;
 		messages: ({
 			PharoCALLMMessage role: (aModel supportsSystemMessages ifTrue: [ #system ] ifFalse: [ #user ]) content: prompt.
-			PharoCALLMMessage user: transcript
+			PharoCALLMMessage user: source
 		});
 		temperature: 0;
 		yourself.
@@ -85,16 +159,26 @@ PharoCACompactionSummarizer >> summarizeMessages: messages model: aModel provide
 ]
 
 { #category : 'private' }
-PharoCACompactionSummarizer >> transcriptFor: messages [
-	^ String streamContents: [ :stream |
-		messages do: [ :message |
-			stream nextPutAll: message role asString; nextPutAll: ': '.
-			message textContent ifNotEmpty: [ :text | stream nextPutAll: text ].
-			message toolCalls ifNotEmpty: [ :calls |
-				stream nextPutAll: ' [tool calls: '.
-				calls doWithIndex: [ :call :index |
-					index > 1 ifTrue: [ stream nextPutAll: ', ' ].
-					stream nextPutAll: call name ].
-				stream nextPut: $] ].
-			stream lf ] ]
+PharoCACompactionSummarizer >> transcriptLineFor: message [
+	| label text stream |
+	label := message role = #user
+		ifTrue: [ '[User]' ]
+		ifFalse: [ message role = #assistant
+			ifTrue: [ '[Assistant]' ]
+			ifFalse: [ message role = #tool ifTrue: [ '[Tool result]' ] ifFalse: [ '[', message role asString, ']' ] ] ].
+	text := message role = #tool
+		ifTrue: [ self clipped: message textContent to: 2000 ]
+		ifFalse: [ self clipped: message textContent to: 6000 ].
+	stream := String new writeStream.
+	stream nextPutAll: label; nextPutAll: ': '; nextPutAll: text.
+	(message role = #assistant and: [ message reasoning notEmpty ]) ifTrue: [
+		stream cr; nextPutAll: '[Assistant reasoning]: '; nextPutAll: (self clipped: message reasoning to: 1500) ].
+	message toolCalls ifNotEmpty: [ :calls |
+		stream cr; nextPutAll: '[Assistant tool calls]: '.
+		calls doWithIndex: [ :call :index |
+			index > 1 ifTrue: [ stream nextPutAll: '; ' ].
+			stream nextPutAll: call name.
+			call argumentsJSON ifNotEmpty: [ :arguments |
+				stream nextPut: $(; nextPutAll: (self clipped: arguments to: 1200); nextPut: $) ] ] ].
+	^ stream contents
 ]
