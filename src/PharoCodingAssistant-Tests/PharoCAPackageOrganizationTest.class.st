@@ -12,7 +12,7 @@ PharoCAPackageOrganizationTest >> testProductionPackageUsesClassTags [
 	package := PackageOrganizer default packageNamed: 'PharoCodingAssistant'.
 	expectedTags := #(
 		Adapters Artifacts Changes Context Core Environment Extensions Instructions LLM
-		Observability Protocol Runtime Sessions Skills Tools 'Tools-Pharo'
+		MCP Observability Protocol Runtime Sessions Skills Tools 'Tools-Pharo'
 		'Tools-Pharo-Refactoring' 'Tools-UI' 'Tools-Web' 'Tools-Workspace' UI Web Workspace).
 
 	self assert: (package classesTaggedWith: package rootTagName) isEmpty.
@@ -28,6 +28,7 @@ PharoCAPackageOrganizationTest >> testRepresentativeClassesAreInExpectedTags [
 
 	self assert: (package tagOf: PharoCAAgent) name equals: #Core.
 	self assert: (package tagOf: PharoCAOpenAIProvider) name equals: #LLM.
+	self assert: (package tagOf: PharoCAMCPService) name equals: #MCP.
 	self assert: (package tagOf: PharoCAToolCompileMethod) name equals: #'Tools-Pharo'.
 	self assert: (package tagOf: PharoCAToolRefactorRenameClass) name equals: #'Tools-Pharo-Refactoring'.
 	self assert: (package tagOf: PharoCAToolWorkspaceReadFile) name equals: #'Tools-Workspace'.
