@@ -12,7 +12,8 @@ PharoCAMCPServerTest >> testDiscoverAdvertisesCurrentProtocolAndToolsOnly [
 	server := PharoCAMCPServer default.
 	request := McpJsonRpcRequest id: 1 method: 'server/discover' params: Dictionary new.
 	result := (server dispatchRequest: request) result.
-	self assert: (result at: 'supportedVersions') equals: { MCPConstants mcpProtocolVersion }.
+	self assert: (result at: 'supportedVersions') equals: PharoCAMCPServer legacyProtocolVersions.
+	self assert: ((result at: 'supportedVersions') allSatisfy: [ :each | each isString ]).
 	self assert: ((result at: 'capabilities') includesKey: 'tools').
 	self deny: ((result at: 'capabilities') includesKey: 'resources').
 	self deny: ((result at: 'capabilities') includesKey: 'prompts')
@@ -68,4 +69,40 @@ PharoCAMCPServerTest >> testHardenedStdioStopsAtEndOfInput [
 	transport start.
 	transport waitUntilStopped.
 	self deny: transport isRunning
+]
+
+{ #category : 'tests' }
+PharoCAMCPServerTest >> testLegacyInitializeNegotiatesEachPiSupportedVersion [
+    | server request result |
+    server := PharoCAMCPServer default.
+    PharoCAMCPServer legacyProtocolVersions do: [ :version |
+        request := McpJsonRpcRequest
+            id: 100
+            method: 'initialize'
+            params: ({ 'protocolVersion' -> version. 'capabilities' -> Dictionary new } asDictionary).
+        result := (server dispatchRequest: request) result.
+        self assert: (result at: 'protocolVersion') equals: version.
+        self assert: (result at: 'protocolVersion') isString.
+        self assert: ((result at: 'capabilities') includesKey: 'tools') ]
+]
+
+{ #category : 'tests' }
+PharoCAMCPServerTest >> testLegacyInitializeRejectsUnknownVersionAsNegotiatedFallback [
+    | server request result |
+    server := PharoCAMCPServer default.
+    request := McpJsonRpcRequest
+        id: 101
+        method: 'initialize'
+        params: ({ 'protocolVersion' -> '2099-01-01' } asDictionary).
+    result := (server dispatchRequest: request) result.
+    self assert: (result at: 'protocolVersion') equals: PharoCAMCPServer preferredLegacyProtocolVersion.
+    self assert: (result at: 'protocolVersion') isString
+]
+
+{ #category : 'tests' }
+PharoCAMCPServerTest >> testUpstreamProtocolConstantsAreInitializedForErrorResponses [
+    PharoCAMCPServer default.
+    self assert: MCPConstants mcpProtocolVersion equals: '2025-03-26'.
+    self assert: MCPConstants errorCodeInvalidParams equals: -32602.
+    self assert: MCPConstants errorCodeMethodNotFound equals: -32601
 ]

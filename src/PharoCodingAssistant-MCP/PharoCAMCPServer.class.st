@@ -1,4 +1,4 @@
-"MCP protocol facade over the live PCA tool service. The wire/protocol machinery is inherited from pharo-mcp; PCA remains responsible for tool policy and execution."
+"MCP protocol facade over the live PCA tool service. PCA negotiates handshake-era versions explicitly; pharo-mcp supplies the legacy request and transport classes."
 Class {
 	#name : 'PharoCAMCPServer',
 	#superclass : 'McpServer',
@@ -11,6 +11,18 @@ Class {
 	#package : 'PharoCodingAssistant-MCP',
 	#tag : 'Server'
 }
+
+
+{ #category : 'protocol versions' }
+PharoCAMCPServer class >> legacyProtocolVersions [
+    "Handshake-era MCP versions supported by PCA's JSON-RPC tool facade. Keep this list independent of pharo-mcp's class-side initialization state."
+    ^ #('2024-11-05' '2025-03-26' '2025-06-18' '2025-11-25')
+]
+
+{ #category : 'protocol versions' }
+PharoCAMCPServer class >> preferredLegacyProtocolVersion [
+    ^ '2025-11-25'
+]
 
 { #category : 'instance creation' }
 PharoCAMCPServer class >> default [
@@ -41,7 +53,7 @@ PharoCAMCPServer >> handleServerDiscover: aRequest [
 		yourself.
 	result := OrderedDictionary new
 		at: 'resultType' put: 'complete';
-		at: 'supportedVersions' put: { MCPConstants mcpProtocolVersion };
+		at: 'supportedVersions' put: self class legacyProtocolVersions;
 		at: 'capabilities' put: self capabilities asDictionary;
 		at: '_meta' put: metadata;
 		at: 'instructions' put: 'PCA exposes live Pharo coding tools. Tool availability is controlled by the PCA MCP session profile, active packs, and workspace policy.';
@@ -49,6 +61,28 @@ PharoCAMCPServer >> handleServerDiscover: aRequest [
 		at: 'cacheScope' put: 'private';
 		yourself.
 	^ McpJsonRpcResponse id: aRequest id result: result
+]
+
+{ #category : 'handler' }
+PharoCAMCPServer >> handleInitialize: aRequest [
+    "Negotiate a string version, even when the upstream MCPConstants pool was not initialized. Unlike pharo-mcp's default initialize handler, this also preserves the requested version when it is one of PCA's supported handshake-era versions."
+    | params requestedVersion negotiatedVersion result |
+    params := aRequest params.
+    requestedVersion := params isDictionary
+        ifTrue: [ params at: 'protocolVersion' ifAbsent: [ nil ] ]
+        ifFalse: [ nil ].
+    negotiatedVersion := (requestedVersion isString and: [ self class legacyProtocolVersions includes: requestedVersion ])
+        ifTrue: [ requestedVersion ]
+        ifFalse: [ self class preferredLegacyProtocolVersion ].
+    result := OrderedDictionary new
+        at: 'protocolVersion' put: negotiatedVersion;
+        at: 'capabilities' put: self capabilities asDictionary;
+        at: 'serverInfo' put: (OrderedDictionary new
+            at: 'name' put: self name;
+            at: 'version' put: self version;
+            yourself);
+        yourself.
+    ^ McpJsonRpcResponse id: aRequest id result: result
 ]
 
 { #category : 'handler' }
@@ -120,6 +154,10 @@ PharoCAMCPServer >> handleNotification: aNotification [
 
 { #category : 'initialization' }
 PharoCAMCPServer >> initialize [
+	"pharo-mcp stores its constants in class-instance variables. In some images its class-side initialize was never run after loading, leaving protocol versions and JSON-RPC error codes nil."
+	(MCPConstants mcpProtocolVersion isNil or: [
+		MCPConstants errorCodeInvalidParams isNil or: [ MCPConstants errorCodeMethodNotFound isNil ] ])
+		ifTrue: [ MCPConstants initialize ].
 	super initialize.
 	inFlightTokens := Dictionary new.
 	inFlightMutex := Semaphore forMutualExclusion.

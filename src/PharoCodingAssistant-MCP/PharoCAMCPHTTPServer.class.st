@@ -1,4 +1,4 @@
-"Zinc HTTP binding for PCA MCP tools. The endpoint is dual-era: handshake-era MCP 2025-03-26 requests are delegated to the reused pharo-mcp server, while MCP 2026-07-28 requests use PCA's stateless protocol adapter. The server binds to loopback by default but can be explicitly bound to another interface for sandbox/container clients."
+"Zinc HTTP binding for PCA MCP tools. The endpoint is dual-era: handshake-era MCP 2024-11-05 through 2025-11-25 requests are delegated to the reused pharo-mcp server, while MCP 2026-07-28 requests use PCA's stateless protocol adapter. The server binds to loopback by default but can be explicitly bound to another interface for sandbox/container clients."
 Class {
 	#name : 'PharoCAMCPHTTPServer',
 	#superclass : 'Object',
@@ -216,7 +216,17 @@ PharoCAMCPHTTPServer >> jsonResponse: responseObject status: statusCode [
 
 { #category : 'accessing' }
 PharoCAMCPHTTPServer >> legacyProtocolVersion [
-	^ MCPConstants mcpProtocolVersion
+	^ PharoCAMCPServer preferredLegacyProtocolVersion
+]
+
+{ #category : 'accessing' }
+PharoCAMCPHTTPServer >> supportedLegacyProtocolVersions [
+	^ PharoCAMCPServer legacyProtocolVersions
+]
+
+{ #category : 'accessing' }
+PharoCAMCPHTTPServer >> supportedProtocolVersions [
+	^ self supportedLegacyProtocolVersions , { PharoCAMCP2026Protocol protocolVersion }
 ]
 
 { #category : 'accessing' }
@@ -256,16 +266,16 @@ PharoCAMCPHTTPServer >> protocolEraFor: message request: request [
 	headerVersion := self header: 'MCP-Protocol-Version' from: request.
 	bodyVersion := self currentProtocolVersionFrom: message.
 	method = 'initialize' ifTrue: [
-		(headerVersion isNil or: [ headerVersion = self legacyProtocolVersion ]) ifTrue: [ ^ #legacy ].
+		(headerVersion isNil or: [ self supportedLegacyProtocolVersions includes: headerVersion ]) ifTrue: [ ^ #legacy ].
 		^ #unsupported ].
 	"A current request body is authoritative enough to enter the current validator, which then reports header/body mismatches precisely."
 	bodyVersion = PharoCAMCP2026Protocol protocolVersion ifTrue: [ ^ #current ].
-	bodyVersion = self legacyProtocolVersion ifTrue: [ ^ #legacy ].
+	(self supportedLegacyProtocolVersions includes: bodyVersion) ifTrue: [ ^ #legacy ].
 	headerVersion = PharoCAMCP2026Protocol protocolVersion ifTrue: [ ^ #current ].
-	headerVersion = self legacyProtocolVersion ifTrue: [ ^ #legacy ].
+	(self supportedLegacyProtocolVersions includes: headerVersion) ifTrue: [ ^ #legacy ].
 	headerVersion ifNotNil: [ ^ #unsupported ].
 	bodyVersion ifNotNil: [ ^ #unsupported ].
-	"Handshake-era Streamable HTTP did not require MCP-Protocol-Version on initialize and 2025-03-26 is the compatibility default when the server has no other version signal."
+	"Handshake-era Streamable HTTP did not require MCP-Protocol-Version on initialize and PCA negotiates a supported version when the server has no other version signal."
 	^ #legacy
 ]
 
@@ -325,7 +335,7 @@ PharoCAMCPHTTPServer >> statusDictionary [
 		at: 'url' put: (self isRunning ifTrue: [ self url ] ifFalse: [ nil ]);
 		at: 'profile' put: self service registry profile name;
 		at: 'workspace' put: (workspace ifNil: [ nil ] ifNotNil: [ workspace asDictionary ]);
-		at: 'supportedProtocolVersions' put: { self legacyProtocolVersion. PharoCAMCP2026Protocol protocolVersion };
+		at: 'supportedProtocolVersions' put: self supportedProtocolVersions;
 		yourself
 ]
 
@@ -361,7 +371,7 @@ PharoCAMCPHTTPServer >> unsupportedProtocolResponseFor: message request: request
 			message: 'Unsupported MCP protocol version'
 			data: (OrderedDictionary new
 				at: 'requestedVersion' put: version;
-				at: 'supportedVersions' put: { self legacyProtocolVersion. PharoCAMCP2026Protocol protocolVersion };
+				at: 'supportedVersions' put: self supportedProtocolVersions;
 				yourself))
 		status: 400
 ]
@@ -441,11 +451,11 @@ PharoCAMCPHTTPServer >> validateLegacyHTTPHeadersOf: request forMessage: message
 	validation := self validateAcceptHeaderOf: request requestId: requestId.
 	validation ifNotNil: [ ^ validation ].
 	version := self header: 'MCP-Protocol-Version' from: request.
-	(version notNil and: [ version ~= self legacyProtocolVersion ]) ifTrue: [
+	(version notNil and: [ (self supportedLegacyProtocolVersions includes: version) not ]) ifTrue: [
 		^ protocol
 			errorResponseId: requestId
 			code: -32022
 			message: 'Unsupported MCP protocol version'
-			data: (OrderedDictionary new at: 'supportedVersions' put: { self legacyProtocolVersion. PharoCAMCP2026Protocol protocolVersion }; yourself) ].
+			data: (OrderedDictionary new at: 'supportedVersions' put: self supportedProtocolVersions; yourself) ].
 	^ nil
 ]

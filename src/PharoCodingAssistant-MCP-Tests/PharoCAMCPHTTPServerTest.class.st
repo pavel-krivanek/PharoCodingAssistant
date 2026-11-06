@@ -182,7 +182,7 @@ PharoCAMCPHTTPServerTest >> testLegacyInitializeHandshakeUses2025Protocol [
 	response := server handleRequest: request.
 	self assert: response status equals: 200.
 	result := (self responseObject: response) at: 'result'.
-	self assert: (result at: 'protocolVersion') equals: MCPConstants mcpProtocolVersion.
+	self assert: (result at: 'protocolVersion') equals: '2025-03-26'.
 	self assert: ((result at: 'capabilities') includesKey: 'tools')
 ]
 
@@ -196,7 +196,7 @@ PharoCAMCPHTTPServerTest >> testLegacyInitializedNotificationAndToolsListShareEn
 		at: 'params' put: Dictionary new;
 		yourself.
 	request := self legacyRequestFor: notification.
-	request headers at: 'MCP-Protocol-Version' put: MCPConstants mcpProtocolVersion.
+	request headers at: 'MCP-Protocol-Version' put: '2025-03-26'.
 	response := server handleRequest: request.
 	self assert: response status equals: 202.
 	message := OrderedDictionary new
@@ -206,7 +206,7 @@ PharoCAMCPHTTPServerTest >> testLegacyInitializedNotificationAndToolsListShareEn
 		at: 'params' put: Dictionary new;
 		yourself.
 	request := self legacyRequestFor: message.
-	request headers at: 'MCP-Protocol-Version' put: MCPConstants mcpProtocolVersion.
+	request headers at: 'MCP-Protocol-Version' put: '2025-03-26'.
 	response := server handleRequest: request.
 	self assert: response status equals: 200.
 	result := (self responseObject: response) at: 'result'.
@@ -224,7 +224,7 @@ PharoCAMCPHTTPServerTest >> testLegacyToolsCallExecutesPCARegistry [
 		at: 'params' put: { 'name' -> 'evaluate_and_print'. 'arguments' -> { 'code' -> '7 * 6' } asDictionary } asDictionary;
 		yourself.
 	request := self legacyRequestFor: message.
-	request headers at: 'MCP-Protocol-Version' put: MCPConstants mcpProtocolVersion.
+	request headers at: 'MCP-Protocol-Version' put: '2025-03-26'.
 	response := server handleRequest: request.
 	self assert: response status equals: 200.
 	result := (self responseObject: response) at: 'result'.
@@ -252,7 +252,8 @@ PharoCAMCPHTTPServerTest >> testWorkspaceCurrentLifecycleAndStatus [
 		status := PharoCAMCPHTTPServer currentStatus.
 		self assert: (status at: 'running').
 		self assert: (status at: 'bindingHost') equals: '127.0.0.1'.
-		self assert: (status at: 'supportedProtocolVersions') size equals: 2.
+		self assert: (status at: 'supportedProtocolVersions') size equals: 5.
+		self assert: ((status at: 'supportedProtocolVersions') allSatisfy: [ :each | each isString ]).
 		server stop.
 		self assert: PharoCAMCPHTTPServer current isNil.
 		self deny: (PharoCAMCPHTTPServer currentStatus at: 'running')
@@ -265,7 +266,7 @@ PharoCAMCPHTTPServerTest >> testCurrentHeaderAndBodyVersionConflictIsRejected [
 	server := PharoCAMCPHTTPServer default.
 	message := self currentMessageId: 23 method: 'tools/list' params: Dictionary new.
 	request := self requestFor: message.
-	request headers at: 'MCP-Protocol-Version' put: MCPConstants mcpProtocolVersion.
+	request headers at: 'MCP-Protocol-Version' put: '2025-03-26'.
 	response := server handleRequest: request.
 	self assert: response status equals: 400.
 	self assert: (((self responseObject: response) at: 'error') at: 'code') equals: -32020
@@ -287,7 +288,7 @@ PharoCAMCPHTTPServerTest >> testRealLegacyRoundTripOnWildcardBinding [
 			post.
 		self assert: client response code equals: 200.
 		object := STONJSON fromString: client response entity contents.
-		self assert: ((object at: 'result') at: 'protocolVersion') equals: MCPConstants mcpProtocolVersion.
+		self assert: ((object at: 'result') at: 'protocolVersion') equals: '2025-03-26'.
 		message := OrderedDictionary new
 			at: 'jsonrpc' put: '2.0';
 			at: 'id' put: 31;
@@ -298,7 +299,7 @@ PharoCAMCPHTTPServerTest >> testRealLegacyRoundTripOnWildcardBinding [
 		client
 			url: endpoint;
 			headerAt: 'Accept' put: 'application/json, text/event-stream';
-			headerAt: 'MCP-Protocol-Version' put: MCPConstants mcpProtocolVersion;
+			headerAt: 'MCP-Protocol-Version' put: '2025-03-26';
 			entity: (ZnEntity json: body);
 			post.
 		self assert: client response code equals: 200.
@@ -306,4 +307,103 @@ PharoCAMCPHTTPServerTest >> testRealLegacyRoundTripOnWildcardBinding [
 		self assert: ((((object at: 'result') at: 'structuredContent') at: 'ok')).
 		self assert: (((((object at: 'result') at: 'content') first) at: 'text') includesSubstring: '42')
 	] ensure: [ client close. server stop ]
+]
+
+{ #category : 'tests' }
+PharoCAMCPHTTPServerTest >> testInitializeWithPiVersionAndHeaderWorks [
+    | server message request response result |
+    server := PharoCAMCPHTTPServer default.
+    message := self legacyInitializeMessageId: 40.
+    (message at: 'params') at: 'protocolVersion' put: '2025-11-25'.
+    request := self legacyRequestFor: message.
+    request headers at: 'MCP-Protocol-Version' put: '2025-11-25'.
+    response := server handleRequest: request.
+    self assert: response status equals: 200.
+    result := (self responseObject: response) at: 'result'.
+    self assert: (result at: 'protocolVersion') equals: '2025-11-25'.
+    self assert: ((result at: 'serverInfo') at: 'name') equals: 'pharo-coding-assistant'
+]
+
+{ #category : 'tests' }
+PharoCAMCPHTTPServerTest >> testLegacyToolCallsAllowPiProtocolVersionHeader [
+    | server message request response result |
+    server := PharoCAMCPHTTPServer default.
+    message := OrderedDictionary new
+        at: 'jsonrpc' put: '2.0';
+        at: 'id' put: 41;
+        at: 'method' put: 'tools/list';
+        at: 'params' put: Dictionary new;
+        yourself.
+    request := self legacyRequestFor: message.
+    request headers at: 'MCP-Protocol-Version' put: '2025-11-25'.
+    response := server handleRequest: request.
+    self assert: response status equals: 200.
+    result := (self responseObject: response) at: 'result'.
+    self assert: (result at: 'tools') isNotEmpty.
+    message at: 'method' put: 'tools/call'.
+    message at: 'id' put: 42.
+    message at: 'params' put: { 'name' -> 'check_code'. 'arguments' -> { 'code' -> '1 + 1' } asDictionary } asDictionary.
+    request := self legacyRequestFor: message.
+    request headers at: 'MCP-Protocol-Version' put: '2025-11-25'.
+    response := server handleRequest: request.
+    self assert: response status equals: 200.
+    result := (self responseObject: response) at: 'result'.
+    self assert: ((result at: 'structuredContent') at: 'valid')
+]
+
+{ #category : 'tests' }
+PharoCAMCPHTTPServerTest >> testRejectUnsupportedLegacyHeaderWithoutNullVersions [
+    | server message request response versions |
+    server := PharoCAMCPHTTPServer default.
+    message := self legacyInitializeMessageId: 43.
+    request := self legacyRequestFor: message.
+    request headers at: 'MCP-Protocol-Version' put: '2099-01-01'.
+    response := server handleRequest: request.
+    self assert: response status equals: 400.
+    self assert: (((self responseObject: response) at: 'error') at: 'code') equals: -32022.
+    versions := ((((self responseObject: response) at: 'error') at: 'data') at: 'supportedVersions').
+    self assert: versions size equals: 5.
+    self assert: (versions allSatisfy: [ :version | version isString ]).
+    self assert: (versions includes: '2025-11-25').
+    self assert: (versions includes: '2026-07-28')
+]
+
+{ #category : 'tests' }
+PharoCAMCPHTTPServerTest >> testRealPiStyleHandshakeAndToolCallOverZinc [
+    | server client endpoint message object |
+    server := PharoCAMCPHTTPServer default startOn: 0.
+    [
+        endpoint := server url.
+        message := self legacyInitializeMessageId: 44.
+        (message at: 'params') at: 'protocolVersion' put: '2025-11-25'.
+        client := ZnClient new.
+        [
+            client
+                url: endpoint;
+                headerAt: 'Accept' put: 'application/json, text/event-stream';
+                entity: (ZnEntity json: (STONJSON toString: message));
+                post.
+            self assert: client response code equals: 200.
+            object := STONJSON fromString: client response entity contents.
+            self assert: ((object at: 'result') at: 'protocolVersion') equals: '2025-11-25'
+        ] ensure: [ client close ].
+        message := OrderedDictionary new
+            at: 'jsonrpc' put: '2.0';
+            at: 'id' put: 45;
+            at: 'method' put: 'tools/call';
+            at: 'params' put: { 'name' -> 'check_code'. 'arguments' -> { 'code' -> '1 + 1' } asDictionary } asDictionary;
+            yourself.
+        client := ZnClient new.
+        [
+            client
+                url: endpoint;
+                headerAt: 'Accept' put: 'application/json, text/event-stream';
+                headerAt: 'MCP-Protocol-Version' put: '2025-11-25';
+                entity: (ZnEntity json: (STONJSON toString: message));
+                post.
+            self assert: client response code equals: 200.
+            object := STONJSON fromString: client response entity contents.
+            self assert: (((object at: 'result') at: 'structuredContent') at: 'valid')
+        ] ensure: [ client close ]
+    ] ensure: [ server stop ]
 ]
