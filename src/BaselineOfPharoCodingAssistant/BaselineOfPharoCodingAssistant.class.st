@@ -26,13 +26,10 @@ BaselineOfPharoCodingAssistant >> baseline: spec [
 		spec
 			package: 'PharoCodingAssistant-Benchmarks-Tests'
 			with: [ spec requires: #( 'PharoCodingAssistant-Benchmarks' ) ].
-
 		spec
-			baseline: 'LLMPharoMCP'
-			with: [
-				spec
-					repository: 'github://pharo-llm/pharo-mcp:main/src';
-					loads: #( 'Core' ) ].
+			package: 'LLM-Pharo-MCP'
+			with: [ spec requires: #( 'Core' ) ].
+
 		spec
 			package: 'PharoCodingAssistant-MCP'
 			with: [ spec requires: #( 'PharoCodingAssistant' 'LLMPharoMCP' ) ].
@@ -50,5 +47,5 @@ BaselineOfPharoCodingAssistant >> baseline: spec [
 			group: 'MCP' with: #( 'PharoCodingAssistant-MCP' );
 			group: 'MCPTests' with: #( 'PharoCodingAssistant-MCP-Tests' );
 			group: 'MCPDevelopment' with: #( 'Development' 'MCPTests' );
-			group: 'default' with: #( 'Core' ) ]
+			group: 'default' with: #( 'MCP' ) ]
 ]
