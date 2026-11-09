@@ -32,7 +32,7 @@ BaselineOfPharoCodingAssistant >> baseline: spec [
 
 		spec
 			package: 'PharoCodingAssistant-MCP'
-			with: [ spec requires: #( 'PharoCodingAssistant' 'LLMPharoMCP' ) ].
+			with: [ spec requires: #( 'PharoCodingAssistant' 'LLM-Pharo-MCP' ) ].
 		spec
 			package: 'PharoCodingAssistant-MCP-Tests'
 			with: [ spec requires: #( 'PharoCodingAssistant-MCP' 'PharoCodingAssistant-Tests' ) ].
